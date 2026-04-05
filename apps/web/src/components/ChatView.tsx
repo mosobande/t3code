@@ -4254,7 +4254,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
                           selectedProfileId={selectedProfileId}
                           onProfileChange={(profileId) => setSelectedProfileId(profileId)}
                           onAddProfile={(provider) => {
-                            window.location.href = `/settings?panel=provider-profiles&provider=${provider}`;
+                            window.location.href = `/settings/provider-profiles?provider=${provider}`;
                           }}
                         />
 
