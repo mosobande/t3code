@@ -38,6 +38,14 @@ import {
   observeRpcStreamEffect,
 } from "./observability/RpcInstrumentation";
 import { ProviderRegistry } from "./provider/Services/ProviderRegistry";
+import {
+  createProfile,
+  deleteProfile,
+  getProfiles,
+  renameProfile,
+  setDefaultProfile,
+  updateProfile,
+} from "./providerSettings";
 import { ServerLifecycleEvents } from "./serverLifecycleEvents";
 import { ServerRuntimeStartup } from "./serverRuntimeStartup";
 import { ServerSettingsService } from "./serverSettings";
@@ -707,6 +715,43 @@ const WsRpcLayer = WsRpcGroup.toLayer(
             return Stream.concat(Stream.fromIterable(snapshotEvents), liveEvents);
           }),
           { "rpc.aggregate": "server" },
+        ),
+      // Provider profile handlers
+      [WS_METHODS.profileGetAll]: (_input) =>
+        observeRpcEffect(
+          WS_METHODS.profileGetAll,
+          Effect.promise(() => getProfiles()),
+          { "rpc.aggregate": "profiles" },
+        ),
+      [WS_METHODS.profileCreate]: ({ profile }) =>
+        observeRpcEffect(
+          WS_METHODS.profileCreate,
+          Effect.promise(() => createProfile(profile)),
+          { "rpc.aggregate": "profiles" },
+        ),
+      [WS_METHODS.profileUpdate]: ({ id, patch }) =>
+        observeRpcEffect(
+          WS_METHODS.profileUpdate,
+          Effect.promise(() => updateProfile(id, patch)),
+          { "rpc.aggregate": "profiles" },
+        ),
+      [WS_METHODS.profileRename]: ({ id, name }) =>
+        observeRpcEffect(
+          WS_METHODS.profileRename,
+          Effect.promise(() => renameProfile(id, name)),
+          { "rpc.aggregate": "profiles" },
+        ),
+      [WS_METHODS.profileDelete]: ({ id }) =>
+        observeRpcEffect(
+          WS_METHODS.profileDelete,
+          Effect.promise(() => deleteProfile(id)),
+          { "rpc.aggregate": "profiles" },
+        ),
+      [WS_METHODS.profileSetDefault]: ({ id }) =>
+        observeRpcEffect(
+          WS_METHODS.profileSetDefault,
+          Effect.promise(() => setDefaultProfile(id)),
+          { "rpc.aggregate": "profiles" },
         ),
     });
   }),

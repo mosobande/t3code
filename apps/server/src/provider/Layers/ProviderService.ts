@@ -14,6 +14,7 @@ import {
   NonNegativeInt,
   ThreadId,
   ProviderInterruptTurnInput,
+  ProviderProfile,
   ProviderRespondToRequestInput,
   ProviderRespondToUserInputInput,
   ProviderSendTurnInput,
@@ -326,22 +327,54 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
             ),
           ),
         );
-        if (!settings.providers[input.provider].enabled) {
+
+        // Resolve profile if profileId is provided
+        let effectiveProvider = input.provider;
+        let effectiveModel: string | undefined;
+        let customEndpoint: ProviderProfile["customEndpoint"] = null;
+
+        if (input.profileId !== undefined && input.profileId !== null) {
+          const profile = settings.providerProfiles.find((p) => p.id === input.profileId);
+          if (!profile) {
+            return yield* toValidationError(
+              "ProviderService.startSession",
+              `Profile '${input.profileId}' not found.`,
+            );
+          }
+          effectiveProvider = profile.provider;
+          effectiveModel = profile.model;
+          customEndpoint = profile.customEndpoint;
+        }
+
+        if (!settings.providers[effectiveProvider].enabled) {
           return yield* toValidationError(
             "ProviderService.startSession",
-            `Provider '${input.provider}' is disabled in T3 Code settings.`,
+            `Provider '${effectiveProvider}' is disabled in T3 Code settings.`,
           );
         }
         const persistedBinding = Option.getOrUndefined(yield* directory.getBinding(threadId));
         const effectiveResumeCursor =
           input.resumeCursor ??
-          (persistedBinding?.provider === input.provider
+          (persistedBinding?.provider === effectiveProvider
             ? persistedBinding.resumeCursor
             : undefined);
-        const adapter = yield* registry.getByProvider(input.provider);
+        const adapter = yield* registry.getByProvider(effectiveProvider);
+
+        // Build effective modelSelection from profile if profileId was provided
+        const effectiveModelSelection = effectiveModel
+          ? {
+              provider: effectiveProvider,
+              model: effectiveModel,
+              options: input.modelSelection?.options,
+            }
+          : input.modelSelection;
+
         const session = yield* adapter.startSession({
           ...input,
+          provider: effectiveProvider,
+          modelSelection: effectiveModelSelection,
           ...(effectiveResumeCursor !== undefined ? { resumeCursor: effectiveResumeCursor } : {}),
+          customEndpoint,
         });
 
         if (session.provider !== adapter.provider) {
