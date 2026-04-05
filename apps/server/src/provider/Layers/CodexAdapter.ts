@@ -1417,6 +1417,7 @@ const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
         ...(input.modelSelection?.provider === "codex" && input.modelSelection.options?.fastMode
           ? { serviceTier: "fast" }
           : {}),
+        ...(input.customEndpoint !== undefined ? { customEndpoint: input.customEndpoint } : {}),
       };
 
       return yield* Effect.tryPromise({

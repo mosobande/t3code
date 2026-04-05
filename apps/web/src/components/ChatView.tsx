@@ -156,6 +156,7 @@ import { ChatHeader } from "./chat/ChatHeader";
 import { ContextWindowMeter } from "./chat/ContextWindowMeter";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { AVAILABLE_PROVIDER_OPTIONS, ProviderModelPicker } from "./chat/ProviderModelPicker";
+import { useProviderProfilesStore } from "~/store/providerProfilesStore";
 import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
 import { ComposerPendingApprovalActions } from "./chat/ComposerPendingApprovalActions";
 import { CompactComposerControlsMenu } from "./chat/CompactComposerControlsMenu";
@@ -691,6 +692,12 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const [composerCursor, setComposerCursor] = useState(() =>
     collapseExpandedComposerCursor(prompt, prompt.length),
   );
+  const { profiles, fetchProfiles } = useProviderProfilesStore();
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, [fetchProfiles]);
   const [composerTrigger, setComposerTrigger] = useState<ComposerTrigger | null>(() =>
     detectComposerTrigger(prompt, prompt.length),
   );
@@ -4244,6 +4251,12 @@ export default function ChatView({ threadId }: ChatViewProps) {
                               }
                             : {})}
                           onProviderModelChange={onProviderModelSelect}
+                          profiles={profiles}
+                          selectedProfileId={selectedProfileId}
+                          onProfileChange={(profileId) => setSelectedProfileId(profileId)}
+                          onAddProfile={(provider) => {
+                            window.location.href = `/settings/provider-profiles?provider=${provider}`;
+                          }}
                         />
 
                         {isComposerFooterCompact ? (

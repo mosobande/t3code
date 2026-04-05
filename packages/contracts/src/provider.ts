@@ -22,6 +22,7 @@ import {
   ProviderUserInputAnswers,
   RuntimeMode,
 } from "./orchestration";
+import { ProviderProfileId, CustomEndpointConfig } from "./settings";
 
 const ProviderSessionStatus = Schema.Literals([
   "connecting",
@@ -55,6 +56,8 @@ export const ProviderSessionStartInput = Schema.Struct({
   approvalPolicy: Schema.optional(ProviderApprovalPolicy),
   sandboxMode: Schema.optional(ProviderSandboxMode),
   runtimeMode: RuntimeMode,
+  profileId: Schema.optional(Schema.NullOr(ProviderProfileId)),
+  customEndpoint: Schema.optional(Schema.NullOr(CustomEndpointConfig)),
 });
 export type ProviderSessionStartInput = typeof ProviderSessionStartInput.Type;
 

@@ -1,13 +1,15 @@
 import { Effect } from "effect";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
-import { TrimmedNonEmptyString, TrimmedString } from "./baseSchemas";
+import { IsoDateTime, TrimmedNonEmptyString, TrimmedString } from "./baseSchemas";
+// Re-export for external consumers
+export { TrimmedNonEmptyString, TrimmedString } from "./baseSchemas";
 import {
   ClaudeModelOptions,
   CodexModelOptions,
   DEFAULT_GIT_TEXT_GENERATION_MODEL_BY_PROVIDER,
 } from "./model";
-import { ModelSelection } from "./orchestration";
+import { ModelSelection, ProviderKind } from "./orchestration";
 
 // ── Client Settings (local-only) ───────────────────────────────
 
@@ -77,6 +79,86 @@ export const ObservabilitySettings = Schema.Struct({
 });
 export type ObservabilitySettings = typeof ObservabilitySettings.Type;
 
+// ── Provider Profiles ──────────────────────────────────────────────
+
+// ULID-based profile identifier
+export const ProviderProfileId = TrimmedNonEmptyString;
+export type ProviderProfileId = typeof ProviderProfileId.Type;
+
+// Custom endpoint config (null = no custom endpoint)
+export const CustomEndpointConfig = Schema.Struct({
+  baseUrl: TrimmedNonEmptyString,
+  apiKey: TrimmedNonEmptyString,
+});
+export type CustomEndpointConfig = typeof CustomEndpointConfig.Type;
+
+// Migration version marker
+export const ProviderProfilesMigration = Schema.Struct({
+  version: Schema.Literal(1),
+  performedAt: IsoDateTime,
+});
+export type ProviderProfilesMigration = typeof ProviderProfilesMigration.Type;
+
+// Provider profile schema
+export const CodexProfileOptions = Schema.Struct({
+  provider: Schema.Literal("codex"),
+  codex: CodexModelOptions,
+});
+export const ClaudeProfileOptions = Schema.Struct({
+  provider: Schema.Literal("claudeAgent"),
+  claudeAgent: ClaudeModelOptions,
+});
+
+export const ProviderProfile = Schema.Struct({
+  id: ProviderProfileId,
+  name: TrimmedNonEmptyString,
+  provider: ProviderKind,
+  model: TrimmedNonEmptyString,
+  options: Schema.Union([CodexProfileOptions, ClaudeProfileOptions]),
+  customEndpoint: Schema.NullOr(CustomEndpointConfig),
+  isDefault: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),
+  description: Schema.optional(TrimmedString.pipe(Schema.withDecodingDefault(() => ""))),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+export type ProviderProfile = typeof ProviderProfile.Type;
+
+// Input for profile creation — all ProviderProfile fields except auto-generated ones
+export const ProviderProfileCreateInput = Schema.Struct({
+  name: TrimmedNonEmptyString,
+  provider: ProviderKind,
+  model: TrimmedNonEmptyString,
+  options: Schema.Union([CodexProfileOptions, ClaudeProfileOptions]),
+  customEndpoint: Schema.NullOr(CustomEndpointConfig),
+  isDefault: Schema.optional(Schema.Boolean),
+  description: Schema.optional(TrimmedString),
+});
+
+// Provider profile patch schema
+const CodexProfileOptionsPatch = Schema.Struct({
+  provider: Schema.Literal("codex"),
+  codex: Schema.optional(CodexModelOptions),
+});
+const ClaudeProfileOptionsPatch = Schema.Struct({
+  provider: Schema.Literal("claudeAgent"),
+  claudeAgent: Schema.optional(ClaudeModelOptions),
+});
+
+const CustomEndpointConfigPatch = Schema.Struct({
+  baseUrl: Schema.optionalKey(TrimmedString),
+  apiKey: Schema.optionalKey(TrimmedString),
+});
+
+export const ProviderProfilePatch = Schema.Struct({
+  name: Schema.optionalKey(TrimmedNonEmptyString),
+  model: Schema.optionalKey(TrimmedNonEmptyString),
+  options: Schema.optionalKey(Schema.Union([CodexProfileOptionsPatch, ClaudeProfileOptionsPatch])),
+  customEndpoint: Schema.optionalKey(Schema.NullOr(CustomEndpointConfigPatch)),
+  isDefault: Schema.optionalKey(Schema.Boolean),
+  description: Schema.optionalKey(TrimmedString),
+});
+export type ProviderProfilePatch = typeof ProviderProfilePatch.Type;
+
 export const ServerSettings = Schema.Struct({
   enableAssistantStreaming: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),
   defaultThreadEnvMode: ThreadEnvMode.pipe(
@@ -95,6 +177,12 @@ export const ServerSettings = Schema.Struct({
     claudeAgent: ClaudeSettings.pipe(Schema.withDecodingDefault(() => ({}))),
   }).pipe(Schema.withDecodingDefault(() => ({}))),
   observability: ObservabilitySettings.pipe(Schema.withDecodingDefault(() => ({}))),
+
+  // Provider profiles
+  providerProfiles: Schema.Array(ProviderProfile).pipe(
+    Schema.withDecodingDefault(() => []),
+  ),
+  _providerProfilesMigration: Schema.optional(ProviderProfilesMigration),
 });
 export type ServerSettings = typeof ServerSettings.Type;
 
@@ -177,5 +265,6 @@ export const ServerSettingsPatch = Schema.Struct({
       claudeAgent: Schema.optionalKey(ClaudeSettingsPatch),
     }),
   ),
+  providerProfiles: Schema.optionalKey(Schema.Array(ProviderProfile)),
 });
 export type ServerSettingsPatch = typeof ServerSettingsPatch.Type;

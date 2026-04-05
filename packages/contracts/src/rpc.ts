@@ -69,6 +69,12 @@ import {
   ServerUpsertKeybindingResult,
 } from "./server";
 import { ServerSettings, ServerSettingsError, ServerSettingsPatch } from "./settings";
+import {
+  ProviderProfileCreateInput,
+  ProviderProfileId,
+  ProviderProfilePatch,
+  TrimmedNonEmptyString,
+} from "./settings";
 
 export const WS_METHODS = {
   // Project registry methods
@@ -114,6 +120,14 @@ export const WS_METHODS = {
   subscribeTerminalEvents: "subscribeTerminalEvents",
   subscribeServerConfig: "subscribeServerConfig",
   subscribeServerLifecycle: "subscribeServerLifecycle",
+
+  // Provider profile methods
+  profileGetAll: "profile.getAll",
+  profileCreate: "profile.create",
+  profileUpdate: "profile.update",
+  profileRename: "profile.rename",
+  profileDelete: "profile.delete",
+  profileSetDefault: "profile.setDefault",
 } as const;
 
 export const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -321,6 +335,43 @@ export const WsSubscribeServerLifecycleRpc = Rpc.make(WS_METHODS.subscribeServer
   stream: true,
 });
 
+// Provider Profile RPCs
+export const WsProfileGetAllRpc = Rpc.make(WS_METHODS.profileGetAll, {
+  payload: Schema.Struct({}),
+  success: Schema.Array(Schema.Unknown), // ProviderProfile[]
+  error: ServerSettingsError,
+});
+
+export const WsProfileCreateRpc = Rpc.make(WS_METHODS.profileCreate, {
+  payload: Schema.Struct({ profile: ProviderProfileCreateInput }),
+  success: Schema.Unknown, // ProviderProfile
+  error: ServerSettingsError,
+});
+
+export const WsProfileUpdateRpc = Rpc.make(WS_METHODS.profileUpdate, {
+  payload: Schema.Struct({ id: ProviderProfileId, patch: ProviderProfilePatch }),
+  success: Schema.Unknown, // ProviderProfile
+  error: ServerSettingsError,
+});
+
+export const WsProfileRenameRpc = Rpc.make(WS_METHODS.profileRename, {
+  payload: Schema.Struct({ id: ProviderProfileId, name: TrimmedNonEmptyString }),
+  success: Schema.Unknown, // ProviderProfile
+  error: ServerSettingsError,
+});
+
+export const WsProfileDeleteRpc = Rpc.make(WS_METHODS.profileDelete, {
+  payload: Schema.Struct({ id: ProviderProfileId }),
+  success: Schema.Struct({}),
+  error: ServerSettingsError,
+});
+
+export const WsProfileSetDefaultRpc = Rpc.make(WS_METHODS.profileSetDefault, {
+  payload: Schema.Struct({ id: ProviderProfileId }),
+  success: Schema.Struct({}),
+  error: ServerSettingsError,
+});
+
 export const WsRpcGroup = RpcGroup.make(
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,
@@ -356,4 +407,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationGetTurnDiffRpc,
   WsOrchestrationGetFullThreadDiffRpc,
   WsOrchestrationReplayEventsRpc,
+  WsProfileGetAllRpc,
+  WsProfileCreateRpc,
+  WsProfileUpdateRpc,
+  WsProfileRenameRpc,
+  WsProfileDeleteRpc,
+  WsProfileSetDefaultRpc,
 );

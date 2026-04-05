@@ -17,6 +17,7 @@ import {
   type ProviderTurnStartResult,
   RuntimeMode,
   ProviderInteractionMode,
+  type CustomEndpointConfig,
 } from "@t3tools/contracts";
 import { normalizeModelSlug } from "@t3tools/shared/model";
 import { Effect, ServiceMap } from "effect";
@@ -125,6 +126,7 @@ export interface CodexAppServerStartSessionInput {
   readonly binaryPath: string;
   readonly homePath?: string;
   readonly runtimeMode: RuntimeMode;
+  readonly customEndpoint?: CustomEndpointConfig | null;
 }
 
 export interface CodexThreadTurnSnapshot {
@@ -464,12 +466,24 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
         cwd: resolvedCwd,
         ...(codexHomePath ? { homePath: codexHomePath } : {}),
       });
+
+      // Build env block with custom endpoint injection
+      const spawnEnv: Record<string, string> = { ...process.env };
+      if (codexHomePath) {
+        spawnEnv.CODEX_HOME = codexHomePath;
+      }
+      if (input.customEndpoint != null) {
+        if (input.customEndpoint.baseUrl) {
+          spawnEnv.OPENAI_BASE_URL = input.customEndpoint.baseUrl;
+        }
+        if (input.customEndpoint.apiKey) {
+          spawnEnv.OPENAI_API_KEY = input.customEndpoint.apiKey;
+        }
+      }
+
       const child = spawn(codexBinaryPath, ["app-server"], {
         cwd: resolvedCwd,
-        env: {
-          ...process.env,
-          ...(codexHomePath ? { CODEX_HOME: codexHomePath } : {}),
-        },
+        env: spawnEnv,
         stdio: ["pipe", "pipe", "pipe"],
         shell: process.platform === "win32",
       });

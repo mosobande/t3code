@@ -14,6 +14,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   PROVIDER_DISPLAY_NAMES,
   type ProviderKind,
+  type ProviderProfile,
   type ServerProvider,
   type ServerProviderModel,
   ThreadId,
@@ -64,6 +65,7 @@ import {
   useServerObservability,
   useServerProviders,
 } from "../../rpc/serverState";
+import { useProviderProfilesStore } from "~/store/providerProfilesStore";
 
 const THEME_OPTIONS = [
   {
@@ -1594,6 +1596,381 @@ export function ArchivedThreadsPanel() {
           </SettingsSection>
         ))
       )}
+    </SettingsPageContainer>
+  );
+}
+
+// ── Provider Profiles Panel ─────────────────────────────────────────
+
+export function ProviderProfilesPanel() {
+  const { profiles, loaded, error, fetchProfiles, createProfile, updateProfile, renameProfile, deleteProfile, setDefaultProfile, clearError } =
+    useProviderProfilesStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createProvider, setCreateProvider] = useState<ProviderKind>("codex");
+  const [createName, setCreateName] = useState("");
+  const [createDescription, setCreateDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch profiles on mount
+  useEffect(() => {
+    if (!loaded) {
+      void fetchProfiles();
+    }
+  }, [fetchProfiles, loaded]);
+
+  // Group profiles by provider
+  const profilesByProvider = useMemo(() => {
+    const map = new Map<ProviderKind, ProviderProfile[]>();
+    for (const profile of profiles) {
+      const existing = map.get(profile.provider) ?? [];
+      existing.push(profile);
+      map.set(profile.provider, existing);
+    }
+    return map;
+  }, [profiles]);
+
+  const startEditing = (profile: ProviderProfile) => {
+    setEditingId(profile.id);
+    setEditName(profile.name);
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditName("");
+  };
+
+  const saveEditing = async () => {
+    if (!editingId || !editName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await renameProfile(editingId, editName.trim());
+      setEditingId(null);
+      setEditName("");
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: "Failed to rename profile",
+        description: err instanceof Error ? err.message : "An error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (profile: ProviderProfile) => {
+    const api = readNativeApi();
+    const confirmed = await (api ?? ensureNativeApi()).dialogs.confirm(
+      `Delete profile "${profile.name}"?`,
+      "This action cannot be undone.",
+    );
+    if (!confirmed) return;
+    setIsSubmitting(true);
+    try {
+      await deleteProfile(profile.id);
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: "Failed to delete profile",
+        description: err instanceof Error ? err.message : "An error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSetDefault = async (profile: ProviderProfile) => {
+    setIsSubmitting(true);
+    try {
+      await setDefaultProfile(profile.id);
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: "Failed to set default profile",
+        description: err instanceof Error ? err.message : "An error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!createName.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await createProfile({
+        name: createName.trim(),
+        provider: createProvider,
+        model: "unknown", // User must edit model after creation
+        options:
+          createProvider === "codex"
+            ? { provider: "codex" as const, codex: {} }
+            : { provider: "claudeAgent" as const, claudeAgent: {} },
+        customEndpoint: null,
+        isDefault: false,
+        description: createDescription.trim() || undefined,
+      });
+      setShowCreateForm(false);
+      setCreateName("");
+      setCreateDescription("");
+    } catch (err) {
+      toastManager.add({
+        type: "error",
+        title: "Failed to create profile",
+        description: err instanceof Error ? err.message : "An error occurred.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const cancelCreate = () => {
+    setShowCreateForm(false);
+    setCreateName("");
+    setCreateDescription("");
+    setCreateProvider("codex");
+  };
+
+  if (!loaded) {
+    return (
+      <SettingsPageContainer>
+        <SettingsSection title="Provider Profiles" icon={<InfoIcon className="size-3.5" />}>
+          <div className="flex items-center gap-2 border-t border-border px-4 py-4 sm:px-5">
+            <LoaderIcon className="size-4 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Loading profiles…</span>
+          </div>
+        </SettingsSection>
+      </SettingsPageContainer>
+    );
+  }
+
+  return (
+    <SettingsPageContainer>
+      <SettingsSection
+        title="Provider Profiles"
+        icon={<InfoIcon className="size-3.5" />}
+        headerAction={
+          !showCreateForm && (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => setShowCreateForm(true)}
+            >
+              <PlusIcon className="size-3.5" aria-hidden="true" />
+              New Profile
+            </Button>
+          )
+        }
+      >
+        {/* Error banner */}
+        {error && (
+          <div className="flex items-center gap-2 border-t border-destructive/30 bg-destructive/10 px-4 py-3 sm:px-5">
+            <span className="flex-1 text-sm text-destructive">{error}</span>
+            <Button size="icon-xs" variant="ghost" onClick={clearError}>
+              <XIcon className="size-3" />
+            </Button>
+          </div>
+        )}
+
+        {/* Create form */}
+        {showCreateForm && (
+          <div className="border-t border-border px-4 py-4 sm:px-5">
+            <div className="mb-3 text-sm font-medium text-foreground">New Profile</div>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-muted-foreground" htmlFor="create-profile-name">
+                  Name
+                </label>
+                <Input
+                  id="create-profile-name"
+                  placeholder="e.g. MiniMax Ultra"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-muted-foreground" htmlFor="create-profile-provider">
+                  Provider
+                </label>
+                <Select
+                  value={createProvider}
+                  onValueChange={(value) => setCreateProvider(value as ProviderKind)}
+                >
+                  <SelectTrigger id="create-profile-provider">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectPopup>
+                    <SelectItem value="codex">Codex</SelectItem>
+                    <SelectItem value="claudeAgent">Claude Agent</SelectItem>
+                  </SelectPopup>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-muted-foreground" htmlFor="create-profile-description">
+                  Description (optional)
+                </label>
+                <Input
+                  id="create-profile-description"
+                  placeholder="Brief description of this profile"
+                  value={createDescription}
+                  onChange={(e) => setCreateDescription(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button size="sm" variant="ghost" onClick={cancelCreate} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleCreate} disabled={isSubmitting || !createName.trim()}>
+                  {isSubmitting ? "Creating…" : "Create Profile"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Profile list by provider */}
+        {[...profilesByProvider.entries()].map(([provider, providerProfiles]) => (
+          <div key={provider} className="border-t border-border first:border-t-0">
+            <div className="border-t border-border px-4 py-3 sm:px-5">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {PROVIDER_DISPLAY_NAMES[provider]}
+              </h3>
+            </div>
+            {providerProfiles.map((profile) => (
+              <div
+                key={profile.id}
+                className="flex items-center gap-3 border-t border-border px-4 py-3 first:border-t-0 sm:px-5"
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {profile.name}
+                    </span>
+                    {profile.isDefault && (
+                      <span className="inline-flex h-4 items-center rounded bg-primary/20 px-1.5 text-[10px] font-medium text-primary">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                  {profile.description && (
+                    <span className="truncate text-xs text-muted-foreground">
+                      {profile.description}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground/70">
+                    Model: {profile.model}
+                    {profile.customEndpoint && (
+                      <span className="ms-2 text-primary/70">
+                        · Custom endpoint
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {editingId === profile.id ? (
+                    <>
+                      <Input
+                        className="h-7 w-32"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void saveEditing();
+                          if (e.key === "Escape") cancelEditing();
+                        }}
+                        autoFocus
+                      />
+                      <Button size="sm" variant="ghost" onClick={saveEditing} disabled={isSubmitting}>
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={cancelEditing} disabled={isSubmitting}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              aria-label="Rename profile"
+                              className="size-5"
+                              onClick={() => startEditing(profile)}
+                              disabled={isSubmitting}
+                            >
+                              <InfoIcon className="size-3" />
+                            </Button>
+                          }
+                        />
+                        <TooltipPopup side="top">Rename</TooltipPopup>
+                      </Tooltip>
+                      {!profile.isDefault && (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                size="icon-xs"
+                                variant="ghost"
+                                aria-label="Set as default"
+                                className="size-5"
+                                onClick={() => void handleSetDefault(profile)}
+                                disabled={isSubmitting}
+                              >
+                                <InfoIcon className="size-3" />
+                              </Button>
+                            }
+                          />
+                          <TooltipPopup side="top">Set as default</TooltipPopup>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              size="icon-xs"
+                              variant="ghost"
+                              aria-label="Delete profile"
+                              className="size-5 text-destructive/70 hover:text-destructive"
+                              onClick={() => void handleDelete(profile)}
+                              disabled={isSubmitting || profile.isDefault}
+                            >
+                              <XIcon className="size-3" />
+                            </Button>
+                          }
+                        />
+                        <TooltipPopup side="top">
+                          {profile.isDefault
+                            ? "Cannot delete the default profile"
+                            : "Delete profile"}
+                        </TooltipPopup>
+                      </Tooltip>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        {/* Empty state */}
+        {profiles.length === 0 && !showCreateForm && (
+          <div className="flex flex-col items-center gap-3 border-t border-border px-4 py-8 sm:px-5">
+            <Empty>
+              <EmptyHeader>No profiles yet</EmptyHeader>
+              <EmptyDescription>
+                Create a profile to use custom API endpoints or alternative credentials.
+              </EmptyDescription>
+            </Empty>
+            <Button size="sm" onClick={() => setShowCreateForm(true)}>
+              <PlusIcon className="size-4" aria-hidden="true" />
+              Create your first profile
+            </Button>
+          </div>
+        )}
+      </SettingsSection>
     </SettingsPageContainer>
   );
 }

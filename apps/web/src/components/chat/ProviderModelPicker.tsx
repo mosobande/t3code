@@ -1,9 +1,13 @@
-import { type ProviderKind, type ServerProvider } from "@t3tools/contracts";
+import {
+  type ProviderKind,
+  type ProviderProfile,
+  type ServerProvider,
+} from "@t3tools/contracts";
 import { resolveSelectableModel } from "@t3tools/shared/model";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { VariantProps } from "class-variance-authority";
 import { type ProviderPickerKind, PROVIDER_OPTIONS } from "../../session-logic";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { Button, buttonVariants } from "../ui/button";
 import {
   Menu,
@@ -20,7 +24,7 @@ import {
 } from "../ui/menu";
 import { ClaudeAI, CursorIcon, Gemini, Icon, OpenAI, OpenCodeIcon } from "../Icons";
 import { cn } from "~/lib/utils";
-import { getProviderSnapshot } from "../../providerModels";
+import { getProviderSnapshot } from "~/providerModels";
 
 function isAvailableProviderOption(option: (typeof PROVIDER_OPTIONS)[number]): option is {
   value: ProviderKind;
@@ -61,6 +65,14 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   disabled?: boolean;
   triggerVariant?: VariantProps<typeof buttonVariants>["variant"];
   triggerClassName?: string;
+  /** Optional profiles for the profile picker section. */
+  profiles?: ReadonlyArray<ProviderProfile>;
+  /** Currently selected profile ID (if any). */
+  selectedProfileId?: string | null;
+  /** Callback when a profile is selected. */
+  onProfileChange?: (profileId: string | null) => void;
+  /** Callback when "Add profile" is clicked for a provider. */
+  onAddProfile?: (provider: ProviderKind) => void;
   onProviderModelChange: (provider: ProviderKind, model: string) => void;
 }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -79,6 +91,24 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
     );
     if (!resolvedModel) return;
     props.onProviderModelChange(provider, resolvedModel);
+    setIsMenuOpen(false);
+  };
+
+  // Group profiles by provider when profiles are provided
+  const profilesByProvider = useMemo(() => {
+    if (!props.profiles || props.profiles.length === 0) return null;
+    const map = new Map<ProviderKind, ProviderProfile[]>();
+    for (const profile of props.profiles) {
+      const existing = map.get(profile.provider) ?? [];
+      existing.push(profile);
+      map.set(profile.provider, existing);
+    }
+    return map;
+  }, [props.profiles]);
+
+  const handleProfileSelect = (profileId: string) => {
+    if (props.disabled) return;
+    props.onProfileChange?.(profileId);
     setIsMenuOpen(false);
   };
 
@@ -173,6 +203,10 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                   </MenuItem>
                 );
               }
+
+              const providerProfiles = profilesByProvider?.get(option.value) ?? [];
+              const hasProfiles = providerProfiles.length > 0;
+
               return (
                 <MenuSub key={option.value}>
                   <MenuSubTrigger>
@@ -187,8 +221,40 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                   </MenuSubTrigger>
                   <MenuSubPopup className="[--available-height:min(24rem,70vh)]" sideOffset={4}>
                     <MenuGroup>
+                      {/* Profile entries — shown when profiles exist for this provider */}
+                      {hasProfiles && (
+                        <>
+                          <MenuRadioGroup
+                            value={props.selectedProfileId ?? ""}
+                            onValueChange={handleProfileSelect}
+                          >
+                            {providerProfiles.map((profile) => (
+                              <MenuRadioItem
+                                key={profile.id}
+                                value={profile.id}
+                                onClick={() => setIsMenuOpen(false)}
+                              >
+                                <span className="flex flex-col items-start gap-0.5">
+                                  <span>{profile.name}</span>
+                                  {profile.description && (
+                                    <span className="text-[11px] text-muted-foreground/70">
+                                      {profile.description}
+                                    </span>
+                                  )}
+                                </span>
+                              </MenuRadioItem>
+                            ))}
+                          </MenuRadioGroup>
+                          <MenuDivider />
+                        </>
+                      )}
+                      {/* Model entries */}
                       <MenuRadioGroup
-                        value={props.provider === option.value ? props.model : ""}
+                        value={
+                          props.provider === option.value && !props.selectedProfileId
+                            ? props.model
+                            : ""
+                        }
                         onValueChange={(value) => handleModelChange(option.value, value)}
                       >
                         {props.modelOptionsByProvider[option.value].map((modelOption) => (
@@ -202,6 +268,21 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                         ))}
                       </MenuRadioGroup>
                     </MenuGroup>
+                    {/* Add profile action */}
+                    {props.onAddProfile && (
+                      <>
+                        <MenuDivider />
+                        <MenuItem
+                          onClick={() => {
+                            props.onAddProfile?.(option.value);
+                            setIsMenuOpen(false);
+                          }}
+                        >
+                          <PlusIcon aria-hidden="true" className="size-4 shrink-0" />
+                          <span>Add profile</span>
+                        </MenuItem>
+                      </>
+                    )}
                   </MenuSubPopup>
                 </MenuSub>
               );

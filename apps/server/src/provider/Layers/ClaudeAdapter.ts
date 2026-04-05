@@ -2714,7 +2714,19 @@ const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(newSessionId ? { sessionId: newSessionId } : {}),
         includePartialMessages: true,
         canUseTool,
-        env: process.env,
+        // Build env block with custom endpoint injection for Claude
+        env: (() => {
+          const env: Record<string, string> = { ...process.env };
+          if (input.customEndpoint != null) {
+            if (input.customEndpoint.baseUrl) {
+              env.ANTHROPIC_BASE_URL = input.customEndpoint.baseUrl;
+            }
+            if (input.customEndpoint.apiKey) {
+              env.ANTHROPIC_API_KEY = input.customEndpoint.apiKey;
+            }
+          }
+          return env;
+        })(),
         ...(input.cwd ? { additionalDirectories: [input.cwd] } : {}),
       };
 

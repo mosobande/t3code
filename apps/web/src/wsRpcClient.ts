@@ -4,6 +4,9 @@ import {
   type GitRunStackedActionResult,
   type NativeApi,
   ORCHESTRATION_WS_METHODS,
+  type ProviderProfile,
+  type ProviderProfileId,
+  type ProviderProfilePatch,
   type ServerSettingsPatch,
   WS_METHODS,
 } from "@t3tools/contracts";
@@ -98,6 +101,20 @@ export interface WsRpcClient {
     readonly getFullThreadDiff: RpcUnaryMethod<typeof ORCHESTRATION_WS_METHODS.getFullThreadDiff>;
     readonly replayEvents: RpcUnaryMethod<typeof ORCHESTRATION_WS_METHODS.replayEvents>;
     readonly onDomainEvent: RpcStreamMethod<typeof WS_METHODS.subscribeOrchestrationDomainEvents>;
+  };
+  readonly profile: {
+    readonly getAll: RpcUnaryNoArgMethod<typeof WS_METHODS.profileGetAll>;
+    readonly create: (
+      input: { profile: Omit<ProviderProfile, "id" | "createdAt" | "updatedAt"> },
+    ) => Promise<ProviderProfile>;
+    readonly update: (
+      input: { id: ProviderProfileId; patch: ProviderProfilePatch },
+    ) => Promise<ProviderProfile>;
+    readonly rename: (
+      input: { id: ProviderProfileId; name: string },
+    ) => Promise<ProviderProfile>;
+    readonly delete: (input: { id: ProviderProfileId }) => Promise<void>;
+    readonly setDefault: (input: { id: ProviderProfileId }) => Promise<void>;
   };
 }
 
@@ -225,6 +242,19 @@ export function createWsRpcClient(transport = new WsTransport()): WsRpcClient {
           listener,
           options,
         ),
+    },
+    profile: {
+      getAll: () => transport.request((client) => client[WS_METHODS.profileGetAll]({})),
+      create: (input) =>
+        transport.request((client) => client[WS_METHODS.profileCreate](input)),
+      update: (input) =>
+        transport.request((client) => client[WS_METHODS.profileUpdate](input)),
+      rename: (input) =>
+        transport.request((client) => client[WS_METHODS.profileRename](input)),
+      delete: (input) =>
+        transport.request((client) => client[WS_METHODS.profileDelete](input)),
+      setDefault: (input) =>
+        transport.request((client) => client[WS_METHODS.profileSetDefault](input)),
     },
   };
 }

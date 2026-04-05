@@ -42,6 +42,11 @@ import * as Semaphore from "effect/Semaphore";
 import { ServerConfig } from "./config";
 import { type DeepPartial, deepMerge } from "@t3tools/shared/Struct";
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
+import {
+  needsMigration,
+  synthesizeDefaultProfiles,
+  PROVIDER_PROFILES_MIGRATION_VERSION,
+} from "./providerProfilesMigration";
 
 export interface ServerSettingsShape {
   /** Start the settings runtime and attach file watching. */
@@ -208,7 +213,25 @@ const makeServerSettings = Effect.gen(function* () {
       });
       return DEFAULT_SERVER_SETTINGS;
     }
-    return decoded.value;
+
+    const settings = decoded.value;
+    if (needsMigration(settings)) {
+      yield* Effect.logInfo("Migrating provider profiles to version " + PROVIDER_PROFILES_MIGRATION_VERSION);
+
+      const defaultProfiles = synthesizeDefaultProfiles(settings);
+      const migrationMarker = {
+        version: PROVIDER_PROFILES_MIGRATION_VERSION as 1,
+        performedAt: new Date().toISOString(),
+      };
+
+      return {
+        ...settings,
+        providerProfiles: defaultProfiles,
+        _providerProfilesMigration: migrationMarker,
+      };
+    }
+
+    return settings;
   });
 
   const settingsCache = yield* Cache.make<typeof cacheKey, ServerSettings, ServerSettingsError>({

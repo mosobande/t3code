@@ -48,7 +48,15 @@ import type {
   OrchestrationReadModel,
 } from "./orchestration";
 import { EditorId } from "./editor";
-import { ServerSettings, ServerSettingsPatch } from "./settings";
+import {
+  CustomEndpointConfig,
+  ProviderProfile,
+  ProviderProfileId,
+  ProviderProfilePatch,
+  ServerSettings,
+  ServerSettingsPatch,
+  TrimmedNonEmptyString,
+} from "./settings";
 
 export interface ContextMenuItem<T extends string = string> {
   id: T;
@@ -187,4 +195,18 @@ export interface NativeApi {
       },
     ) => () => void;
   };
+  profiles: ProviderProfilesApi;
+}
+
+export interface ProviderProfilesApi {
+  getProfiles: () => Promise<readonly ProviderProfile[]>;
+  createProfile: (profile: Omit<ProviderProfile, "id" | "createdAt" | "updatedAt">) => Promise<ProviderProfile>;
+  updateProfile: (id: ProviderProfileId, patch: ProviderProfilePatch) => Promise<ProviderProfile>;
+  renameProfile: (id: ProviderProfileId, name: TrimmedNonEmptyString) => Promise<ProviderProfile>;
+  /**
+   * @throws if the profile is the default profile for its provider
+   * @throws if it is the last profile for its provider
+   */
+  deleteProfile: (id: ProviderProfileId) => Promise<void>;
+  setDefaultProfile: (id: ProviderProfileId) => Promise<void>;
 }
