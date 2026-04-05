@@ -44,6 +44,7 @@ import {
   getProfiles,
   renameProfile,
   setDefaultProfile,
+  setServerSettingsContext,
   updateProfile,
 } from "./providerSettings";
 import { ServerLifecycleEvents } from "./serverLifecycleEvents";
@@ -69,6 +70,11 @@ const WsRpcLayer = WsRpcGroup.toLayer(
     const config = yield* ServerConfig;
     const lifecycleEvents = yield* ServerLifecycleEvents;
     const serverSettings = yield* ServerSettingsService;
+    // Initialize providerSettings module context so profile RPCs can read/write settings
+    setServerSettingsContext({
+      getSettings: serverSettings.getSettings,
+      updateSettings: serverSettings.updateSettings,
+    });
     const startup = yield* ServerRuntimeStartup;
     const workspaceEntries = yield* WorkspaceEntries;
     const workspaceFileSystem = yield* WorkspaceFileSystem;
