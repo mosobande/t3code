@@ -3,7 +3,7 @@ import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { Maximize2Icon, PanelRightCloseIcon, PanelRightOpenIcon, XIcon } from "lucide-react";
+import { Maximize2Icon, Minimize2Icon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { projectEnvironment } from "~/state/projects";
@@ -255,8 +255,7 @@ export function ProjectNotesSurface({
           onPointerCancel={endDrag}
         >
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-sm font-semibold">Project notes</h2>
-            <p className="truncate text-xs text-muted-foreground">{projectName}</p>
+            <h2 className="truncate text-sm font-semibold">Project Notes - {projectName}</h2>
           </div>
           <span
             className={
@@ -274,7 +273,7 @@ export function ProjectNotesSurface({
             aria-label={mode === "panel" ? "Open as floating window" : "Dock notes in side panel"}
             onClick={() => onModeChange(mode === "panel" ? "floating" : "panel")}
           >
-            {mode === "panel" ? <Maximize2Icon /> : <PanelRightOpenIcon />}
+            {mode === "panel" ? <Maximize2Icon /> : <Minimize2Icon />}
           </Button>
           <Button
             type="button"
