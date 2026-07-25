@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   clampProjectNotesWindowRect,
+  projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
 } from "./projectNotesWindowState";
 
@@ -27,5 +28,22 @@ describe("project notes window state", () => {
     expect(projectNotesWindowStorageKey("remote", "project-a")).not.toBe(
       projectNotesWindowStorageKey("local", "project-a"),
     );
+    expect(projectNotePendingDraftStorageKey("local", "project-a")).not.toBe(
+      projectNotePendingDraftStorageKey("local", "project-b"),
+    );
+  });
+
+  it("fits inside a viewport that is smaller than the normal minimum size", () => {
+    expect(
+      clampProjectNotesWindowRect(
+        { x: 80, y: 80, width: 460, height: 560 },
+        { width: 300, height: 240 },
+      ),
+    ).toEqual({
+      x: 16,
+      y: 16,
+      width: 268,
+      height: 208,
+    });
   });
 });

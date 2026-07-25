@@ -16,6 +16,7 @@ import {
   DEFAULT_PROJECT_NOTES_WINDOW_RECT,
   type ProjectNotesWindowRect,
   ProjectNotesWindowRect as ProjectNotesWindowRectSchema,
+  projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
 } from "~/projectNotesWindowState";
 import * as Schema from "effect/Schema";
@@ -53,6 +54,11 @@ function errorMessage(error: unknown): string {
   return cause instanceof Error ? cause.message : "Could not save this note.";
 }
 
+function readPendingDraft(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(key);
+}
+
 export function ProjectNotesSurface({
   environmentId,
   projectId,
@@ -62,6 +68,7 @@ export function ProjectNotesSurface({
   onClose,
 }: ProjectNotesSurfaceProps) {
   const key = noteKey(environmentId, projectId);
+  const pendingDraftKey = projectNotePendingDraftStorageKey(environmentId, projectId);
   const queryAtom = useMemo(
     () => projectEnvironment.getNote({ environmentId, input: { projectId } }),
     [environmentId, projectId],
@@ -79,21 +86,22 @@ export function ProjectNotesSurface({
 
   useEffect(() => {
     if (!loaded || initializedKey === key) return;
-    const next = drafts.get(key) ?? loaded.markdown;
+    const next = drafts.get(key) ?? readPendingDraft(pendingDraftKey) ?? loaded.markdown;
     drafts.set(key, next);
     setMarkdown(next);
     setInitializedKey(key);
-  }, [initializedKey, key, loaded]);
+  }, [initializedKey, key, loaded, pendingDraftKey]);
 
   const handleChange = useCallback(
     (nextMarkdown: string) => {
       drafts.set(key, nextMarkdown);
+      window.localStorage.setItem(pendingDraftKey, nextMarkdown);
       setMarkdown(nextMarkdown);
       setSaveStatus("idle");
       setSaveError(null);
       saveRevision.current += 1;
     },
-    [key],
+    [key, pendingDraftKey],
   );
 
   useEffect(() => {
@@ -107,6 +115,7 @@ export function ProjectNotesSurface({
       }).then((result) => {
         if (revision !== saveRevision.current) return;
         if (result._tag === "Success") {
+          window.localStorage.removeItem(pendingDraftKey);
           setSaveStatus("saved");
           return;
         }
@@ -115,7 +124,16 @@ export function ProjectNotesSurface({
       });
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [environmentId, initializedKey, key, loaded, markdown, projectId, updateNote]);
+  }, [
+    environmentId,
+    initializedKey,
+    key,
+    loaded,
+    markdown,
+    pendingDraftKey,
+    projectId,
+    updateNote,
+  ]);
 
   const storageKey = projectNotesWindowStorageKey(environmentId, projectId);
   const [rect, setRect] = useState(() =>
@@ -129,13 +147,23 @@ export function ProjectNotesSurface({
 
   useLayoutEffect(() => {
     if (mode !== "floating" || !surfaceRef.current || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      setRect((current) => ({
-        ...current,
-        width: Math.round(entry.contentRect.width),
-        height: Math.round(entry.contentRect.height),
-      }));
+    const observer = new ResizeObserver(() => {
+      const bounds = surfaceRef.current?.getBoundingClientRect();
+      if (!bounds) return;
+      setRect((current) => {
+        const width = Math.round(bounds.width);
+        const height = Math.round(bounds.height);
+        const next = clampProjectNotesWindowRect(
+          { ...current, width, height },
+          { width: window.innerWidth, height: window.innerHeight },
+        );
+        return current.x === next.x &&
+          current.y === next.y &&
+          current.width === next.width &&
+          current.height === next.height
+          ? current
+          : next;
+      });
     });
     observer.observe(surfaceRef.current);
     return () => observer.disconnect();
@@ -200,7 +228,7 @@ export function ProjectNotesSurface({
   const queryError = query._tag === "Failure" ? errorMessage(query.cause) : null;
 
   const surface = (
-    <div
+    <aside
       ref={surfaceRef}
       className={
         mode === "floating"
@@ -212,7 +240,6 @@ export function ProjectNotesSurface({
           ? { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
           : undefined
       }
-      role="complementary"
       aria-label={`${projectName} notes`}
     >
       <div className="flex min-h-0 flex-1 flex-col">
@@ -273,7 +300,7 @@ export function ProjectNotesSurface({
           <ProjectNoteEditor key={key} initialMarkdown={markdown} onChange={handleChange} />
         )}
       </div>
-    </div>
+    </aside>
   );
 
   return surface;

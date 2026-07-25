@@ -7,11 +7,7 @@ import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPl
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import {
-  $convertFromMarkdownString,
-  $convertToMarkdownString,
-  TRANSFORMERS,
-} from "@lexical/markdown";
+import { $convertFromMarkdownString, $convertToMarkdownString } from "@lexical/markdown";
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
 import { LinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
 import {
@@ -38,10 +34,9 @@ import {
   LinkIcon,
   ListIcon,
 } from "lucide-react";
-import { useCallback } from "react";
-
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { PROJECT_NOTE_MARKDOWN_TRANSFORMERS } from "~/projectNoteMarkdown";
 
 interface ProjectNoteEditorProps {
   readonly initialMarkdown: string;
@@ -98,24 +93,22 @@ function ToolbarButton({
 
 function NotesToolbar() {
   const [editor] = useLexicalComposerContext();
-  const format = useCallback(
-    (kind: "bold" | "italic" | "code") => editor.dispatchCommand(FORMAT_TEXT_COMMAND, kind),
-    [editor],
-  );
-  const heading = useCallback(() => {
+  const format = (kind: "bold" | "italic" | "code") =>
+    editor.dispatchCommand(FORMAT_TEXT_COMMAND, kind);
+  const heading = () => {
     editor.update(() => {
       const selection = $getSelection();
       if ($isRangeSelection(selection)) {
         $setBlocksType(selection, () => $createHeadingNode("h2"));
       }
     });
-  }, [editor]);
-  const addLink = useCallback(() => {
+  };
+  const addLink = () => {
     const url = window.prompt("Link URL");
     if (url?.trim()) {
       editor.dispatchCommand(TOGGLE_LINK_COMMAND, url.trim());
     }
-  }, [editor]);
+  };
 
   return (
     <div
@@ -155,7 +148,9 @@ function NotesToolbar() {
 }
 
 function markdownFromEditor(editor: LexicalEditor): string {
-  return editor.getEditorState().read(() => $convertToMarkdownString(TRANSFORMERS));
+  return editor
+    .getEditorState()
+    .read(() => $convertToMarkdownString(PROJECT_NOTE_MARKDOWN_TRANSFORMERS));
 }
 
 export function ProjectNoteEditor({ initialMarkdown, onChange }: ProjectNoteEditorProps) {
@@ -167,7 +162,7 @@ export function ProjectNoteEditor({ initialMarkdown, onChange }: ProjectNoteEdit
       throw error;
     },
     editorState: () => {
-      $convertFromMarkdownString(initialMarkdown, TRANSFORMERS);
+      $convertFromMarkdownString(initialMarkdown, PROJECT_NOTE_MARKDOWN_TRANSFORMERS);
     },
   };
 
@@ -193,7 +188,7 @@ export function ProjectNoteEditor({ initialMarkdown, onChange }: ProjectNoteEdit
           <HistoryPlugin />
           <ListPlugin />
           <LinkPlugin />
-          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          <MarkdownShortcutPlugin transformers={PROJECT_NOTE_MARKDOWN_TRANSFORMERS} />
           <OnChangePlugin
             ignoreSelectionChange
             onChange={(_editorState, editor) => onChange(markdownFromEditor(editor))}
