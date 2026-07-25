@@ -6181,6 +6181,7 @@ function ChatViewContent(props: ChatViewProps) {
 
       {projectNotesMode !== null && activeProject ? (
         <ProjectNotesSurface
+          key={`${activeProject.environmentId}:${activeProject.id}`}
           environmentId={activeProject.environmentId}
           projectId={activeProject.id}
           projectName={activeProject.title}

@@ -23,14 +23,23 @@ export function projectNotesWindowStorageKey(environmentId: string, projectId: s
   return `t3.project-notes.window.v1:${environmentId}:${projectId}`;
 }
 
+export function projectNotePendingDraftStorageKey(
+  environmentId: string,
+  projectId: string,
+): string {
+  return `t3.project-notes.pending-draft.v1:${environmentId}:${projectId}`;
+}
+
 export function clampProjectNotesWindowRect(
   rect: ProjectNotesWindowRect,
   viewport: { width: number; height: number },
 ): ProjectNotesWindowRect {
-  const maximumWidth = Math.max(MIN_WIDTH, viewport.width - VIEWPORT_MARGIN * 2);
-  const maximumHeight = Math.max(MIN_HEIGHT, viewport.height - VIEWPORT_MARGIN * 2);
-  const width = Math.min(Math.max(rect.width, MIN_WIDTH), maximumWidth);
-  const height = Math.min(Math.max(rect.height, MIN_HEIGHT), maximumHeight);
+  const maximumWidth = Math.max(1, viewport.width - VIEWPORT_MARGIN * 2);
+  const maximumHeight = Math.max(1, viewport.height - VIEWPORT_MARGIN * 2);
+  const minimumWidth = Math.min(MIN_WIDTH, maximumWidth);
+  const minimumHeight = Math.min(MIN_HEIGHT, maximumHeight);
+  const width = Math.min(Math.max(rect.width, minimumWidth), maximumWidth);
+  const height = Math.min(Math.max(rect.height, minimumHeight), maximumHeight);
   return {
     x: Math.min(
       Math.max(rect.x, VIEWPORT_MARGIN),
