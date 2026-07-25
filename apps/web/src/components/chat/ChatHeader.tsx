@@ -19,6 +19,8 @@ import { usePrimaryEnvironmentId } from "../../state/environments";
 import { useT3ProjectFileScripts } from "~/hooks/useT3ProjectFileScripts";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { cn } from "~/lib/utils";
+import { Button } from "../ui/button";
+import { NotebookPenIcon } from "lucide-react";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -41,6 +43,8 @@ interface ChatHeaderProps {
     input: NewProjectScriptInput,
   ) => Promise<ProjectScriptActionResult>;
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
+  projectNotesOpen: boolean;
+  onToggleProjectNotes: () => void;
 }
 
 export function shouldShowOpenInPicker(input: {
@@ -73,6 +77,8 @@ export const ChatHeader = memo(function ChatHeader({
   onAddProjectScript,
   onUpdateProjectScript,
   onDeleteProjectScript,
+  projectNotesOpen,
+  onToggleProjectNotes,
 }: ChatHeaderProps) {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const fileScripts = useT3ProjectFileScripts(
@@ -128,6 +134,27 @@ export const ChatHeader = memo(function ChatHeader({
           rightPanelOpen ? "pr-0" : "pr-16",
         )}
       >
+        {activeProjectName ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant={projectNotesOpen ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  aria-label={projectNotesOpen ? "Close project notes" : "Open project notes"}
+                  aria-pressed={projectNotesOpen}
+                  onClick={onToggleProjectNotes}
+                >
+                  <NotebookPenIcon />
+                </Button>
+              }
+            />
+            <TooltipPopup>
+              {projectNotesOpen ? "Close project notes" : "Project notes"}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
         {activeProjectScripts && (
           <ProjectScriptsControl
             scripts={activeProjectScripts}

@@ -220,6 +220,10 @@ import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
+import {
+  ProjectNotesSurface,
+  type ProjectNotesDisplayMode,
+} from "./projectNotes/ProjectNotesSurface";
 import { PanelLayoutControls, RightPanelMaximizeControl } from "./chat/PanelLayoutControls";
 import { type ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { NoActiveThreadState } from "./NoActiveThreadState";
@@ -1240,6 +1244,7 @@ function ChatViewContent(props: ChatViewProps) {
   const localComposerRef = useRef<ChatComposerHandle | null>(null);
   const composerRef = useComposerHandleContext() ?? localComposerRef;
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [projectNotesMode, setProjectNotesMode] = useState<ProjectNotesDisplayMode | null>(null);
   const [expandedImage, setExpandedImage] = useState<ExpandedImagePreview | null>(null);
   const [optimisticUserMessages, setOptimisticUserMessages] = useState<ChatMessage[]>([]);
   const optimisticUserMessagesRef = useRef(optimisticUserMessages);
@@ -5652,6 +5657,10 @@ function ChatViewContent(props: ChatViewProps) {
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
+            projectNotesOpen={projectNotesMode !== null}
+            onToggleProjectNotes={() =>
+              setProjectNotesMode((current) => (current === null ? "panel" : null))
+            }
           />
         </header>
 
@@ -6031,6 +6040,17 @@ function ChatViewContent(props: ChatViewProps) {
             {rightPanelContent}
           </RightPanelTabs>
         </RightPanelSheet>
+      ) : null}
+
+      {projectNotesMode !== null && activeProject ? (
+        <ProjectNotesSurface
+          environmentId={activeProject.environmentId}
+          projectId={activeProject.id}
+          projectName={activeProject.title}
+          mode={projectNotesMode}
+          onModeChange={setProjectNotesMode}
+          onClose={() => setProjectNotesMode(null)}
+        />
       ) : null}
 
       {expandedImage && (
