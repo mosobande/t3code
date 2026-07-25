@@ -73,6 +73,7 @@ const TEST_EPOCH = DateTime.makeUnsafe("1970-01-01T00:00:00.000Z");
 
 import * as ServerConfig from "./config.ts";
 import { makeRoutesLayer } from "./server.ts";
+import { ProjectNoteStore } from "./projectNotes/ProjectNoteStore.ts";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as GitManager from "./git/GitManager.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -506,6 +507,7 @@ const buildAppUnderTest = (options?: {
         Layer.provide(WorkspacePaths.layer),
         Layer.provide(T3ProjectFileLoader.layer),
       ),
+      ProjectNoteStore.layer.pipe(Layer.provide(SqlitePersistenceMemory)),
     );
     const gitWorkflowLayer = GitWorkflowService.layer.pipe(
       Layer.provideMerge(vcsDriverRegistryLayer),
@@ -4453,6 +4455,37 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         byteLength: 26,
         truncated: false,
       });
+    }).pipe(Effect.provide(NodeHttpServer.layerTest), TestClock.withLive),
+  );
+
+  it.effect("routes websocket rpc project note updates and reads", () =>
+    Effect.gen(function* () {
+      yield* buildAppUnderTest();
+
+      const projectId = ProjectId.make("project-note-rpc-test");
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const response = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) =>
+          Effect.gen(function* () {
+            const initial = yield* client[WS_METHODS.projectsGetNote]({ projectId });
+            const updated = yield* client[WS_METHODS.projectsUpdateNote]({
+              projectId,
+              markdown: "Remember the retry boundary.",
+            });
+            const loaded = yield* client[WS_METHODS.projectsGetNote]({ projectId });
+            return { initial, updated, loaded };
+          }),
+        ),
+      );
+
+      assert.deepEqual(response.initial, {
+        projectId,
+        markdown: "",
+        updatedAt: null,
+      });
+      assert.strictEqual(response.updated.markdown, "Remember the retry boundary.");
+      assert.isNotNull(response.updated.updatedAt);
+      assert.deepEqual(response.loaded, response.updated);
     }).pipe(Effect.provide(NodeHttpServer.layerTest), TestClock.withLive),
   );
 

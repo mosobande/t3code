@@ -79,6 +79,12 @@ import {
   ProjectWriteFileResult,
 } from "./project.ts";
 import {
+  ProjectNote,
+  ProjectNoteGetInput,
+  ProjectNoteStorageError,
+  ProjectNoteUpdateInput,
+} from "./projectNote.ts";
+import {
   TerminalAttachInput,
   TerminalAttachStreamEvent,
   TerminalClearInput,
@@ -156,6 +162,8 @@ export const WS_METHODS = {
   projectsReadFile: "projects.readFile",
   projectsSearchEntries: "projects.searchEntries",
   projectsWriteFile: "projects.writeFile",
+  projectsGetNote: "projects.getNote",
+  projectsUpdateNote: "projects.updateNote",
 
   // Shell methods
   shellOpenInEditor: "shell.openInEditor",
@@ -393,6 +401,18 @@ export const WsProjectsWriteFileRpc = Rpc.make(WS_METHODS.projectsWriteFile, {
   payload: ProjectWriteFileInput,
   success: ProjectWriteFileResult,
   error: Schema.Union([ProjectWriteFileError, EnvironmentAuthorizationError]),
+});
+
+export const WsProjectsGetNoteRpc = Rpc.make(WS_METHODS.projectsGetNote, {
+  payload: ProjectNoteGetInput,
+  success: ProjectNote,
+  error: Schema.Union([ProjectNoteStorageError, EnvironmentAuthorizationError]),
+});
+
+export const WsProjectsUpdateNoteRpc = Rpc.make(WS_METHODS.projectsUpdateNote, {
+  payload: ProjectNoteUpdateInput,
+  success: ProjectNote,
+  error: Schema.Union([ProjectNoteStorageError, EnvironmentAuthorizationError]),
 });
 
 export const WsShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
@@ -722,6 +742,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsProjectsReadFileRpc,
   WsProjectsSearchEntriesRpc,
   WsProjectsWriteFileRpc,
+  WsProjectsGetNoteRpc,
+  WsProjectsUpdateNoteRpc,
   WsShellOpenInEditorRpc,
   WsFilesystemBrowseRpc,
   WsAssetsCreateUrlRpc,

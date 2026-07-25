@@ -5,7 +5,7 @@ import {
   ProjectNoteStorageError,
 } from "@t3tools/contracts";
 import * as Context from "effect/Context";
-import * as Clock from "effect/Clock";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
@@ -56,7 +56,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
         projectId,
         markdown,
       }: ProjectNoteUpdateInput) {
-        const updatedAt = new Date(yield* Clock.currentTimeMillis).toISOString();
+        const updatedAt = DateTime.formatIso(yield* DateTime.now);
         yield* sql`
           INSERT INTO project_notes (project_id, markdown, updated_at)
           VALUES (${projectId}, ${markdown}, ${updatedAt})
