@@ -361,7 +361,7 @@ export function ProjectNotesSurface({
       className={
         mode === "floating"
           ? "fixed z-50 flex min-h-70 min-w-80 resize overflow-hidden rounded-xl border border-border bg-background shadow-md"
-          : "flex h-full min-h-0 w-96 max-w-[42vw] border-l border-border bg-background"
+          : "flex h-full min-h-0 w-full bg-background"
       }
       style={
         mode === "floating"

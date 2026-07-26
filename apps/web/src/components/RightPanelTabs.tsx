@@ -1,6 +1,15 @@
 import type { ContextMenuItem, PreviewSessionSnapshot } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
-import { ClipboardList, FileDiff, Files, Globe2, Plus, TerminalSquare, X } from "lucide-react";
+import {
+  ClipboardList,
+  FileDiff,
+  Files,
+  Globe2,
+  NotebookPen,
+  Plus,
+  TerminalSquare,
+  X,
+} from "lucide-react";
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -44,15 +53,18 @@ interface RightPanelTabsProps {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddNotes: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
+  notesAvailable: boolean;
   children: ReactNode;
 }
 
 const SURFACE_DISABLED_REASONS = {
   browser: "Browser previews are only available in the T3 Code desktop app.",
   files: "Files are only available when a project is open.",
+  notes: "Notes are only available when a project is open.",
   diff: "Diff is only available for server threads in Git repositories.",
 } as const;
 
@@ -91,9 +103,11 @@ function RightPanelEmptyState(props: {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddNotes: () => void;
   browserAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
+  notesAvailable: boolean;
 }) {
   const actions = [
     {
@@ -127,6 +141,14 @@ function RightPanelEmptyState(props: {
       available: props.diffAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.diff,
       onClick: props.onAddDiff,
+    },
+    {
+      label: "Notes",
+      description: "Keep a project-local scratchpad.",
+      icon: NotebookPen,
+      available: props.notesAvailable,
+      disabledReason: SURFACE_DISABLED_REASONS.notes,
+      onClick: props.onAddNotes,
     },
   ] as const;
 
@@ -205,6 +227,8 @@ function surfaceTitle(
       );
     case "plan":
       return "Plan";
+    case "notes":
+      return "Notes";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
       if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
@@ -266,6 +290,8 @@ function SurfaceIcon({
       return <TerminalSquare className="size-3.5 shrink-0" />;
     case "plan":
       return <ClipboardList className="size-3.5 shrink-0" />;
+    case "notes":
+      return <NotebookPen className="size-3.5 shrink-0" />;
   }
 }
 
@@ -471,6 +497,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     <FileDiff />
                     Diff
                   </SurfaceMenuItem>
+                  <SurfaceMenuItem
+                    available={props.notesAvailable}
+                    disabledReason={SURFACE_DISABLED_REASONS.notes}
+                    onClick={props.onAddNotes}
+                  >
+                    <NotebookPen />
+                    Notes
+                  </SurfaceMenuItem>
                 </MenuPopup>
               </Menu>
             ) : null}
@@ -485,9 +519,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
+            onAddNotes={props.onAddNotes}
             browserAvailable={props.browserAvailable}
             diffAvailable={props.diffAvailable}
             filesAvailable={props.filesAvailable}
+            notesAvailable={props.notesAvailable}
           />
         ) : (
           props.children

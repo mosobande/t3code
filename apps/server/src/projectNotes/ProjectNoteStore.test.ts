@@ -64,4 +64,53 @@ layer("ProjectNoteStore", (it) => {
       assert.deepStrictEqual(loaded, current);
     }),
   );
+
+  it.effect("returns the saved note without changing it when Markdown is unchanged", () =>
+    Effect.gen(function* () {
+      const store = yield* ProjectNoteStore;
+      const projectId = ProjectId.make("project-notes-unchanged-test");
+      const markdown = "# Stable note";
+
+      const saved = yield* store.update({
+        projectId,
+        markdown,
+        expectedRevision: 0,
+      });
+      const repeatedCreate = yield* store.update({
+        projectId,
+        markdown,
+        expectedRevision: 0,
+      });
+      const repeatedUpdate = yield* store.update({
+        projectId,
+        markdown,
+        expectedRevision: saved.revision,
+      });
+
+      assert.deepStrictEqual(repeatedCreate, saved);
+      assert.deepStrictEqual(repeatedUpdate, saved);
+      assert.deepStrictEqual(yield* store.get({ projectId }), saved);
+    }),
+  );
+
+  it.effect("does not create a saved note for unchanged empty Markdown", () =>
+    Effect.gen(function* () {
+      const store = yield* ProjectNoteStore;
+      const projectId = ProjectId.make("project-notes-empty-unchanged-test");
+
+      const unchanged = yield* store.update({
+        projectId,
+        markdown: "",
+        expectedRevision: 0,
+      });
+
+      assert.deepStrictEqual(unchanged, {
+        projectId,
+        markdown: "",
+        updatedAt: null,
+        revision: 0,
+      });
+      assert.deepStrictEqual(yield* store.get({ projectId }), unchanged);
+    }),
+  );
 });

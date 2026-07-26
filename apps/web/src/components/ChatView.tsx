@@ -251,6 +251,16 @@ import {
   MOBILE_DRAFT_HEADLINE_VIEW_TRANSITION_NAME,
   runMobileComposerTransition,
 } from "./chat/draftHeroTransition";
+
+interface ProjectNotesTarget {
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
+  readonly projectName: string;
+}
+
+function projectNotesTargetKey(target: ProjectNotesTarget): string {
+  return `${target.environmentId}:${target.projectId}`;
+}
 import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   branchMismatchKey,
@@ -1282,7 +1292,10 @@ function ChatViewContent(props: ChatViewProps) {
   const localComposerRef = useRef<ChatComposerHandle | null>(null);
   const composerRef = useComposerHandleContext() ?? localComposerRef;
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [projectNotesMode, setProjectNotesMode] = useState<ProjectNotesDisplayMode | null>(null);
+  const [floatingProjectNotesTarget, setFloatingProjectNotesTarget] =
+    useState<ProjectNotesTarget | null>(null);
+  const dockedProjectNotesProjectKeyRef = useRef<string | null>(null);
+  const dockedProjectNotesThreadRef = useRef<ScopedThreadRef | null>(null);
   const [expandedImage, setExpandedImage] = useState<ExpandedImagePreview | null>(null);
   const [optimisticUserMessages, setOptimisticUserMessages] = useState<ChatMessage[]>([]);
   const optimisticUserMessagesRef = useRef(optimisticUserMessages);
@@ -1628,6 +1641,28 @@ function ChatViewContent(props: ChatViewProps) {
   const handleNewThreadInActiveProject = useCallback(() => {
     startNewThreadForProject(activeProjectRef, handleNewThread);
   }, [activeProjectRef, handleNewThread]);
+  const activeProjectNotesTarget = useMemo<ProjectNotesTarget | null>(
+    () =>
+      activeProject
+        ? {
+            environmentId: activeProject.environmentId,
+            projectId: activeProject.id,
+            projectName: activeProject.title,
+          }
+        : null,
+    [activeProject],
+  );
+  const activeProjectNotesTargetKey = activeProjectNotesTarget
+    ? projectNotesTargetKey(activeProjectNotesTarget)
+    : null;
+  const dockedProjectNotesSurfacePresent = rightPanelState.surfaces.some(
+    (surface) => surface.kind === "notes",
+  );
+  const projectNotesMode: ProjectNotesDisplayMode | null = floatingProjectNotesTarget
+    ? "floating"
+    : dockedProjectNotesSurfacePresent
+      ? "panel"
+      : null;
   const activeEnvironmentShell = useEnvironmentQuery(
     activeThread ? environmentShell.stateAtom(activeThread.environmentId) : null,
   );
@@ -1668,6 +1703,45 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeEnvironmentBootstrapComplete) return;
     useRightPanelStore.getState().reconcileFileSurfaces(activeThreadRef, activeProject !== null);
   }, [activeEnvironmentBootstrapComplete, activeProject, activeThreadRef]);
+
+  useEffect(() => {
+    if (floatingProjectNotesTarget) return;
+    const dockedProjectKey = dockedProjectNotesProjectKeyRef.current;
+    if (
+      dockedProjectNotesSurfacePresent &&
+      activeThreadRef &&
+      activeProjectNotesTargetKey &&
+      (dockedProjectKey === null || dockedProjectKey === activeProjectNotesTargetKey)
+    ) {
+      dockedProjectNotesProjectKeyRef.current = activeProjectNotesTargetKey;
+      dockedProjectNotesThreadRef.current = activeThreadRef;
+      return;
+    }
+    if (dockedProjectKey === null) return;
+    if (activeThreadRef && activeProjectNotesTargetKey === dockedProjectKey) {
+      useRightPanelStore.getState().open(activeThreadRef, "notes");
+      dockedProjectNotesThreadRef.current = activeThreadRef;
+      return;
+    }
+    const previousThreadRef = dockedProjectNotesThreadRef.current;
+    if (previousThreadRef) {
+      useRightPanelStore.getState().closeSurface(previousThreadRef, "notes");
+    }
+    if (
+      activeThreadRef &&
+      (!previousThreadRef ||
+        scopedThreadKey(activeThreadRef) !== scopedThreadKey(previousThreadRef))
+    ) {
+      useRightPanelStore.getState().closeSurface(activeThreadRef, "notes");
+    }
+    dockedProjectNotesProjectKeyRef.current = null;
+    dockedProjectNotesThreadRef.current = null;
+  }, [
+    activeProjectNotesTargetKey,
+    activeThreadRef,
+    dockedProjectNotesSurfacePresent,
+    floatingProjectNotesTarget,
+  ]);
 
   // Compute the list of environments this logical project spans, used to
   // drive the environment picker in BranchToolbar.
@@ -3137,6 +3211,51 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeProject) return;
     useRightPanelStore.getState().open(activeThreadRef, "files");
   }, [activeProject, activeThreadRef]);
+  const addProjectNotesSurface = useCallback(() => {
+    if (!activeThreadRef || !activeProjectNotesTarget) return;
+    setFloatingProjectNotesTarget(null);
+    dockedProjectNotesProjectKeyRef.current = projectNotesTargetKey(activeProjectNotesTarget);
+    dockedProjectNotesThreadRef.current = activeThreadRef;
+    useRightPanelStore.getState().open(activeThreadRef, "notes");
+  }, [activeProjectNotesTarget, activeThreadRef]);
+  const closeProjectNotes = useCallback(() => {
+    const dockedThreadRef = dockedProjectNotesThreadRef.current ?? activeThreadRef;
+    dockedProjectNotesProjectKeyRef.current = null;
+    dockedProjectNotesThreadRef.current = null;
+    if (dockedThreadRef) {
+      useRightPanelStore.getState().closeSurface(dockedThreadRef, "notes");
+    }
+    setFloatingProjectNotesTarget(null);
+  }, [activeThreadRef]);
+  const changeProjectNotesMode = useCallback(
+    (nextMode: ProjectNotesDisplayMode) => {
+      if (nextMode === projectNotesMode) return;
+      if (nextMode === "floating") {
+        if (!activeProjectNotesTarget) return;
+        const dockedThreadRef = dockedProjectNotesThreadRef.current;
+        dockedProjectNotesProjectKeyRef.current = null;
+        dockedProjectNotesThreadRef.current = null;
+        if (dockedThreadRef) {
+          useRightPanelStore.getState().closeSurface(dockedThreadRef, "notes");
+        }
+        setFloatingProjectNotesTarget(activeProjectNotesTarget);
+        return;
+      }
+      if (!activeThreadRef || !activeProjectNotesTarget) return;
+      setFloatingProjectNotesTarget(null);
+      dockedProjectNotesProjectKeyRef.current = projectNotesTargetKey(activeProjectNotesTarget);
+      dockedProjectNotesThreadRef.current = activeThreadRef;
+      useRightPanelStore.getState().open(activeThreadRef, "notes");
+    },
+    [activeProjectNotesTarget, activeThreadRef, projectNotesMode],
+  );
+  const toggleProjectNotes = useCallback(() => {
+    if (projectNotesMode === "floating" || activeRightPanelKind === "notes") {
+      closeProjectNotes();
+      return;
+    }
+    addProjectNotesSurface();
+  }, [activeRightPanelKind, addProjectNotesSurface, closeProjectNotes, projectNotesMode]);
   const openFileSurface = useCallback(
     (relativePath: string) => {
       if (!activeThreadRef || !activeProject) return;
@@ -3308,6 +3427,10 @@ function ChatViewContent(props: ChatViewProps) {
       }
 
       for (const surface of surfaces) {
+        if (surface.kind === "notes") {
+          dockedProjectNotesProjectKeyRef.current = null;
+          dockedProjectNotesThreadRef.current = null;
+        }
         if (surface.kind === "preview" && surface.resourceId) {
           void closePreviewSession({
             closePreview,
@@ -5658,6 +5781,7 @@ function ChatViewContent(props: ChatViewProps) {
       {panelToggleControls}
     </div>
   );
+  const renderedProjectNotesTarget = floatingProjectNotesTarget ?? activeProjectNotesTarget;
   const rightPanelContent = activeThreadRef ? (
     activeRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
@@ -5707,6 +5831,15 @@ function ChatViewContent(props: ChatViewProps) {
         workspaceRoot={activeWorkspaceRoot}
         timestampFormat={timestampFormat}
         mode="embedded"
+      />
+    ) : activeRightPanelSurface?.kind === "notes" && renderedProjectNotesTarget ? (
+      <ProjectNotesSurface
+        environmentId={renderedProjectNotesTarget.environmentId}
+        projectId={renderedProjectNotesTarget.projectId}
+        projectName={renderedProjectNotesTarget.projectName}
+        mode="panel"
+        onModeChange={changeProjectNotesMode}
+        onClose={closeProjectNotes}
       />
     ) : (activeRightPanelSurface?.kind === "files" || activeRightPanelSurface?.kind === "file") &&
       activeProject &&
@@ -5781,10 +5914,8 @@ function ChatViewContent(props: ChatViewProps) {
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
-            projectNotesOpen={projectNotesMode !== null}
-            onToggleProjectNotes={() =>
-              setProjectNotesMode((current) => (current === null ? "panel" : null))
-            }
+            projectNotesOpen={projectNotesMode === "floating" || activeRightPanelKind === "notes"}
+            onToggleProjectNotes={toggleProjectNotes}
           />
         </header>
 
@@ -6143,9 +6274,11 @@ function ChatViewContent(props: ChatViewProps) {
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
+          onAddNotes={addProjectNotesSurface}
           browserAvailable={isPreviewSupportedInRuntime()}
           diffAvailable={isServerThread && isGitRepo}
           filesAvailable={activeProject !== null}
+          notesAvailable={activeProject !== null}
         >
           {rightPanelContent}
         </RightPanelTabs>
@@ -6170,24 +6303,26 @@ function ChatViewContent(props: ChatViewProps) {
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}
+            onAddNotes={addProjectNotesSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             diffAvailable={isServerThread && isGitRepo}
             filesAvailable={activeProject !== null}
+            notesAvailable={activeProject !== null}
           >
             {rightPanelContent}
           </RightPanelTabs>
         </RightPanelSheet>
       ) : null}
 
-      {projectNotesMode !== null && activeProject ? (
+      {projectNotesMode === "floating" && floatingProjectNotesTarget ? (
         <ProjectNotesSurface
-          key={`${activeProject.environmentId}:${activeProject.id}`}
-          environmentId={activeProject.environmentId}
-          projectId={activeProject.id}
-          projectName={activeProject.title}
-          mode={projectNotesMode}
-          onModeChange={setProjectNotesMode}
-          onClose={() => setProjectNotesMode(null)}
+          key={`${floatingProjectNotesTarget.environmentId}:${floatingProjectNotesTarget.projectId}`}
+          environmentId={floatingProjectNotesTarget.environmentId}
+          projectId={floatingProjectNotesTarget.projectId}
+          projectName={floatingProjectNotesTarget.projectName}
+          mode="floating"
+          onModeChange={changeProjectNotesMode}
+          onClose={closeProjectNotes}
         />
       ) : null}
 

@@ -60,6 +60,10 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
         markdown,
         expectedRevision,
       }: ProjectNoteUpdateInput) {
+        if (expectedRevision === 0 && markdown === "") {
+          const current = yield* get({ projectId });
+          if (current.markdown === markdown) return current;
+        }
         const updatedAt = DateTime.formatIso(yield* DateTime.now);
         const mapUpdateError = Effect.mapError(
           (cause) =>
@@ -89,6 +93,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
                   revision = revision + 1
                 WHERE project_id = ${projectId}
                   AND revision = ${expectedRevision}
+                  AND markdown <> ${markdown}
                 RETURNING
                   project_id AS "projectId",
                   markdown,
@@ -99,6 +104,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
         if (saved) return saved;
 
         const current = yield* get({ projectId });
+        if (current.markdown === markdown) return current;
         return yield* new ProjectNoteConflictError({
           projectId,
           expectedRevision,
