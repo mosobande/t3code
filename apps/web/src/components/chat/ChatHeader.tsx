@@ -156,6 +156,8 @@ export const ChatHeader = memo(function ChatHeader({
                   size="icon-sm"
                   aria-label={projectNotesOpen ? "Close project notes" : "Open project notes"}
                   aria-pressed={projectNotesOpen}
+                  aria-expanded={projectNotesOpen}
+                  aria-controls="project-notes-surface"
                   onClick={onToggleProjectNotes}
                 >
                   <NotebookPenIcon />

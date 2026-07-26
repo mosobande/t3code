@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  adjustProjectNotesWindowRect,
   clampProjectNotesWindowRect,
   projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
@@ -44,6 +45,28 @@ describe("project notes window state", () => {
       y: 16,
       width: 268,
       height: 208,
+    });
+  });
+
+  it("moves and resizes a floating notes window with bounded keyboard actions", () => {
+    const viewport = { width: 1_000, height: 800 };
+    const initial = { x: 100, y: 100, width: 460, height: 560 };
+
+    expect(
+      adjustProjectNotesWindowRect(initial, { x: 16, y: -16, width: 0, height: 0 }, viewport),
+    ).toEqual({
+      x: 116,
+      y: 84,
+      width: 460,
+      height: 560,
+    });
+    expect(
+      adjustProjectNotesWindowRect(initial, { x: 0, y: 0, width: 16, height: -16 }, viewport),
+    ).toEqual({
+      x: 100,
+      y: 100,
+      width: 476,
+      height: 544,
     });
   });
 });

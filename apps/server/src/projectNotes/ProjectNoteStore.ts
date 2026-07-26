@@ -1,5 +1,6 @@
 import {
   type ProjectNote,
+  ProjectNoteConflictError,
   type ProjectNoteGetInput,
   type ProjectNoteUpdateInput,
   ProjectNoteStorageError,
@@ -14,7 +15,7 @@ export interface ProjectNoteStoreShape {
   readonly get: (input: ProjectNoteGetInput) => Effect.Effect<ProjectNote, ProjectNoteStorageError>;
   readonly update: (
     input: ProjectNoteUpdateInput,
-  ) => Effect.Effect<ProjectNote, ProjectNoteStorageError>;
+  ) => Effect.Effect<ProjectNote, ProjectNoteStorageError | ProjectNoteConflictError>;
 }
 
 export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectNoteStoreShape>()(
@@ -30,7 +31,8 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
           SELECT
             project_id AS "projectId",
             markdown,
-            updated_at AS "updatedAt"
+            updated_at AS "updatedAt",
+            revision
           FROM project_notes
           WHERE project_id = ${projectId}
         `.pipe(
@@ -48,6 +50,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
             projectId,
             markdown: "",
             updatedAt: null,
+            revision: 0,
           }
         );
       });
@@ -55,30 +58,52 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
       const update = Effect.fn("ProjectNoteStore.update")(function* ({
         projectId,
         markdown,
+        expectedRevision,
       }: ProjectNoteUpdateInput) {
         const updatedAt = DateTime.formatIso(yield* DateTime.now);
-        yield* sql`
-          INSERT INTO project_notes (project_id, markdown, updated_at)
-          VALUES (${projectId}, ${markdown}, ${updatedAt})
-          ON CONFLICT (project_id)
-          DO UPDATE SET
-            markdown = excluded.markdown,
-            updated_at = excluded.updated_at
-        `.pipe(
-          Effect.mapError(
-            (cause) =>
-              new ProjectNoteStorageError({
-                operation: "update",
-                projectId,
-                message: String(cause),
-              }),
-          ),
+        const mapUpdateError = Effect.mapError(
+          (cause) =>
+            new ProjectNoteStorageError({
+              operation: "update",
+              projectId,
+              message: String(cause),
+            }),
         );
-        return {
+        const rows =
+          expectedRevision === 0
+            ? yield* sql<ProjectNote>`
+                INSERT INTO project_notes (project_id, markdown, updated_at, revision)
+                VALUES (${projectId}, ${markdown}, ${updatedAt}, 1)
+                ON CONFLICT (project_id) DO NOTHING
+                RETURNING
+                  project_id AS "projectId",
+                  markdown,
+                  updated_at AS "updatedAt",
+                  revision
+              `.pipe(mapUpdateError)
+            : yield* sql<ProjectNote>`
+                UPDATE project_notes
+                SET
+                  markdown = ${markdown},
+                  updated_at = ${updatedAt},
+                  revision = revision + 1
+                WHERE project_id = ${projectId}
+                  AND revision = ${expectedRevision}
+                RETURNING
+                  project_id AS "projectId",
+                  markdown,
+                  updated_at AS "updatedAt",
+                  revision
+              `.pipe(mapUpdateError);
+        const saved = rows[0];
+        if (saved) return saved;
+
+        const current = yield* get({ projectId });
+        return yield* new ProjectNoteConflictError({
           projectId,
-          markdown,
-          updatedAt,
-        };
+          expectedRevision,
+          current,
+        });
       });
 
       return ProjectNoteStore.of({ get, update });

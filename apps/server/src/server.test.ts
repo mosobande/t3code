@@ -4705,9 +4705,15 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             const updated = yield* client[WS_METHODS.projectsUpdateNote]({
               projectId,
               markdown: "Remember the retry boundary.",
+              expectedRevision: initial.revision,
             });
+            const conflict = yield* client[WS_METHODS.projectsUpdateNote]({
+              projectId,
+              markdown: "Replace a newer note.",
+              expectedRevision: initial.revision,
+            }).pipe(Effect.flip);
             const loaded = yield* client[WS_METHODS.projectsGetNote]({ projectId });
-            return { initial, updated, loaded };
+            return { initial, updated, conflict, loaded };
           }),
         ),
       );
@@ -4716,9 +4722,15 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         projectId,
         markdown: "",
         updatedAt: null,
+        revision: 0,
       });
       assert.strictEqual(response.updated.markdown, "Remember the retry boundary.");
       assert.isNotNull(response.updated.updatedAt);
+      assert.strictEqual(response.updated.revision, 1);
+      assert.strictEqual(response.conflict._tag, "ProjectNoteConflictError");
+      if (response.conflict._tag === "ProjectNoteConflictError") {
+        assert.deepEqual(response.conflict.current, response.updated);
+      }
       assert.deepEqual(response.loaded, response.updated);
     }).pipe(Effect.provide(NodeHttpServer.layerTest), TestClock.withLive),
   );

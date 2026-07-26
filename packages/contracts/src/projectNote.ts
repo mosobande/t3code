@@ -1,11 +1,12 @@
 import * as Schema from "effect/Schema";
 
-import { IsoDateTime, ProjectId } from "./baseSchemas.ts";
+import { IsoDateTime, NonNegativeInt, ProjectId } from "./baseSchemas.ts";
 
 export const ProjectNote = Schema.Struct({
   projectId: ProjectId,
   markdown: Schema.String,
   updatedAt: Schema.NullOr(IsoDateTime),
+  revision: NonNegativeInt,
 });
 export type ProjectNote = typeof ProjectNote.Type;
 
@@ -17,6 +18,7 @@ export type ProjectNoteGetInput = typeof ProjectNoteGetInput.Type;
 export const ProjectNoteUpdateInput = Schema.Struct({
   projectId: ProjectId,
   markdown: Schema.String,
+  expectedRevision: NonNegativeInt,
 });
 export type ProjectNoteUpdateInput = typeof ProjectNoteUpdateInput.Type;
 
@@ -26,5 +28,14 @@ export class ProjectNoteStorageError extends Schema.TaggedErrorClass<ProjectNote
     operation: Schema.Literals(["get", "update"]),
     projectId: ProjectId,
     message: Schema.String,
+  },
+) {}
+
+export class ProjectNoteConflictError extends Schema.TaggedErrorClass<ProjectNoteConflictError>()(
+  "ProjectNoteConflictError",
+  {
+    projectId: ProjectId,
+    expectedRevision: NonNegativeInt,
+    current: ProjectNote,
   },
 ) {}

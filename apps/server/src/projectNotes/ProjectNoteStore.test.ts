@@ -21,12 +21,47 @@ layer("ProjectNoteStore", (it) => {
       const saved = yield* store.update({
         projectId,
         markdown: "# Decisions\n\n- Keep the RPC small.",
+        expectedRevision: initial.revision,
       });
       assert.strictEqual(saved.markdown, "# Decisions\n\n- Keep the RPC small.");
       assert.isNotNull(saved.updatedAt);
+      assert.strictEqual(saved.revision, 1);
 
       const loaded = yield* store.get({ projectId });
       assert.deepStrictEqual(loaded, saved);
+    }),
+  );
+
+  it.effect("rejects a stale update without replacing the current note", () =>
+    Effect.gen(function* () {
+      const store = yield* ProjectNoteStore;
+      const projectId = ProjectId.make("project-notes-conflict-test");
+
+      const first = yield* store.update({
+        projectId,
+        markdown: "First saved version",
+        expectedRevision: 0,
+      });
+      const current = yield* store.update({
+        projectId,
+        markdown: "Current saved version",
+        expectedRevision: first.revision,
+      });
+
+      const conflict = yield* store
+        .update({
+          projectId,
+          markdown: "Stale replacement",
+          expectedRevision: first.revision,
+        })
+        .pipe(Effect.flip);
+
+      assert.strictEqual(conflict._tag, "ProjectNoteConflictError");
+      if (conflict._tag === "ProjectNoteConflictError") {
+        assert.deepStrictEqual(conflict.current, current);
+      }
+      const loaded = yield* store.get({ projectId });
+      assert.deepStrictEqual(loaded, current);
     }),
   );
 });

@@ -76,7 +76,7 @@ export function createProjectEnvironmentAtoms<R, E>(
     getNote: createEnvironmentRpcQueryAtomFamily(runtime, {
       label: "environment-data:projects:get-note",
       tag: WS_METHODS.projectsGetNote,
-      staleTimeMs: 30_000,
+      staleTimeMs: 0,
       idleTtlMs: 5 * 60_000,
     }),
     optimisticFile: (target: OptimisticProjectFileTarget) =>

@@ -53,3 +53,19 @@ export function clampProjectNotesWindowRect(
     height,
   };
 }
+
+export function adjustProjectNotesWindowRect(
+  rect: ProjectNotesWindowRect,
+  adjustment: ProjectNotesWindowRect,
+  viewport: { width: number; height: number },
+): ProjectNotesWindowRect {
+  return clampProjectNotesWindowRect(
+    {
+      x: rect.x + adjustment.x,
+      y: rect.y + adjustment.y,
+      width: rect.width + adjustment.width,
+      height: rect.height + adjustment.height,
+    },
+    viewport,
+  );
+}

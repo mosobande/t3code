@@ -88,6 +88,7 @@ import {
 } from "./project.ts";
 import {
   ProjectNote,
+  ProjectNoteConflictError,
   ProjectNoteGetInput,
   ProjectNoteStorageError,
   ProjectNoteUpdateInput,
@@ -483,7 +484,11 @@ export const WsProjectsGetNoteRpc = Rpc.make(WS_METHODS.projectsGetNote, {
 export const WsProjectsUpdateNoteRpc = Rpc.make(WS_METHODS.projectsUpdateNote, {
   payload: ProjectNoteUpdateInput,
   success: ProjectNote,
-  error: Schema.Union([ProjectNoteStorageError, EnvironmentAuthorizationError]),
+  error: Schema.Union([
+    ProjectNoteStorageError,
+    ProjectNoteConflictError,
+    EnvironmentAuthorizationError,
+  ]),
 });
 
 export const WsShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
