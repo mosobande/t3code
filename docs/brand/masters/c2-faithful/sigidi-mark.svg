@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 610 640" role="img" aria-labelledby="title description">
+  <title id="title">SIGIDI C2 Forged Automaton mark</title>
+  <desc id="description">A faithful vector reconstruction of the selected C2 automaton and axe silhouette.</desc>
+  <defs>
+    <mask id="joint-cutouts">
+      <rect width="610" height="640" fill="#fff"/>
+      <circle cx="160" cy="238" r="10"/>
+      <circle cx="178" cy="376" r="11"/>
+      <circle cx="299" cy="451" r="9"/>
+    </mask>
+  </defs>
+  <g id="sigidi-c2-mark" fill="#171717" mask="url(#joint-cutouts)">
+    <!-- Faceless square head and short neck. -->
+    <path d="m211 160 48 17-14 57-48-16Z"/>
+    <path d="m202 217 37 13-6 20-37-13Z"/>
+
+    <!-- Shoulder, segmented striking arm, shaft, tang, and one wedge blade. -->
+    <circle cx="160" cy="238" r="23"/>
+    <path d="m148 252 15-22 119 51-12 36Z"/>
+    <path d="m287 290 85 41-17 38-85-41Z"/>
+    <path d="m379 341 116 56-11 25-119-56Z"/>
+    <path d="m493 390 35 15-15 39-35-15Z"/>
+    <path d="m484 413 27 11-13 99-88-46Z"/>
+
+    <!-- Triangular torso and hip pivot. -->
+    <path d="m147 258 81 43-70 63Z"/>
+    <circle cx="178" cy="376" r="28"/>
+
+    <!-- Rear bracing leg. -->
+    <path d="m163 379 30 21-80 127-31-19Z"/>
+    <path d="m82 511 31 20-28 39 22 6-2 15H42v-21Z"/>
+
+    <!-- Front linked leg. -->
+    <path d="m166 394 22-30 127 68-15 36Z"/>
+    <circle cx="299" cy="451" r="22"/>
+    <path d="m280 458 40-2 4 114 28 6v15h-67Z"/>
+  </g>
+</svg>

@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">SIGIDI Forged Automaton mark</title>
+  <desc id="description">A geometric automaton leans into a diagonal strike with a single broad axe.</desc>
+  <defs>
+    <mask id="pivot-cutouts">
+      <rect width="512" height="512" fill="#fff"/>
+      <circle cx="105" cy="136" r="8"/>
+      <circle cx="148" cy="250" r="9"/>
+      <circle cx="90" cy="340" r="6"/>
+      <circle cx="270" cy="330" r="6"/>
+      <circle cx="247" cy="208" r="5"/>
+      <circle cx="306" cy="263" r="5"/>
+    </mask>
+  </defs>
+  <g id="sigidi-mark" fill="#171717" mask="url(#pivot-cutouts)">
+    <!-- Plain axe shaft and single broad wedge blade. -->
+    <path d="m120 108 308 234-17 23L103 131Z"/>
+    <path d="m414 326 78 26-60 86-30-78Z"/>
+
+    <!-- Faceless forged head and torso plate. -->
+    <path d="m92 55 66 25-22 58-66-25Z"/>
+    <path d="m72 132 62-20 86 66-50 92-84-35Z"/>
+
+    <!-- Two assembled arms grip the shaft. -->
+    <path d="m105 119 27-24 132 100-21 29Z"/>
+    <path d="m130 153 24-29 165 125-20 29Z"/>
+
+    <!-- Braced legs form the striking stance. -->
+    <path d="m119 242 49 12-63 98-37-23Z"/>
+    <path d="m68 321 42 27-50 100H12Z"/>
+    <path d="m153 243 37-25 96 101-35 32Z"/>
+    <path d="m247 324 46-5 7 129h-46Z"/>
+    <path d="M12 427h84v22H12Z"/>
+    <path d="M254 427h78v22h-78Z"/>
+
+    <!-- Assembly pivots. -->
+    <circle cx="105" cy="136" r="23"/>
+    <circle cx="148" cy="250" r="25"/>
+    <circle cx="90" cy="340" r="18"/>
+    <circle cx="270" cy="330" r="18"/>
+    <circle cx="247" cy="208" r="14"/>
+    <circle cx="306" cy="263" r="14"/>
+  </g>
+</svg>

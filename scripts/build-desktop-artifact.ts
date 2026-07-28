@@ -35,7 +35,7 @@ import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.mosobande.sigidi";
+const DESKTOP_APP_ID = "com.quantipixels.sigidi";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -1367,7 +1367,15 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
-  return desktopPackageJson.productName ?? "SIGIDI";
+  return resolveDesktopUpdateChannel(version) === "nightly"
+    ? "SIGIDI Nightly"
+    : (desktopPackageJson.productName ?? "SIGIDI");
+}
+
+export function resolveDesktopAppId(version: string): string {
+  return resolveDesktopUpdateChannel(version) === "nightly"
+    ? `${DESKTOP_APP_ID}.nightly`
+    : DESKTOP_APP_ID;
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -1385,7 +1393,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     | undefined,
 ) {
   const buildConfig: Record<string, unknown> = {
-    appId: DESKTOP_APP_ID,
+    appId: resolveDesktopAppId(version),
     productName: resolveDesktopProductName(version),
     artifactName: "SIGIDI-${version}-${arch}.${ext}",
     directories: {

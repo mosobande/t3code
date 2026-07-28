@@ -28,6 +28,7 @@ import {
   resolveFffNativeDependencies,
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
+  resolveDesktopAppId,
   resolveDesktopProductName,
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
@@ -84,9 +85,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopUpdateChannel("0.0.17"), "latest");
   });
 
-  it("uses the SIGIDI product name for every desktop build channel", () => {
+  it("uses a distinct SIGIDI Nightly identity for nightly builds", () => {
     assert.equal(resolveDesktopProductName("0.0.17"), "SIGIDI");
-    assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "SIGIDI");
+    assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "SIGIDI Nightly");
+    assert.equal(resolveDesktopAppId("0.0.17"), "com.quantipixels.sigidi");
+    assert.equal(
+      resolveDesktopAppId("0.0.17-nightly.20260413.42"),
+      "com.quantipixels.sigidi.nightly",
+    );
   });
 
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
@@ -355,7 +361,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     });
 
     assert.deepStrictEqual(configuration, {
-      appId: "com.mosobande.sigidi",
+      appId: "com.quantipixels.sigidi",
       teamId: "ABC1234567",
       rpDomains: ["example.clerk.accounts.dev"],
       provisioningProfilePath: "/tmp/t3code.provisionprofile",
@@ -375,7 +381,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       "clerk.example.com",
       "example.clerk.accounts.dev",
     ]);
-    assert.include(entitlements, "<string>ABC1234567.com.mosobande.sigidi</string>");
+    assert.include(entitlements, "<string>ABC1234567.com.quantipixels.sigidi</string>");
     assert.include(entitlements, "<string>webcredentials:clerk.example.com</string>");
     assert.include(entitlements, "<string>webcredentials:example.clerk.accounts.dev</string>");
     assert.include(entitlements, "<key>com.apple.security.cs.allow-jit</key>");
@@ -470,7 +476,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       });
 
       const mac = config.mac as Record<string, unknown>;
-      assert.equal(config.appId, "com.mosobande.sigidi");
+      assert.equal(config.appId, "com.quantipixels.sigidi");
       assert.equal(config.productName, "SIGIDI");
       assert.equal(config.artifactName, "SIGIDI-${version}-${arch}.${ext}");
       assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
