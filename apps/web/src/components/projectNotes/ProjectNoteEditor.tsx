@@ -9,7 +9,7 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $convertFromMarkdownString, $convertToMarkdownString } from "@lexical/markdown";
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
-import { LinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
+import { $isLinkNode, LinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
 import {
   INSERT_CHECK_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
@@ -19,9 +19,14 @@ import {
 import { $createHeadingNode, HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
 import {
+  $createParagraphNode,
   $getSelection,
   $isRangeSelection,
+  $isTextNode,
+  COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
+  type LexicalNode,
+  SELECTION_CHANGE_COMMAND,
   type EditorThemeClasses,
   type LexicalEditor,
 } from "lexical";
@@ -33,10 +38,14 @@ import {
   ItalicIcon,
   LinkIcon,
   ListIcon,
+  RemoveFormattingIcon,
+  UnlinkIcon,
 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PROJECT_NOTE_MARKDOWN_TRANSFORMERS } from "~/projectNoteMarkdown";
+import { resolveProjectNoteSelectionActions } from "./projectNoteToolbarState";
 
 interface ProjectNoteEditorProps {
   readonly initialMarkdown: string;
@@ -70,10 +79,12 @@ const editorTheme: EditorThemeClasses = {
 
 function ToolbarButton({
   label,
+  disabled = false,
   onClick,
   children,
 }: {
   readonly label: string;
+  readonly disabled?: boolean;
   readonly onClick: () => void;
   readonly children: React.ReactNode;
 }) {
@@ -81,7 +92,14 @@ function ToolbarButton({
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button type="button" variant="ghost" size="icon-sm" aria-label={label} onClick={onClick}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={label}
+            disabled={disabled}
+            onClick={onClick}
+          >
             {children}
           </Button>
         }
@@ -91,8 +109,51 @@ function ToolbarButton({
   );
 }
 
+function nodeHasLinkAncestor(node: LexicalNode): boolean {
+  let current: LexicalNode | null = node;
+  while (current) {
+    if ($isLinkNode(current)) return true;
+    current = current.getParent();
+  }
+  return false;
+}
+
 function NotesToolbar() {
   const [editor] = useLexicalComposerContext();
+  const [selectionActions, setSelectionActions] = useState(() =>
+    resolveProjectNoteSelectionActions({
+      hasExpandedSelection: false,
+      selectionContainsLink: false,
+    }),
+  );
+  const updateSelectionActions = useCallback(() => {
+    const selection = $getSelection();
+    const hasExpandedSelection = $isRangeSelection(selection) && !selection.isCollapsed();
+    setSelectionActions(
+      resolveProjectNoteSelectionActions({
+        hasExpandedSelection,
+        selectionContainsLink:
+          hasExpandedSelection && selection.getNodes().some(nodeHasLinkAncestor),
+      }),
+    );
+  }, []);
+  useEffect(() => {
+    const unregisterUpdate = editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(updateSelectionActions);
+    });
+    const unregisterSelectionChange = editor.registerCommand(
+      SELECTION_CHANGE_COMMAND,
+      () => {
+        updateSelectionActions();
+        return false;
+      },
+      COMMAND_PRIORITY_LOW,
+    );
+    return () => {
+      unregisterSelectionChange();
+      unregisterUpdate();
+    };
+  }, [editor, updateSelectionActions]);
   const format = (kind: "bold" | "italic" | "code") =>
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, kind);
   const heading = () => {
@@ -108,6 +169,22 @@ function NotesToolbar() {
     if (url?.trim()) {
       editor.dispatchCommand(TOGGLE_LINK_COMMAND, url.trim());
     }
+  };
+  const removeLink = () => {
+    editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+  };
+  const clearFormatting = () => {
+    editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) || selection.isCollapsed()) return;
+      $setBlocksType(selection, () => $createParagraphNode());
+      selection.extract().forEach((node) => {
+        if (!$isTextNode(node)) return;
+        node.setFormat(0);
+        node.setStyle("");
+      });
+    });
   };
 
   return (
@@ -142,6 +219,20 @@ function NotesToolbar() {
       </ToolbarButton>
       <ToolbarButton label="Link" onClick={addLink}>
         <LinkIcon />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Remove link"
+        disabled={!selectionActions.canRemoveLink}
+        onClick={removeLink}
+      >
+        <UnlinkIcon />
+      </ToolbarButton>
+      <ToolbarButton
+        label="Clear formatting"
+        disabled={!selectionActions.canClearFormatting}
+        onClick={clearFormatting}
+      >
+        <RemoveFormattingIcon />
       </ToolbarButton>
     </div>
   );

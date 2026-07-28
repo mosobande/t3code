@@ -8,7 +8,7 @@ import {
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { Maximize2Icon, Minimize2Icon, XIcon } from "lucide-react";
+import { Maximize2Icon, Minimize2Icon, PinIcon, PinOffIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { projectEnvironment } from "~/state/projects";
@@ -28,7 +28,9 @@ interface ProjectNotesSurfaceProps {
   readonly projectId: ProjectId;
   readonly projectName: string;
   readonly mode: ProjectNotesDisplayMode;
+  readonly keepOpenAcrossThreads: boolean;
   readonly onModeChange: (mode: ProjectNotesDisplayMode) => void;
+  readonly onKeepOpenAcrossThreadsChange: (keepOpen: boolean) => void;
   readonly onClose: () => void;
 }
 
@@ -73,6 +75,8 @@ interface ProjectNotesHeaderProps {
   readonly onKeepLocalDraft: () => void;
   readonly onModeChange: (mode: ProjectNotesDisplayMode) => void;
   readonly onClose: () => void;
+  readonly keepOpenAcrossThreads: boolean;
+  readonly onKeepOpenAcrossThreadsChange: (keepOpen: boolean) => void;
   readonly onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
   readonly onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   readonly onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -91,6 +95,8 @@ function ProjectNotesHeader({
   onKeepLocalDraft,
   onModeChange,
   onClose,
+  keepOpenAcrossThreads,
+  onKeepOpenAcrossThreadsChange,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -146,6 +152,31 @@ function ProjectNotesHeader({
             render={
               <Button
                 type="button"
+                variant={keepOpenAcrossThreads ? "secondary" : "ghost"}
+                size="icon-sm"
+                aria-label={
+                  keepOpenAcrossThreads
+                    ? "Stop keeping Notes open across threads"
+                    : "Keep Notes open across threads"
+                }
+                aria-pressed={keepOpenAcrossThreads}
+                onClick={() => onKeepOpenAcrossThreadsChange(!keepOpenAcrossThreads)}
+              >
+                {keepOpenAcrossThreads ? <PinIcon /> : <PinOffIcon />}
+              </Button>
+            }
+          />
+          <TooltipPopup>
+            {keepOpenAcrossThreads
+              ? "Pinned: Notes stay open when you change project threads"
+              : "Keep Notes open when you change project threads"}
+          </TooltipPopup>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
                 variant="ghost"
                 size="icon-sm"
                 aria-label={modeAction.label}
@@ -189,7 +220,9 @@ export function ProjectNotesSurface({
   projectId,
   projectName,
   mode,
+  keepOpenAcrossThreads,
   onModeChange,
+  onKeepOpenAcrossThreadsChange,
   onClose,
 }: ProjectNotesSurfaceProps) {
   const key = noteKey(environmentId, projectId);
@@ -382,6 +415,8 @@ export function ProjectNotesSurface({
           onKeepLocalDraft={keepLocalDraft}
           onModeChange={onModeChange}
           onClose={onClose}
+          keepOpenAcrossThreads={keepOpenAcrossThreads}
+          onKeepOpenAcrossThreadsChange={onKeepOpenAcrossThreadsChange}
           onPointerDown={beginDrag}
           onPointerMove={moveDrag}
           onPointerUp={endDrag}
