@@ -4,6 +4,7 @@ import type {
   DesktopRuntimeArch,
   DesktopRuntimeInfo,
 } from "@t3tools/contracts";
+import { resolveDesktopIdentity } from "@t3tools/shared/desktopIdentity";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -64,6 +65,7 @@ export class DesktopEnvironment extends Context.Service<
     readonly branding: DesktopAppBranding;
     readonly displayName: string;
     readonly appUserModelId: string;
+    readonly protocolScheme: string;
     readonly linuxDesktopEntryName: string;
     readonly linuxWmClass: string;
     readonly userDataDirName: string;
@@ -155,12 +157,16 @@ const make = Effect.fn("desktop.environment.make")(function* (
     isDevelopment,
     appVersion: input.appVersion,
   });
-  const displayName = branding.displayName;
-  const stateDir = path.join(
-    baseDir,
-    isDevelopment && Option.isNone(configuredBaseDir) ? "dev" : "userdata",
+  const identity = resolveDesktopIdentity(
+    isDevelopment
+      ? "development"
+      : isNightlyDesktopVersion(input.appVersion)
+        ? "nightly"
+        : "latest",
   );
-  const userDataDirName = isDevelopment ? "sigidi-dev" : "sigidi";
+  const displayName = branding.displayName;
+  const stateDir = path.join(baseDir, "userdata");
+  const userDataDirName = identity.electronUserDataDirName;
   const legacyUserDataDirName = userDataDirName;
   const resourcesPath = input.resourcesPath;
 
@@ -200,11 +206,10 @@ const make = Effect.fn("desktop.environment.make")(function* (
     otlpExportIntervalMs: config.otlpExportIntervalMs,
     branding,
     displayName,
-    appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
-      isDevelopment ? "com.mosobande.sigidi.dev" : "com.mosobande.sigidi",
-    ),
-    linuxDesktopEntryName: isDevelopment ? "sigidi-dev.desktop" : "sigidi.desktop",
-    linuxWmClass: isDevelopment ? "sigidi-dev" : "sigidi",
+    appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () => identity.appId),
+    protocolScheme: identity.protocolScheme,
+    linuxDesktopEntryName: identity.linuxDesktopEntryName,
+    linuxWmClass: identity.linuxWmClass,
     userDataDirName,
     legacyUserDataDirName,
     defaultDesktopSettings: DesktopAppSettings.resolveDefaultDesktopSettings(input.appVersion),

@@ -82,6 +82,12 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
       <img
         alt=""
         aria-hidden="true"
+        className={cn("size-5 shrink-0 dark:invert", onBackdrop && "brightness-0 invert")}
+        src="/sigidi-mark.svg"
+      />
+      <img
+        alt=""
+        aria-hidden="true"
         className={cn("h-3 w-auto shrink-0 dark:invert", onBackdrop && "brightness-0 invert")}
         src="/sigidi-wordmark.png"
       />

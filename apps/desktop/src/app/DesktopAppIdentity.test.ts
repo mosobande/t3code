@@ -20,9 +20,9 @@ const defaultEnvironmentInput = {
   platform: "darwin",
   processArch: "arm64",
   appVersion: "1.2.3",
-  appPath: "/Applications/T3 Code.app/Contents/Resources/app.asar",
+  appPath: "/Applications/SIGIDI.app/Contents/Resources/app.asar",
   isPackaged: true,
-  resourcesPath: "/Applications/T3 Code.app/Contents/Resources",
+  resourcesPath: "/Applications/SIGIDI.app/Contents/Resources",
   runningUnderArm64Translation: false,
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
@@ -39,7 +39,7 @@ interface ElectronAppCalls {
 const makeElectronAppLayer = (calls: ElectronAppCalls) =>
   Layer.succeed(ElectronApp.ElectronApp, {
     metadata: Effect.die("unexpected metadata read"),
-    name: Effect.succeed("T3 Code"),
+    name: Effect.succeed("SIGIDI"),
     whenReady: Effect.void,
     quit: Effect.void,
     exit: () => Effect.void,
@@ -140,6 +140,31 @@ const withIdentity = <A, E, R>(
 };
 
 describe("DesktopAppIdentity", () => {
+  it.effect("uses the Stable Electron userData path", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        assert.equal(
+          yield* identity.resolveUserDataPath,
+          "/Users/alice/Library/Application Support/sigidi",
+        );
+      }),
+    ),
+  );
+
+  it.effect("uses a separate Nightly Electron userData path", () =>
+    withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        assert.equal(
+          yield* identity.resolveUserDataPath,
+          "/Users/alice/Library/Application Support/sigidi-nightly",
+        );
+      }),
+      { environment: { appVersion: "1.2.4-nightly.20260728.1" } },
+    ),
+  );
+
   it.effect("keeps using the legacy userData path when it already exists", () =>
     withIdentity(
       Effect.gen(function* () {

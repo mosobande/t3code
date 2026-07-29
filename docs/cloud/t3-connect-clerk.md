@@ -127,15 +127,16 @@ In **Clerk Dashboard > Native applications**, enable the Native API and add thes
 mobile SSO redirect allowlist:
 
 ```text
-t3code-dev://app/
-t3code://app/
+sigidi-dev://app/
+sigidi://app/
+sigidi-nightly://app/
 ```
 
-Local desktop development uses `t3code-dev://app`, while packaged builds use `t3code://app`. Add the
-matching origin to each Clerk instance's Backend API `allowed_origins` array as well. The development
-Clerk instance should only need `t3code-dev://app`; the production Clerk instance should only need
-`t3code://app`. `@clerk/electron` owns the native request adapter, encrypted Clerk token persistence,
-external-browser OAuth transport, and callback delivery for initial sign-in and linked-account flows.
+Local desktop development uses `sigidi-dev://app`. Stable uses `sigidi://app`, and Nightly uses
+`sigidi-nightly://app`. Add the matching origin to each Clerk instance's Backend API
+`allowed_origins` array as well. `@clerk/electron` owns the native request adapter, encrypted Clerk
+token persistence, external-browser OAuth transport, and callback delivery for initial sign-in and
+linked-account flows.
 
 There is currently no Dashboard UI for `allowed_origins`. Preserve any existing entries and update
 the instance through the Backend API:
@@ -144,7 +145,7 @@ the instance through the Backend API:
 curl -X PATCH https://api.clerk.com/v1/instance \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $CLERK_SECRET_KEY" \
-  -d '{"allowed_origins":["t3code://app"]}'
+  -d '{"allowed_origins":["sigidi://app","sigidi-nightly://app"]}'
 ```
 
 Never put `CLERK_SECRET_KEY` in the desktop app, a client-facing environment file, or a build
@@ -152,16 +153,18 @@ artifact.
 
 ## Desktop Passkeys
 
-The production macOS bundle ID is `com.t3tools.t3code`. To enable native passkeys:
+The Stable macOS bundle ID is `com.quantipixels.sigidi`. The Nightly bundle ID is
+`com.quantipixels.sigidi.nightly`. To enable native passkeys:
 
-1. Create an explicit macOS App ID for `com.t3tools.t3code` in the Apple Developer portal and enable
-   **Associated Domains**.
-2. Create a compatible macOS provisioning profile for that App ID and the certificate used to sign
-   the distributed app.
-3. In Clerk's Native API settings, add an iOS app with the same Apple Team ID and bundle ID. This is
+1. Create explicit macOS App IDs for both bundle IDs in the Apple Developer portal. Enable
+   **Associated Domains** for both.
+2. Create compatible macOS provisioning profiles for both App IDs and the certificate used to sign
+   the distributed apps.
+3. In Clerk's Native API settings, add entries with the same Apple Team ID and bundle IDs. This is
    also the configuration point for Electron/macOS passkeys.
 4. Confirm Clerk serves `https://<frontend-api>/.well-known/apple-app-site-association` and that
-   `webcredentials.apps` contains `<TEAM_ID>.com.t3tools.t3code`.
+   `webcredentials.apps` contains both `<TEAM_ID>.com.quantipixels.sigidi` and
+   `<TEAM_ID>.com.quantipixels.sigidi.nightly`.
 5. Set the local or CI signing configuration described below.
 
 For a local signed build, add these values to `.env.local` or export them before invoking the
@@ -169,7 +172,7 @@ desktop artifact command:
 
 ```dotenv
 T3CODE_APPLE_TEAM_ID=ABC1234567
-T3CODE_MACOS_PROVISIONING_PROFILE=/absolute/path/to/t3code.provisionprofile
+T3CODE_MACOS_PROVISIONING_PROFILE=/absolute/path/to/sigidi.provisionprofile
 # Optional: comma-separated override when Clerk's RP ID differs from the Frontend API hostname.
 T3CODE_CLERK_PASSKEY_RP_DOMAINS=example.clerk.accounts.dev,clerk.example.com
 ```
@@ -191,7 +194,7 @@ binary from another:
 ```sh
 VITE_DEV_SERVER_URL=http://127.0.0.1:5733 \
 T3CODE_PORT=13773 \
-  "/Applications/T3 Code (Alpha).app/Contents/MacOS/T3 Code (Alpha)"
+  "/Applications/SIGIDI.app/Contents/MacOS/SIGIDI"
 ```
 
 After changing Associated Domains, bump the build version before rebuilding; macOS may otherwise
@@ -200,8 +203,8 @@ reuse stale Shared Web Credentials metadata for the same app/version pair.
 Verify the installed bundle before testing:
 
 ```sh
-codesign --verify --deep --strict "/Applications/T3 Code (Alpha).app"
-codesign -d --entitlements :- "/Applications/T3 Code (Alpha).app"
+codesign --verify --deep --strict "/Applications/SIGIDI.app"
+codesign -d --entitlements :- "/Applications/SIGIDI.app"
 ```
 
 The current mobile UI uses Clerk's native authentication view. If a future mobile browser OAuth

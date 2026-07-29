@@ -29,6 +29,7 @@ const makeDesktopClerkLayer = (isDevelopment = true) => {
   const environment = DesktopEnvironment.DesktopEnvironment.of({
     stateDir: "/tmp/t3-state",
     isDevelopment,
+    protocolScheme: isDevelopment ? "sigidi-dev" : "sigidi",
   } as unknown as DesktopEnvironment.DesktopEnvironment["Service"]);
 
   return DesktopClerk.layer.pipe(
@@ -124,26 +125,26 @@ describe("DesktopClerk", () => {
     });
   });
 
-  it.each([
-    { isDevelopment: true, scheme: "sigidi-dev" },
-    { isDevelopment: false, scheme: "sigidi" },
-  ])("configures the SDK with the $scheme renderer origin", ({ isDevelopment, scheme }) => {
-    const bridge = { cleanup: vi.fn() };
-    storageMock.mockReturnValue(storageAdapter);
-    createClerkBridgeMock.mockReturnValue(bridge);
+  it.each(["sigidi-dev", "sigidi", "sigidi-nightly"])(
+    "configures the SDK with the %s renderer origin",
+    (scheme) => {
+      const bridge = { cleanup: vi.fn() };
+      storageMock.mockReturnValue(storageAdapter);
+      createClerkBridgeMock.mockReturnValue(bridge);
 
-    assert.equal(DesktopClerk.createDesktopClerkBridge("/tmp/t3-state", isDevelopment), bridge);
-    assert.deepEqual(storageMock.mock.calls, [[{ path: "/tmp/t3-state" }]]);
-    assert.deepEqual(createClerkBridgeMock.mock.calls, [
-      [
-        {
-          storage: storageAdapter,
-          passkeys: true,
-          renderer: { scheme, host: "app" },
-        },
-      ],
-    ]);
-    storageMock.mockClear();
-    createClerkBridgeMock.mockClear();
-  });
+      assert.equal(DesktopClerk.createDesktopClerkBridge("/tmp/t3-state", scheme), bridge);
+      assert.deepEqual(storageMock.mock.calls, [[{ path: "/tmp/t3-state" }]]);
+      assert.deepEqual(createClerkBridgeMock.mock.calls, [
+        [
+          {
+            storage: storageAdapter,
+            passkeys: true,
+            renderer: { scheme, host: "app" },
+          },
+        ],
+      ]);
+      storageMock.mockClear();
+      createClerkBridgeMock.mockClear();
+    },
+  );
 });

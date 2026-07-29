@@ -354,14 +354,17 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   });
 
   it("derives macOS passkey signing configuration from the Clerk publishable key", () => {
-    const configuration = resolveMacPasskeySigningConfiguration({
-      T3CODE_APPLE_TEAM_ID: "abc1234567",
-      T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
-      T3CODE_CLERK_PUBLISHABLE_KEY: `pk_test_${btoa("example.clerk.accounts.dev$")}`,
-    });
+    const configuration = resolveMacPasskeySigningConfiguration(
+      {
+        T3CODE_APPLE_TEAM_ID: "abc1234567",
+        T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+        T3CODE_CLERK_PUBLISHABLE_KEY: `pk_test_${btoa("example.clerk.accounts.dev$")}`,
+      },
+      "com.quantipixels.sigidi.nightly",
+    );
 
     assert.deepStrictEqual(configuration, {
-      appId: "com.quantipixels.sigidi",
+      appId: "com.quantipixels.sigidi.nightly",
       teamId: "ABC1234567",
       rpDomains: ["example.clerk.accounts.dev"],
       provisioningProfilePath: "/tmp/t3code.provisionprofile",
@@ -369,12 +372,15 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   });
 
   it("normalizes explicit macOS passkey RP domains and renders required entitlements", () => {
-    const configuration = resolveMacPasskeySigningConfiguration({
-      T3CODE_APPLE_TEAM_ID: "ABC1234567",
-      T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
-      T3CODE_CLERK_PASSKEY_RP_DOMAINS:
-        " Clerk.Example.com,example.clerk.accounts.dev,clerk.example.com ",
-    });
+    const configuration = resolveMacPasskeySigningConfiguration(
+      {
+        T3CODE_APPLE_TEAM_ID: "ABC1234567",
+        T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+        T3CODE_CLERK_PASSKEY_RP_DOMAINS:
+          " Clerk.Example.com,example.clerk.accounts.dev,clerk.example.com ",
+      },
+      "com.quantipixels.sigidi",
+    );
     const entitlements = renderMacPasskeyEntitlements(configuration);
 
     assert.deepStrictEqual(configuration.rpDomains, [
@@ -390,7 +396,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it("rejects incomplete macOS passkey signing configuration", () => {
     const captureError = (env: Readonly<Record<string, string | undefined>>) => {
       try {
-        resolveMacPasskeySigningConfiguration(env);
+        resolveMacPasskeySigningConfiguration(env, "com.quantipixels.sigidi");
       } catch (error) {
         return error;
       }
@@ -427,11 +433,14 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.notInclude(serializedInvalidDomainError, "query-secret");
     assert.throws(
       () =>
-        resolveMacPasskeySigningConfiguration({
-          T3CODE_APPLE_TEAM_ID: "ABC1234567",
-          T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
-          T3CODE_CLERK_PASSKEY_RP_DOMAINS: "example.clerk.accounts.dev:8443",
-        }),
+        resolveMacPasskeySigningConfiguration(
+          {
+            T3CODE_APPLE_TEAM_ID: "ABC1234567",
+            T3CODE_MACOS_PROVISIONING_PROFILE: "/tmp/t3code.provisionprofile",
+            T3CODE_CLERK_PASSKEY_RP_DOMAINS: "example.clerk.accounts.dev:8443",
+          },
+          "com.quantipixels.sigidi",
+        ),
       /Invalid passkey RP domain/u,
     );
     const invalidPublishableKeyError = captureError({
@@ -468,23 +477,36 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.notInclude(error.message, secret);
   });
 
-  it.effect("adds passkey entitlements and both renderer protocols to signed macOS builds", () =>
-    Effect.gen(function* () {
-      const config = yield* createBuildConfig("mac", "dmg", "1.2.3", true, false, undefined, {
-        entitlementsPath: "/tmp/entitlements.mac.plist",
-        provisioningProfilePath: "/tmp/t3code.provisionprofile",
-      });
+  it.effect(
+    "adds channel-specific passkey entitlements and renderer protocols to macOS builds",
+    () =>
+      Effect.gen(function* () {
+        const stable = yield* createBuildConfig("mac", "dmg", "1.2.3", true, false, undefined, {
+          entitlementsPath: "/tmp/entitlements.mac.plist",
+          provisioningProfilePath: "/tmp/t3code.provisionprofile",
+        });
+        const nightly = yield* createBuildConfig(
+          "mac",
+          "dmg",
+          "1.2.3-nightly.20260728.1",
+          false,
+          false,
+          undefined,
+          undefined,
+        );
 
-      const mac = config.mac as Record<string, unknown>;
-      assert.equal(config.appId, "com.quantipixels.sigidi");
-      assert.equal(config.productName, "SIGIDI");
-      assert.equal(config.artifactName, "SIGIDI-${version}-${arch}.${ext}");
-      assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
-      assert.equal(mac.provisioningProfile, "/tmp/t3code.provisionprofile");
-      assert.deepStrictEqual(mac.protocols, [
-        { name: "SIGIDI", schemes: ["sigidi", "sigidi-dev"] },
-      ]);
-    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+        const mac = stable.mac as Record<string, unknown>;
+        const nightlyMac = nightly.mac as Record<string, unknown>;
+        assert.equal(stable.appId, "com.quantipixels.sigidi");
+        assert.equal(stable.productName, "SIGIDI");
+        assert.equal(stable.artifactName, "SIGIDI-${version}-${arch}.${ext}");
+        assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
+        assert.equal(mac.provisioningProfile, "/tmp/t3code.provisionprofile");
+        assert.deepStrictEqual(mac.protocols, [{ name: "SIGIDI", schemes: ["sigidi"] }]);
+        assert.deepStrictEqual(nightlyMac.protocols, [
+          { name: "SIGIDI Nightly", schemes: ["sigidi-nightly"] },
+        ]);
+      }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
   );
 
   it.effect("keeps executable resource editing enabled for unsigned Windows builds", () =>
@@ -503,6 +525,38 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.equal(win.icon, "icon.ico");
       assert.equal(win.signAndEditExecutable, true);
       assert.notProperty(win, "azureSignOptions");
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
+
+  it.effect("uses channel-specific Linux executable and window identities", () =>
+    Effect.gen(function* () {
+      const stable = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        "1.2.3",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+      const nightly = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        "1.2.3-nightly.20260728.1",
+        false,
+        false,
+        undefined,
+        undefined,
+      );
+
+      assert.deepNestedInclude(stable.linux, {
+        executableName: "sigidi",
+        desktop: { entry: { StartupWMClass: "sigidi" } },
+      });
+      assert.deepNestedInclude(nightly.linux, {
+        executableName: "sigidi-nightly",
+        desktop: { entry: { StartupWMClass: "sigidi-nightly" } },
+      });
     }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
   );
 

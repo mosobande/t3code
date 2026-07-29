@@ -1,7 +1,12 @@
-import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as NodeChildProcess from "node:child_process";
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+import * as NodeURL from "node:url";
+
+const { execFileSync } = NodeChildProcess;
+const { readFileSync, writeFileSync, mkdirSync } = NodeFS;
+const { dirname, join } = NodePath;
+const { fileURLToPath } = NodeURL;
 
 const approvedDirectory = dirname(fileURLToPath(import.meta.url));
 const source = join(approvedDirectory, "../concepts/round-2/c2-refined.png");
@@ -16,7 +21,15 @@ function run(command, args) {
 }
 
 function magick(args) {
-  run("magick", args);
+  const output = args.at(-1);
+  if (output === undefined) throw new Error("ImageMagick output path is required.");
+  run("magick", [
+    "-define",
+    "png:exclude-chunks=date,time",
+    ...args.slice(0, -1),
+    "-strip",
+    output,
+  ]);
 }
 
 function writeEmbeddedSvg({ outputName, pngName, width, height, title, description }) {
@@ -105,6 +118,22 @@ magick([
   "-filter",
   "Lanczos",
   "-resize",
+  "1024x1024",
+  "-alpha",
+  "on",
+  "-fuzz",
+  "7%",
+  "-fill",
+  "none",
+  "-draw",
+  "alpha 0,0 floodfill",
+  "-resize",
+  "86%",
+  "-gravity",
+  "center",
+  "-background",
+  "none",
+  "-extent",
   "1024x1024",
   join(assetsDirectory, "sigidi-app-icon-production-1024.png"),
 ]);

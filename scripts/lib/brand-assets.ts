@@ -1,5 +1,6 @@
 export const BRAND_ASSET_PATHS = {
   approvedProductionIconPng: "docs/brand/approved/assets/sigidi-app-icon-production-1024.png",
+  approvedMarkSvg: "docs/brand/approved/sigidi-mark.svg",
   approvedWordmarkPng: "docs/brand/approved/assets/sigidi-wordmark.png",
 
   developmentIconComposerProject: "assets/dev/app-icon.icon",

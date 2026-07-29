@@ -1,3 +1,8 @@
+// @effect-diagnostics nodeBuiltinImport:off
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+
+import { PNG } from "pngjs";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -10,6 +15,19 @@ import {
 } from "./brand-assets.ts";
 
 describe("brand-assets", () => {
+  const repositoryRoot = NodePath.resolve(import.meta.dirname, "../..");
+
+  function pngChunkTypes(contents: Buffer): ReadonlyArray<string> {
+    const chunkTypes: Array<string> = [];
+    let offset = 8;
+    while (offset + 12 <= contents.length) {
+      const length = contents.readUInt32BE(offset);
+      chunkTypes.push(contents.toString("ascii", offset + 4, offset + 8));
+      offset += length + 12;
+    }
+    return chunkTypes;
+  }
+
   it("maps production web assets into the server package", () => {
     expect(resolveWebIconOverrides("production", "dist/client")).toEqual([
       {
@@ -97,5 +115,52 @@ describe("brand-assets", () => {
     expect(BRAND_ASSET_PATHS.previewMacIconPng).toMatch(/^assets\/preview\/preview-/);
     expect(BRAND_ASSET_PATHS.nightlyMacIconPng).toMatch(/^assets\/nightly\/nightly-/);
     expect(BRAND_ASSET_PATHS.productionMacIconPng).toMatch(/^assets\/prod\/black-/);
+  });
+
+  it("keeps the production mark inside a centered transparent safe area", () => {
+    const image = PNG.sync.read(
+      NodeFS.readFileSync(NodePath.join(repositoryRoot, BRAND_ASSET_PATHS.productionMacIconPng)),
+    );
+    let minimumX = image.width;
+    let minimumY = image.height;
+    let maximumX = -1;
+    let maximumY = -1;
+
+    for (let y = 0; y < image.height; y += 1) {
+      for (let x = 0; x < image.width; x += 1) {
+        if ((image.data[(y * image.width + x) * 4 + 3] ?? 0) === 0) continue;
+        minimumX = Math.min(minimumX, x);
+        minimumY = Math.min(minimumY, y);
+        maximumX = Math.max(maximumX, x);
+        maximumY = Math.max(maximumY, y);
+      }
+    }
+
+    expect(image.data[3]).toBe(0);
+    expect(maximumX - minimumX + 1).toBeLessThanOrEqual(900);
+    expect(maximumY - minimumY + 1).toBeLessThanOrEqual(900);
+    expect(Math.abs((minimumX + maximumX) / 2 - (image.width - 1) / 2)).toBeLessThan(32);
+    expect(Math.abs((minimumY + maximumY) / 2 - (image.height - 1) / 2)).toBeLessThan(32);
+  });
+
+  it("exports the approved sidebar mark through the checked asset pipeline", () => {
+    expect(BRAND_ASSET_PATHS.approvedMarkSvg).toBe("docs/brand/approved/sigidi-mark.svg");
+  });
+
+  it("keeps generated approved PNG sources free of volatile metadata", () => {
+    const generatedSources = [
+      BRAND_ASSET_PATHS.approvedProductionIconPng,
+      "docs/brand/approved/assets/sigidi-lockup.png",
+      "docs/brand/approved/assets/sigidi-mark-1024.png",
+      BRAND_ASSET_PATHS.approvedWordmarkPng,
+    ];
+
+    for (const relativePath of generatedSources) {
+      const contents = NodeFS.readFileSync(NodePath.join(repositoryRoot, relativePath));
+      expect(pngChunkTypes(contents)).not.toContain("tIME");
+      expect(contents.includes("date:create")).toBe(false);
+      expect(contents.includes("date:modify")).toBe(false);
+      expect(contents.includes("Thumb::MTime")).toBe(false);
+    }
   });
 });

@@ -3,14 +3,17 @@
 
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
-import { fileURLToPath } from "node:url";
+import * as NodeURL from "node:url";
 
 import { PNG } from "pngjs";
 
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { encodePngIco, WINDOWS_ICON_SIZES } from "./lib/icon-export.ts";
 
-const repositoryRoot = NodePath.resolve(NodePath.dirname(fileURLToPath(import.meta.url)), "..");
+const repositoryRoot = NodePath.resolve(
+  NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)),
+  "..",
+);
 const checkOnly = process.argv.includes("--check");
 
 interface Rgb {
@@ -239,6 +242,8 @@ generated.set(
 const wordmark = NodeFS.readFileSync(absolutePath(BRAND_ASSET_PATHS.approvedWordmarkPng));
 generated.set("apps/web/public/sigidi-wordmark.png", wordmark);
 generated.set("apps/marketing/public/sigidi-wordmark.png", wordmark);
+const mark = NodeFS.readFileSync(absolutePath(BRAND_ASSET_PATHS.approvedMarkSvg));
+generated.set("apps/web/public/sigidi-mark.svg", mark);
 
 const stale: Array<string> = [];
 for (const [relativePath, contents] of generated) {
