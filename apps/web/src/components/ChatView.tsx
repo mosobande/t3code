@@ -5858,6 +5858,7 @@ function ChatViewContent(props: ChatViewProps) {
       />
     ) : activeRightPanelSurface?.kind === "notes" && renderedProjectNotesTarget ? (
       <ProjectNotesSurface
+        key={`${renderedProjectNotesTarget.environmentId}:${renderedProjectNotesTarget.projectId}`}
         environmentId={renderedProjectNotesTarget.environmentId}
         projectId={renderedProjectNotesTarget.projectId}
         projectName={renderedProjectNotesTarget.projectName}
