@@ -26,5 +26,9 @@ describe("release workflow", () => {
     assert.include(releaseWorkflow, "finalize:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "announce_discord:\n    if: ${{ false }}");
     assert.include(marketingWorkflow, "name: Deploy marketing website");
+    assert.include(
+      marketingWorkflow,
+      "if: ${{ github.ref_name == github.event.repository.default_branch }}",
+    );
   });
 });
