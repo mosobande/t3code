@@ -2,8 +2,8 @@ name: Deploy T3 Connect relay
 
 on:
   push:
-    branches:
-      - main
+    paths-ignore:
+      - .github/workflows/**
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ concurrency:
 jobs:
   deploy_relay:
     name: Deploy production relay
+    if: github.ref_name == github.event.repository.default_branch
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 15
     environment:

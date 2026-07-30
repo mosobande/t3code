@@ -2,8 +2,6 @@ name: Issue Labels
 
 on:
   push:
-    branches:
-      - main
     paths:
       - .github/ISSUE_TEMPLATE/**
       - .github/workflows/issue-labels.yml
@@ -15,6 +13,7 @@ permissions:
 jobs:
   sync:
     name: Sync issue labels
+    if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Ensure managed issue labels exist
