@@ -1,0 +1,73 @@
+name: Deploy Marketing
+
+on:
+  push:
+    paths:
+      - ".github/workflows/deploy-marketing.yml"
+      - "apps/marketing/**"
+      - "packages/shared/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy marketing website
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    environment:
+      name: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.MARKETING_VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.MARKETING_VERCEL_PROJECT_ID }}
+      VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: |
+            args:
+              - --filter=@t3tools/marketing...
+
+      - name: Build marketing website
+        run: vp run --filter @t3tools/marketing build
+
+      - name: Deploy marketing website
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required=(
+            VERCEL_TOKEN
+            VERCEL_ORG_ID
+            VERCEL_PROJECT_ID
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required marketing deployment configuration: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+          scope="${VERCEL_TEAM_SLUG:-$VERCEL_ORG_ID}"
+          vp dlx vercel@53.1.1 deploy \
+            --archive=tgz \
+            --prod \
+            --yes \
+            --token "$VERCEL_TOKEN" \
+            --scope "$scope"
