@@ -21,6 +21,7 @@ import { ProjectFavicon } from "../ProjectFavicon";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { NotebookPenIcon } from "lucide-react";
+import { PROJECT_NOTES_SURFACE_ID } from "../projectNotes/ProjectNotesSurface";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -155,9 +156,8 @@ export const ChatHeader = memo(function ChatHeader({
                   variant={projectNotesOpen ? "secondary" : "ghost"}
                   size="icon-sm"
                   aria-label={projectNotesOpen ? "Close project notes" : "Open project notes"}
-                  aria-pressed={projectNotesOpen}
                   aria-expanded={projectNotesOpen}
-                  aria-controls="project-notes-surface"
+                  aria-controls={projectNotesOpen ? PROJECT_NOTES_SURFACE_ID : undefined}
                   onClick={onToggleProjectNotes}
                 >
                   <NotebookPenIcon />

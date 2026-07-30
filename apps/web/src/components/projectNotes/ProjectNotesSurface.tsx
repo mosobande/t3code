@@ -56,7 +56,7 @@ interface SaveState {
   readonly error: string | null;
   readonly conflict: ProjectNote | null;
 }
-const PROJECT_NOTES_SURFACE_ID = "project-notes-surface";
+export const PROJECT_NOTES_SURFACE_ID = "project-notes-surface";
 const PROJECT_NOTES_KEYBOARD_HELP_ID = "project-notes-keyboard-help";
 const isProjectNoteConflictError = Schema.is(ProjectNoteConflictError);
 
@@ -452,6 +452,12 @@ export function ProjectNotesSurface({
     <aside
       id={PROJECT_NOTES_SURFACE_ID}
       ref={surfaceRef}
+      onKeyDownCapture={(event) => {
+        if (mode === "floating" && event.key === "Escape") {
+          event.preventDefault();
+          onClose();
+        }
+      }}
       className={
         mode === "floating"
           ? "fixed z-50 flex min-h-70 min-w-80 resize overflow-hidden rounded-xl border border-border bg-background shadow-md"

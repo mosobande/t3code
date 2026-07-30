@@ -45,6 +45,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PROJECT_NOTE_MARKDOWN_TRANSFORMERS } from "~/projectNoteMarkdown";
+import { isSafeProjectNoteLinkUrl } from "./projectNoteLinks";
 import { resolveProjectNoteSelectionActions } from "./projectNoteToolbarState";
 
 interface ProjectNoteEditorProps {
@@ -165,10 +166,8 @@ function NotesToolbar() {
     });
   };
   const addLink = () => {
-    const url = window.prompt("Link URL");
-    if (url?.trim()) {
-      editor.dispatchCommand(TOGGLE_LINK_COMMAND, url.trim());
-    }
+    const url = window.prompt("Link URL")?.trim();
+    if (url && isSafeProjectNoteLinkUrl(url)) editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
   };
   const removeLink = () => {
     editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
@@ -278,7 +277,7 @@ export function ProjectNoteEditor({ initialMarkdown, onChange }: ProjectNoteEdit
           />
           <HistoryPlugin />
           <ListPlugin />
-          <LinkPlugin />
+          <LinkPlugin validateUrl={isSafeProjectNoteLinkUrl} />
           <MarkdownShortcutPlugin transformers={PROJECT_NOTE_MARKDOWN_TRANSFORMERS} />
           <OnChangePlugin
             ignoreSelectionChange

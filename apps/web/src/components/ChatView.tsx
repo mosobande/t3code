@@ -1710,7 +1710,12 @@ function ChatViewContent(props: ChatViewProps) {
     const ownerProjectKey = projectNotesOwnerProjectKeyRef.current;
     const ownerThreadRef = projectNotesOwnerThreadRef.current;
     if (ownerProjectKey === null || ownerThreadRef === null) {
-      if (!floatingProjectNotesTarget && dockedProjectNotesSurfacePresent && activeThreadRef) {
+      if (
+        !floatingProjectNotesTarget &&
+        dockedProjectNotesSurfacePresent &&
+        activeProjectNotesTargetKey !== null &&
+        activeThreadRef
+      ) {
         projectNotesOwnerProjectKeyRef.current = activeProjectNotesTargetKey;
         projectNotesOwnerThreadRef.current = activeThreadRef;
       }
@@ -5856,7 +5861,9 @@ function ChatViewContent(props: ChatViewProps) {
         timestampFormat={timestampFormat}
         mode="embedded"
       />
-    ) : activeRightPanelSurface?.kind === "notes" && renderedProjectNotesTarget ? (
+    ) : activeRightPanelSurface?.kind === "notes" &&
+      !floatingProjectNotesTarget &&
+      renderedProjectNotesTarget ? (
       <ProjectNotesSurface
         key={`${renderedProjectNotesTarget.environmentId}:${renderedProjectNotesTarget.projectId}`}
         environmentId={renderedProjectNotesTarget.environmentId}
