@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 320" role="img" aria-labelledby="title description">
+  <title id="title">SIGIDI horizontal lockup</title>
+  <desc id="description">The Forged Automaton mark beside the uppercase SIGIDI wordmark.</desc>
+  <g transform="translate(24 24) scale(.53125)">
+    <g fill="#171717">
+      <path d="m120 108 308 234-17 23L103 131Z"/>
+      <path d="m414 326 78 26-60 86-30-78Z"/>
+      <path d="m92 55 66 25-22 58-66-25Z"/>
+      <path d="m72 132 62-20 86 66-50 92-84-35Z"/>
+      <path d="m105 119 27-24 132 100-21 29Z"/>
+      <path d="m130 153 24-29 165 125-20 29Z"/>
+      <path d="m119 242 49 12-63 98-37-23Z"/>
+      <path d="m68 321 42 27-50 100H12Z"/>
+      <path d="m153 243 37-25 96 101-35 32Z"/>
+      <path d="m247 324 46-5 7 129h-46Z"/>
+      <path d="M12 427h84v22H12Z"/>
+      <path d="M254 427h78v22h-78Z"/>
+      <circle cx="105" cy="136" r="23"/>
+      <circle cx="148" cy="250" r="25"/>
+      <circle cx="90" cy="340" r="18"/>
+      <circle cx="270" cy="330" r="18"/>
+      <circle cx="247" cy="208" r="14"/>
+      <circle cx="306" cy="263" r="14"/>
+    </g>
+    <g fill="#fff">
+      <circle cx="105" cy="136" r="8"/>
+      <circle cx="148" cy="250" r="9"/>
+      <circle cx="90" cy="340" r="6"/>
+      <circle cx="270" cy="330" r="6"/>
+      <circle cx="247" cy="208" r="5"/>
+      <circle cx="306" cy="263" r="5"/>
+    </g>
+  </g>
+  <g transform="translate(364 70) scale(.95)" fill="none" stroke="#171717" stroke-width="20" stroke-linecap="square" stroke-linejoin="miter">
+    <path d="M106 24H31L18 37v32l13 13h58l17 17v24l-13 13H18"/>
+    <path d="M151 24h48M175 24v112m-24 0h48"/>
+    <path d="m326 47-23-23h-58l-21 21v70l21 21h58l23-23V86h-49"/>
+    <path d="M370 24h48M394 24v112m-24 0h48"/>
+    <path d="M463 136V24h61l32 32v48l-32 32Z"/>
+    <path d="M603 24h48M627 24v112m-24 0h48"/>
+  </g>
+</svg>

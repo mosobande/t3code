@@ -1,4 +1,8 @@
 export const BRAND_ASSET_PATHS = {
+  approvedProductionIconPng: "docs/brand/approved/assets/sigidi-app-icon-production-1024.png",
+  approvedMarkSvg: "docs/brand/approved/sigidi-mark.svg",
+  approvedWordmarkPng: "docs/brand/approved/assets/sigidi-wordmark.png",
+
   developmentIconComposerProject: "assets/dev/app-icon.icon",
   developmentIosIconPng: "assets/dev/blueprint-ios-1024.png",
   developmentUniversalIconPng: "assets/dev/blueprint-universal-1024.png",
@@ -12,6 +16,15 @@ export const BRAND_ASSET_PATHS = {
   productionWebFavicon16Png: "assets/prod/t3-black-web-favicon-16x16.png",
   productionWebFavicon32Png: "assets/prod/t3-black-web-favicon-32x32.png",
   productionWebAppleTouchIconPng: "assets/prod/t3-black-web-apple-touch-180.png",
+
+  previewIosIconPng: "assets/preview/preview-ios-1024.png",
+  previewMacIconPng: "assets/preview/preview-macos-1024.png",
+  previewLinuxIconPng: "assets/preview/preview-universal-1024.png",
+  previewWindowsIconIco: "assets/preview/preview-windows.ico",
+  previewWebFaviconIco: "assets/preview/preview-web-favicon.ico",
+  previewWebFavicon16Png: "assets/preview/preview-web-favicon-16x16.png",
+  previewWebFavicon32Png: "assets/preview/preview-web-favicon-32x32.png",
+  previewWebAppleTouchIconPng: "assets/preview/preview-web-apple-touch-180.png",
 
   nightlyIconComposerProject: "assets/nightly/app-icon.icon",
   nightlyIosIconPng: "assets/nightly/nightly-ios-1024.png",

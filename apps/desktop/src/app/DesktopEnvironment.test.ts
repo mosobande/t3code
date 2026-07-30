@@ -13,9 +13,9 @@ const defaultInput = {
   platform: "darwin",
   processArch: "arm64",
   appVersion: "0.0.22",
-  appPath: "/Applications/T3 Code.app/Contents/Resources/app.asar",
+  appPath: "/Applications/SIGIDI.app/Contents/Resources/app.asar",
   isPackaged: false,
-  resourcesPath: "/Applications/T3 Code.app/Contents/Resources",
+  resourcesPath: "/Applications/SIGIDI.app/Contents/Resources",
   runningUnderArm64Translation: false,
 } satisfies DesktopEnvironment.MakeDesktopEnvironmentInput;
 
@@ -67,8 +67,11 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.appRoot, "/repo");
       assert.equal(environment.backendEntryPath, "/repo/apps/server/dist/bin.mjs");
       assert.equal(environment.backendCwd, "/repo");
-      assert.equal(environment.appUserModelId, "com.t3tools.t3code.dev");
-      assert.equal(environment.linuxWmClass, "t3code-dev");
+      assert.equal(environment.displayName, "SIGIDI");
+      assert.equal(environment.appUserModelId, "com.quantipixels.sigidi.dev");
+      assert.equal(environment.userDataDirName, "sigidi-dev");
+      assert.equal(environment.protocolScheme, "sigidi-dev");
+      assert.equal(environment.linuxWmClass, "sigidi-dev");
       assert.deepEqual(
         Option.map(environment.devServerUrl, (url) => url.href),
         Option.some("http://localhost:5173/"),
@@ -95,10 +98,30 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.logDir, "/tmp/t3/userdata/logs");
       assert.equal(environment.browserArtifactsDir, "/tmp/t3/userdata/browser-artifacts");
       assert.equal(environment.serverSettingsPath, "/tmp/t3/userdata/settings.json");
+      assert.equal(environment.appUserModelId, "com.quantipixels.sigidi");
+      assert.equal(environment.userDataDirName, "sigidi");
+      assert.equal(environment.protocolScheme, "sigidi");
+      assert.equal(environment.linuxDesktopEntryName, "sigidi.desktop");
     }),
   );
 
-  it.effect("keeps implicit development state separate from production state", () =>
+  it.effect("uses the nightly runtime identity without changing the shared state directory", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment({
+        appVersion: "0.0.22-nightly.20260728.1",
+      });
+
+      assert.equal(environment.baseDir, "/Users/alice/.sigidi");
+      assert.equal(environment.stateDir, "/Users/alice/.sigidi/userdata");
+      assert.equal(environment.appUserModelId, "com.quantipixels.sigidi.nightly");
+      assert.equal(environment.userDataDirName, "sigidi-nightly");
+      assert.equal(environment.protocolScheme, "sigidi-nightly");
+      assert.equal(environment.linuxDesktopEntryName, "sigidi-nightly.desktop");
+      assert.equal(environment.linuxWmClass, "sigidi-nightly");
+    }),
+  );
+
+  it.effect("shares application state between development and production", () =>
     Effect.gen(function* () {
       const development = yield* makeEnvironment(
         {},
@@ -106,8 +129,8 @@ describe("DesktopEnvironment", () => {
       );
       const production = yield* makeEnvironment();
 
-      assert.equal(development.stateDir, "/Users/alice/.t3/dev");
-      assert.equal(production.stateDir, "/Users/alice/.t3/userdata");
+      assert.equal(development.stateDir, "/Users/alice/.sigidi/userdata");
+      assert.equal(production.stateDir, "/Users/alice/.sigidi/userdata");
     }),
   );
 

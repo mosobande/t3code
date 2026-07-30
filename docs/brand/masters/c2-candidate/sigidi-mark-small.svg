@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">SIGIDI simplified small-size mark</title>
+  <desc id="description">A simplified Forged Automaton mark for favicon and notification sizes.</desc>
+  <g id="sigidi-mark-small" fill="#171717">
+    <path d="m112 102 326 247-22 30L90 132Z"/>
+    <path d="m409 321 83 28-63 94-33-86Z"/>
+    <path d="m86 54 78 29-24 64-78-29Z"/>
+    <path d="m66 130 70-23 92 71-55 101-94-39Z"/>
+    <path d="m108 238 59 15-65 103-45-28Z"/>
+    <path d="m57 320 51 32-52 100H4Z"/>
+    <path d="m151 240 43-29 101 107-42 38Z"/>
+    <path d="m246 321 54-6 8 137h-55Z"/>
+    <path d="M4 426h99v27H4Z"/>
+    <path d="M253 426h88v27h-88Z"/>
+  </g>
+</svg>

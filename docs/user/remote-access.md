@@ -160,7 +160,7 @@ be able to update and reconnect the server for you, or it may ask you to update 
 run a copied command on the server machine.
 
 Finish active work before updating because the server restarts briefly. For step-by-step guidance,
-see [Keeping T3 Code in Sync](./server-updates.md).
+see [Keeping SIGIDI in Sync](./server-updates.md).
 
 On a Linux host, you can keep the server running after logout and manage it independently of the
 connection method. See [Running T3 Code in the Background](./background-service.md).

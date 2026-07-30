@@ -8,7 +8,7 @@
 - From the **main checkout**, dev commands implicitly use `~/.t3/dev`, keeping development state separate from `~/.t3/userdata`. An explicit `--home-dir <path>` stores state under `<path>/userdata`; the base directory remains available for caches, worktrees, and other shared data.
 - Web dev commands do not auto-open a browser. Open the one-time pairing URL printed by the server so the first browser navigation is authenticated. Set `T3CODE_NO_BROWSER=0` only when interactive auto-open is intentional.
 - Pass dev-runner flags directly after the root task name, for example:
-  `vp run dev --home-dir /tmp/t3code-dev`
+  `vp run dev --home-dir /tmp/sigidi-dev`
 - `vp run start` — Runs the production server (serves built web app as static files).
 - `vp run build` — Builds contracts, web app, and server.
 - `vp run typecheck` — Strict TypeScript checks for all packages.
@@ -24,8 +24,8 @@
 
 - Default build is unsigned/not notarized for local sharing.
 - The DMG build uses `assets/prod/black-macos-1024.png` as the production app icon source.
-- Desktop production windows load the bundled UI from `t3code://app/index.html` (not a `127.0.0.1` document URL).
-
+- Stable desktop windows load `sigidi://app/index.html`. Nightly uses
+  `sigidi-nightly://app/index.html`, and Dev uses `sigidi-dev://app/index.html`.
 - Desktop packaging includes `apps/server/dist` (the `t3` backend) and starts it on loopback with an auth token for WebSocket/API traffic.
 - Your tester can still open it on macOS by right-clicking the app and choosing **Open** on first launch.
 - To keep staging files for debugging package contents, run: `vp run dist:desktop:dmg -- --keep-stage`

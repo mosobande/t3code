@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 160" role="img" aria-labelledby="title description">
+  <title id="title">SIGIDI wordmark</title>
+  <desc id="description">The uppercase word SIGIDI drawn with angular geometric strokes.</desc>
+  <g id="sigidi-wordmark" fill="none" stroke="#171717" stroke-width="20" stroke-linecap="square" stroke-linejoin="miter">
+    <!-- S -->
+    <path d="M106 24H31L18 37v32l13 13h58l17 17v24l-13 13H18"/>
+    <!-- I -->
+    <path d="M151 24h48M175 24v112m-24 0h48"/>
+    <!-- G -->
+    <path d="m326 47-23-23h-58l-21 21v70l21 21h58l23-23V86h-49"/>
+    <!-- I -->
+    <path d="M370 24h48M394 24v112m-24 0h48"/>
+    <!-- D -->
+    <path d="M463 136V24h61l32 32v48l-32 32Z"/>
+    <!-- I -->
+    <path d="M603 24h48M627 24v112m-24 0h48"/>
+  </g>
+</svg>

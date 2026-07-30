@@ -239,7 +239,8 @@ Required secrets used by the workflow:
 - `APPLE_API_KEY`
 - `APPLE_API_KEY_ID`
 - `APPLE_API_ISSUER`
-- `MACOS_PROVISIONING_PROFILE` (base64-encoded provisioning profile with Associated Domains)
+- `MACOS_PROVISIONING_PROFILE_STABLE` (base64-encoded Stable provisioning profile)
+- `MACOS_PROVISIONING_PROFILE_NIGHTLY` (base64-encoded Nightly provisioning profile)
 
 Required repository variables:
 
@@ -254,12 +255,14 @@ Checklist:
 
 1. Apple Developer account access:
    - Team has rights to create Developer ID certificates.
-2. Create an explicit App ID for `com.t3tools.t3code` and enable Associated Domains.
-3. Create a `Developer ID Application` certificate and a compatible provisioning profile for that
-   App ID with Associated Domains enabled.
+2. Create explicit App IDs for `com.quantipixels.sigidi` and
+   `com.quantipixels.sigidi.nightly`. Enable Associated Domains for both.
+3. Create a `Developer ID Application` certificate and compatible provisioning profiles for both
+   App IDs with Associated Domains enabled.
 4. Export the certificate + private key as `.p12` from Keychain.
 5. Base64-encode the `.p12` and store as `CSC_LINK`.
-6. Base64-encode the provisioning profile and store it as `MACOS_PROVISIONING_PROFILE`.
+6. Base64-encode the profiles and store them as `MACOS_PROVISIONING_PROFILE_STABLE` and
+   `MACOS_PROVISIONING_PROFILE_NIGHTLY`.
 7. Store the `.p12` export password as `CSC_KEY_PASSWORD`, and set `APPLE_TEAM_ID` to the
    10-character Apple Developer Team ID.
 8. In App Store Connect, create an API key (Team key).
@@ -275,8 +278,8 @@ Notes:
 
 - `APPLE_API_KEY` is stored as raw key text in secrets.
 - The workflow writes it to a temporary `AuthKey_<id>.p8` file at runtime.
-- The workflow decodes `MACOS_PROVISIONING_PROFILE`, validates it with `security cms`, and passes it
-  to the desktop packager.
+- The workflow selects the profile for the release channel. It validates the profile application
+  identifier before it passes the profile to the desktop packager.
 
 ## 3) Azure Trusted Signing setup (Windows)
 
@@ -321,8 +324,8 @@ Checklist:
 
 - macOS build unsigned when expected signed:
   - Check all Apple secrets plus `APPLE_TEAM_ID` are populated and non-empty.
-  - Confirm the provisioning profile belongs to `APPLE_TEAM_ID.com.t3tools.t3code` and includes
-    Associated Domains.
+  - Confirm the provisioning profile belongs to the selected channel App ID and includes Associated
+    Domains.
 - Windows build unsigned when expected signed:
   - Check all Azure ATS and auth secrets are populated and non-empty.
 - Build fails with signing error:
