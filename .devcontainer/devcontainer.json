@@ -1,5 +1,5 @@
 {
-  "name": "T3 Code Dev",
+  "name": "SIGIDI Dev",
   "image": "debian:bookworm",
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
@@ -7,10 +7,11 @@
       "version": "1.3.11"
     },
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "24.13.1"
+      "version": "24.13.1",
+      "pnpmVersion": "11.10.0"
     },
     "ghcr.io/devcontainers/features/python:1": {
-      "version": "3.10",
+      "version": "os-provided",
       "installTools": false
     }
   },
@@ -18,8 +19,12 @@
     "ghcr.io/devcontainers/features/git",
     "ghcr.io/devcontainers-extra/features/bun"
   ],
+  "mounts": [
+    "source=${devcontainerId}-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=${devcontainerId}-pnpm-store,target=/pnpm/store,type=volume"
+  ],
   "postCreateCommand": {
-    "bun-install": "bun install --backend=copyfile --frozen-lockfile"
+    "pnpm-install": "NODE_OPTIONS=--max-old-space-size=1536 pnpm install --frozen-lockfile --filter . --filter t3... --filter @t3tools/desktop... --store-dir /pnpm/store --child-concurrency=2 --network-concurrency=8"
   },
   "customizations": {
     "vscode": {
