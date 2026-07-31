@@ -97,13 +97,13 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17"), {
-      macIconPng: BRAND_ASSET_PATHS.productionMacIconPng,
+      macIconComposerProject: BRAND_ASSET_PATHS.productionIconComposerProject,
       linuxIconPng: BRAND_ASSET_PATHS.productionLinuxIconPng,
       windowsIconIco: BRAND_ASSET_PATHS.productionWindowsIconIco,
     });
 
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17-nightly.20260413.42"), {
-      macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
+      macIconComposerProject: BRAND_ASSET_PATHS.nightlyIconComposerProject,
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
       windowsIconIco: BRAND_ASSET_PATHS.nightlyWindowsIconIco,
     });
@@ -502,6 +502,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         assert.equal(stable.artifactName, "SIGIDI-${version}-${arch}.${ext}");
         assert.equal(mac.entitlements, "/tmp/entitlements.mac.plist");
         assert.equal(mac.provisioningProfile, "/tmp/t3code.provisionprofile");
+        assert.equal(mac.icon, "app-icon.icon");
         assert.deepStrictEqual(mac.protocols, [{ name: "SIGIDI", schemes: ["sigidi"] }]);
         assert.deepStrictEqual(nightlyMac.protocols, [
           { name: "SIGIDI Nightly", schemes: ["sigidi-nightly"] },

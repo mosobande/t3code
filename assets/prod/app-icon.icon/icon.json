@@ -1,31 +1,30 @@
 {
   "fill": {
-    "solid": "display-p3:0.00000,0.00000,0.00000,1.00000"
+    "solid": "display-p3:0.07843,0.07843,0.08627,1.00000"
   },
   "groups": [
     {
       "layers": [
         {
-          "image-name": "text.svg",
-          "name": "Text",
-          "position": {
-            "scale": 10,
-            "translation-in-points": [0, 0]
-          }
+          "glass": true,
+          "hidden": false,
+          "image-name": "sigidi-mark.png",
+          "name": "SIGIDI automaton"
         }
       ],
+      "lighting": "individual",
       "shadow": {
         "kind": "neutral",
-        "opacity": 0.5
+        "opacity": 0.45
       },
+      "specular": true,
       "translucency": {
         "enabled": true,
-        "value": 0.5
+        "value": 0.2
       }
     }
   ],
   "supported-platforms": {
-    "circles": ["watchOS"],
     "squares": "shared"
   }
 }

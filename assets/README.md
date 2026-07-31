@@ -13,9 +13,20 @@ The channel treatments are:
 - Preview: deep moss green
 - Nightly: midnight violet
 
-The old Icon Composer projects remain as upstream reference files. They are not SIGIDI identity sources.
+The Icon Composer projects are generated SIGIDI macOS sources:
 
-Run `pnpm icons:export` from the repository root to regenerate the tracked platform assets. The command generates Linux, Windows, desktop, marketing, and web files. It also copies the development favicon family to `apps/web/public`.
+- `assets/prod/app-icon.icon`
+- `assets/nightly/app-icon.icon`
+- `assets/dev/app-icon.icon`
+
+Each project contains the approved automaton as a transparent foreground layer.
+Icon Composer supplies the platform enclosure, corners, lighting, and fallback
+ICNS renditions.
+
+Run `pnpm icons:export` from the repository root to regenerate the tracked
+Icon Composer projects and the Linux, Windows, desktop, marketing, and web
+files. The command also copies the development favicon family to
+`apps/web/public`.
 
 Run `pnpm icons:check` to verify that the generated files match the approved source. The check does not change files.
 

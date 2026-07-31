@@ -25,6 +25,8 @@ interface Rgb {
 interface BrandVariant {
   readonly name: string;
   readonly background: Rgb | null;
+  readonly macBackground: Rgb;
+  readonly iconComposerProject: string | null;
   readonly macos: string;
   readonly universal: string;
   readonly appleTouch: string;
@@ -38,6 +40,8 @@ const variants = [
   {
     name: "development",
     background: { red: 0x00, green: 0x63, blue: 0x9b },
+    macBackground: { red: 0x00, green: 0x4f, blue: 0x7d },
+    iconComposerProject: BRAND_ASSET_PATHS.developmentIconComposerProject,
     macos: BRAND_ASSET_PATHS.developmentDesktopIconPng,
     universal: BRAND_ASSET_PATHS.developmentUniversalIconPng,
     appleTouch: BRAND_ASSET_PATHS.developmentWebAppleTouchIconPng,
@@ -49,6 +53,8 @@ const variants = [
   {
     name: "preview",
     background: { red: 0x26, green: 0x4d, blue: 0x3e },
+    macBackground: { red: 0x1e, green: 0x3e, blue: 0x32 },
+    iconComposerProject: null,
     macos: BRAND_ASSET_PATHS.previewMacIconPng,
     universal: BRAND_ASSET_PATHS.previewLinuxIconPng,
     appleTouch: BRAND_ASSET_PATHS.previewWebAppleTouchIconPng,
@@ -60,6 +66,8 @@ const variants = [
   {
     name: "nightly",
     background: { red: 0x21, green: 0x1b, blue: 0x4d },
+    macBackground: { red: 0x1c, green: 0x17, blue: 0x42 },
+    iconComposerProject: BRAND_ASSET_PATHS.nightlyIconComposerProject,
     macos: BRAND_ASSET_PATHS.nightlyMacIconPng,
     universal: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
     appleTouch: BRAND_ASSET_PATHS.nightlyWebAppleTouchIconPng,
@@ -71,6 +79,8 @@ const variants = [
   {
     name: "production",
     background: null,
+    macBackground: { red: 0x14, green: 0x14, blue: 0x16 },
+    iconComposerProject: BRAND_ASSET_PATHS.productionIconComposerProject,
     macos: BRAND_ASSET_PATHS.productionMacIconPng,
     universal: BRAND_ASSET_PATHS.productionLinuxIconPng,
     appleTouch: BRAND_ASSET_PATHS.productionWebAppleTouchIconPng,
@@ -152,8 +162,120 @@ function resize(source: PNG, size: number): PNG {
   return result;
 }
 
+const APPLE_ICON_SIZE = 1024;
+const APPLE_MARK_SIZE = 820;
+const APPLE_MARK_OFFSET = (APPLE_ICON_SIZE - APPLE_MARK_SIZE) / 2;
+const IVORY = { red: 0xf4, green: 0xf0, blue: 0xe6 } as const;
+const EMBER = { red: 0xe9, green: 0x4f, blue: 0x22 } as const;
+const AXE_BLADE = [
+  [700, 710],
+  [840, 590],
+  [950, 640],
+  [950, 820],
+] as const;
+
+function pointInsidePolygon(x: number, y: number, polygon: typeof AXE_BLADE): boolean {
+  let inside = false;
+  for (
+    let current = 0, previous = polygon.length - 1;
+    current < polygon.length;
+    previous = current, current += 1
+  ) {
+    const [currentX, currentY] = polygon[current]!;
+    const [previousX, previousY] = polygon[previous]!;
+    if (
+      currentY > y !== previousY > y &&
+      x < ((previousX - currentX) * (y - currentY)) / (previousY - currentY) + currentX
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function composeAppleForeground(markSource: PNG): PNG {
+  const result = new PNG({ width: APPLE_ICON_SIZE, height: APPLE_ICON_SIZE });
+  const mark = resize(markSource, APPLE_MARK_SIZE);
+
+  for (let y = 0; y < mark.height; y += 1) {
+    for (let x = 0; x < mark.width; x += 1) {
+      const markOffset = (y * mark.width + x) * 4;
+      const luminance =
+        ((mark.data[markOffset] ?? 0) * 0.2126 +
+          (mark.data[markOffset + 1] ?? 0) * 0.7152 +
+          (mark.data[markOffset + 2] ?? 0) * 0.0722) /
+        0xff;
+      // The approved transparent mark retains a light presentation fringe from
+      // the source board. Its dark pixels are the authoritative geometry.
+      const alpha = ((mark.data[markOffset + 3] ?? 0) / 0xff) * (1 - luminance);
+      if (alpha === 0) continue;
+
+      const sourceX = (x + 0.5) * (markSource.width / mark.width) - 0.5;
+      const sourceY = (y + 0.5) * (markSource.height / mark.height) - 0.5;
+      const color = pointInsidePolygon(sourceX, sourceY, AXE_BLADE) ? EMBER : IVORY;
+      const materialLight = 0.94 + (1 - y / mark.height) * 0.06;
+      const targetX = x + APPLE_MARK_OFFSET;
+      const targetY = y + APPLE_MARK_OFFSET;
+      const targetOffset = (targetY * result.width + targetX) * 4;
+
+      result.data[targetOffset] = Math.round(color.red * materialLight);
+      result.data[targetOffset + 1] = Math.round(color.green * materialLight);
+      result.data[targetOffset + 2] = Math.round(color.blue * materialLight);
+      result.data[targetOffset + 3] = Math.round(alpha * 0xff);
+    }
+  }
+
+  return result;
+}
+
+function colorString(color: Rgb): string {
+  const channel = (value: number) => (value / 0xff).toFixed(5);
+  return `display-p3:${channel(color.red)},${channel(color.green)},${channel(color.blue)},1.00000`;
+}
+
+function iconComposerManifest(background: Rgb): Buffer {
+  return Buffer.from(
+    `${JSON.stringify(
+      {
+        fill: {
+          solid: colorString(background),
+        },
+        groups: [
+          {
+            layers: [
+              {
+                glass: true,
+                hidden: false,
+                "image-name": "sigidi-mark.png",
+                name: "SIGIDI automaton",
+              },
+            ],
+            lighting: "individual",
+            shadow: {
+              kind: "neutral",
+              opacity: 0.45,
+            },
+            specular: true,
+            translucency: {
+              enabled: true,
+              value: 0.2,
+            },
+          },
+        ],
+        "supported-platforms": {
+          squares: "shared",
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+}
+
 const generated = new Map<string, Buffer>();
 const productionSource = readPng(BRAND_ASSET_PATHS.approvedProductionIconPng);
+const markSource = readPng(BRAND_ASSET_PATHS.approvedMarkPng);
+const appleForeground = encodePng(composeAppleForeground(markSource));
 const channelProofIcons = new Map<string, PNG>();
 
 for (const variant of variants) {
@@ -178,6 +300,16 @@ for (const variant of variants) {
   generated.set(variant.favicon32, png32);
   generated.set(variant.faviconIco, ico);
   generated.set(variant.windowsIco, ico);
+  if (variant.iconComposerProject) {
+    generated.set(
+      NodePath.join(variant.iconComposerProject, "icon.json"),
+      iconComposerManifest(variant.macBackground),
+    );
+    generated.set(
+      NodePath.join(variant.iconComposerProject, "Assets", "sigidi-mark.png"),
+      appleForeground,
+    );
+  }
 }
 
 const channelProof = new PNG({ width: 1104, height: 288, fill: true });

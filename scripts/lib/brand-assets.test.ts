@@ -117,9 +117,43 @@ describe("brand-assets", () => {
     expect(BRAND_ASSET_PATHS.productionMacIconPng).toMatch(/^assets\/prod\/black-/);
   });
 
-  it("keeps the production mark inside a centered transparent safe area", () => {
+  it("uses the SIGIDI mark in each Icon Composer project", () => {
+    for (const projectPath of [
+      BRAND_ASSET_PATHS.developmentIconComposerProject,
+      BRAND_ASSET_PATHS.nightlyIconComposerProject,
+      BRAND_ASSET_PATHS.productionIconComposerProject,
+    ]) {
+      const projectRoot = NodePath.join(repositoryRoot, projectPath);
+      const manifest = NodeFS.readFileSync(NodePath.join(projectRoot, "icon.json"), "utf8");
+      const markPath = NodePath.join(projectRoot, "Assets", "sigidi-mark.png");
+
+      expect(manifest).toContain('"image-name": "sigidi-mark.png"');
+      expect(manifest).not.toContain("text.svg");
+      expect(NodeFS.existsSync(markPath)).toBe(true);
+
+      const mark = PNG.sync.read(NodeFS.readFileSync(markPath));
+      expect(mark.width).toBe(1024);
+      expect(mark.height).toBe(1024);
+      expect(mark.data[3]).toBe(0);
+    }
+  });
+
+  it("keeps flattened macOS fallback icons transparent outside their enclosure", () => {
     const image = PNG.sync.read(
       NodeFS.readFileSync(NodePath.join(repositoryRoot, BRAND_ASSET_PATHS.productionMacIconPng)),
+    );
+
+    expect(image.width).toBe(1024);
+    expect(image.height).toBe(1024);
+    expect(image.data[3]).toBe(0);
+    expect(image.data[(image.width - 1) * 4 + 3]).toBe(0);
+    expect(image.data[(image.height - 1) * image.width * 4 + 3]).toBe(0);
+    expect(image.data[(image.width * image.height - 1) * 4 + 3]).toBe(0);
+  });
+
+  it("keeps the universal production icon inside a centered transparent safe area", () => {
+    const image = PNG.sync.read(
+      NodeFS.readFileSync(NodePath.join(repositoryRoot, BRAND_ASSET_PATHS.productionLinuxIconPng)),
     );
     let minimumX = image.width;
     let minimumY = image.height;
