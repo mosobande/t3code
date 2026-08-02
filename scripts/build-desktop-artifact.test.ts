@@ -355,6 +355,11 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       assert.notProperty(mac, "asarUnpack");
       assert.notProperty(linux, "asarUnpack");
       assert.deepStrictEqual(win.asarUnpack, WINDOWS_ASAR_UNPACK);
+      // Linux must register the renderer scheme so the generated .desktop
+      // entry advertises the correct OAuth deep-link handler.
+      assert.deepStrictEqual((linux.linux as Record<string, unknown>).protocols, [
+        { name: "SIGIDI", schemes: ["sigidi"] },
+      ]);
       for (const config of [mac, linux, win]) {
         assert.deepStrictEqual(config.electronLanguages, DESKTOP_ELECTRON_LANGUAGES);
         assert.deepStrictEqual(config.files, DESKTOP_FILE_EXCLUSIONS);
@@ -600,10 +605,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
       assert.deepNestedInclude(stable.linux, {
         executableName: "sigidi",
+        protocols: [{ name: "SIGIDI", schemes: ["sigidi"] }],
         desktop: { entry: { StartupWMClass: "sigidi" } },
       });
       assert.deepNestedInclude(nightly.linux, {
         executableName: "sigidi-nightly",
+        protocols: [{ name: "SIGIDI Nightly", schemes: ["sigidi-nightly"] }],
         desktop: { entry: { StartupWMClass: "sigidi-nightly" } },
       });
     }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
