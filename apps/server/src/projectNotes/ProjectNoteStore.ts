@@ -1,3 +1,4 @@
+// @effect-diagnostics deterministicKeys:off - This fork-owned service intentionally uses the SIGIDI namespace.
 import {
   type ProjectNote,
   ProjectNoteConflictError,
@@ -19,7 +20,7 @@ export interface ProjectNoteStoreShape {
 }
 
 export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectNoteStoreShape>()(
-  "t3/projectNotes/ProjectNoteStore",
+  "sigidi/projectNotes/ProjectNoteStore",
 ) {
   static readonly layer = Layer.effect(
     ProjectNoteStore,
@@ -33,7 +34,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
             markdown,
             updated_at AS "updatedAt",
             revision
-          FROM project_notes
+          FROM sigidi_project_notes
           WHERE project_id = ${projectId}
         `.pipe(
           Effect.mapError(
@@ -76,7 +77,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
         const rows =
           expectedRevision === 0
             ? yield* sql<ProjectNote>`
-                INSERT INTO project_notes (project_id, markdown, updated_at, revision)
+                INSERT INTO sigidi_project_notes (project_id, markdown, updated_at, revision)
                 VALUES (${projectId}, ${markdown}, ${updatedAt}, 1)
                 ON CONFLICT (project_id) DO NOTHING
                 RETURNING
@@ -86,7 +87,7 @@ export class ProjectNoteStore extends Context.Service<ProjectNoteStore, ProjectN
                   revision
               `.pipe(mapUpdateError)
             : yield* sql<ProjectNote>`
-                UPDATE project_notes
+                UPDATE sigidi_project_notes
                 SET
                   markdown = ${markdown},
                   updated_at = ${updatedAt},

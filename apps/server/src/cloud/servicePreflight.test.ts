@@ -7,10 +7,11 @@ import * as Path from "effect/Path";
 import * as NodeSqlite from "node:sqlite";
 
 import { migrationManifest } from "../persistence/Migrations.ts";
+import { sigidiMigrationManifest } from "../persistence/SigidiMigrations.ts";
 import { runServicePreflight } from "./servicePreflight.ts";
 
 it.layer(NodeServices.layer)("service update preflight", (it) => {
-  it.effect("requires exact migration-manifest equality without mutating the database", () =>
+  it.effect("requires exact upstream and SIGIDI manifests without mutating the database", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -18,10 +19,15 @@ it.layer(NodeServices.layer)("service update preflight", (it) => {
       const databasePath = path.join(root, "state.sqlite");
       const database = new NodeSqlite.DatabaseSync(databasePath);
       database.exec("CREATE TABLE effect_sql_migrations (migration_id INTEGER, name TEXT)");
-      const insert = database.prepare(
+      database.exec("CREATE TABLE sigidi_sql_migrations (migration_id INTEGER, name TEXT)");
+      const insertUpstream = database.prepare(
         "INSERT INTO effect_sql_migrations (migration_id, name) VALUES (?, ?)",
       );
-      for (const [id, name] of migrationManifest) insert.run(id, name);
+      for (const [id, name] of migrationManifest) insertUpstream.run(id, name);
+      const insertSigidi = database.prepare(
+        "INSERT INTO sigidi_sql_migrations (migration_id, name) VALUES (?, ?)",
+      );
+      for (const [id, name] of sigidiMigrationManifest) insertSigidi.run(id, name);
       database.close();
 
       expect(runServicePreflight({ databasePath, launcherProtocol: 1, version: "1.2.3" })).toEqual({
@@ -42,6 +48,22 @@ it.layer(NodeServices.layer)("service update preflight", (it) => {
       if (blocked.status === "blocked") {
         expect(blocked.reason).toContain("npx t3@1.2.3 service update");
       }
+
+      const missingSigidi = new NodeSqlite.DatabaseSync(databasePath);
+      const latestUpstream = migrationManifest.at(-1);
+      if (latestUpstream) {
+        missingSigidi
+          .prepare("INSERT INTO effect_sql_migrations (migration_id, name) VALUES (?, ?)")
+          .run(...latestUpstream);
+      }
+      missingSigidi.exec("DELETE FROM sigidi_sql_migrations WHERE migration_id = 2");
+      missingSigidi.close();
+      const sigidiBlocked = runServicePreflight({
+        databasePath,
+        launcherProtocol: 1,
+        version: "1.2.3",
+      });
+      expect(sigidiBlocked.status).toBe("blocked");
     }),
   );
 });

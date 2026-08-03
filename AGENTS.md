@@ -119,6 +119,14 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 - One concern per PR. If the description says "also", split it.
 - When babysitting: poll checks and comments newer than the last push, verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
 
+## Migration ownership
+
+- Keep upstream migrations in `apps/server/src/persistence/Migrations.ts`, `Migrations/`, and `effect_sql_migrations`. Do not allocate an upstream migration ID for a SIGIDI feature.
+- Keep SIGIDI migrations in `apps/server/src/persistence/SigidiMigrations.ts`, `SigidiMigrations/`, and `sigidi_sql_migrations`. Start and order SIGIDI IDs independently.
+- Create or alter only `sigidi_*` tables from a SIGIDI migration unless a maintainer approves and records an explicit exception.
+- Run `pnpm migrations:check` after an upstream sync or any change to migration sources, manifests, the Effect engine identity, SQLite adapters, startup migration wiring, or service preflight.
+- Update `packages/shared/src/sigidiMigrationCompatibility.ts` only after the focused Node and Bun migration tests, supported upgrade proof, concurrency proof, and two-ledger preflight tests pass.
+
 ## How it works
 
 Clients send typed WebSocket requests. The server turns them into _commands_, a pure _decider_ turns commands into persisted _events_, and a _projector_ derives the read model the UI renders. Provider CLIs run as subprocesses; per-provider _adapters_ translate their native protocols into orchestration events. Side effects run in queue-backed _reactors_ that emit _receipts_ when milestones land. Each turn ends with a _checkpoint_, a hidden git ref, so the app can diff and restore.
