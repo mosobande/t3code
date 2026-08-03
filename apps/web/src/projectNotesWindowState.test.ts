@@ -5,6 +5,7 @@ import {
   clampProjectNotesWindowRect,
   projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
+  projectNotesTargetMatchesActiveProject,
   resolveProjectNotesNavigation,
 } from "./projectNotesWindowState";
 
@@ -43,6 +44,21 @@ describe("project notes window state", () => {
         keepOpenAcrossThreads: true,
       }),
     ).toEqual({ action: "close", resetKeepOpen: true });
+  });
+
+  it("hides a floating note synchronously at a project boundary", () => {
+    expect(
+      projectNotesTargetMatchesActiveProject({
+        targetProjectKey: "local:project-a",
+        activeProjectKey: "local:project-b",
+      }),
+    ).toBe(false);
+    expect(
+      projectNotesTargetMatchesActiveProject({
+        targetProjectKey: "local:project-a",
+        activeProjectKey: "local:project-a",
+      }),
+    ).toBe(true);
   });
 
   it("keeps a restored window inside the viewport", () => {

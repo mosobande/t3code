@@ -28,6 +28,7 @@ import {
 import { effectiveSettled, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import {
   parseScopedThreadKey,
+  scopedProjectKey,
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
@@ -226,11 +227,11 @@ import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
+import type { ProjectNotesDisplayMode } from "./projectNotes/projectNotesConstants";
 import {
-  ProjectNotesSurface,
-  type ProjectNotesDisplayMode,
-} from "./projectNotes/ProjectNotesSurface";
-import { resolveProjectNotesNavigation } from "~/projectNotesWindowState";
+  projectNotesTargetMatchesActiveProject,
+  resolveProjectNotesNavigation,
+} from "~/projectNotesWindowState";
 import { PanelLayoutControls, RightPanelMaximizeControl } from "./chat/PanelLayoutControls";
 import { type ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { NoActiveThreadState } from "./NoActiveThreadState";
@@ -405,6 +406,11 @@ const PreviewPanel = lazy(() =>
 );
 const DiffPanel = lazy(() => import("./DiffPanel"));
 const FilePreviewPanel = lazy(() => import("./files/FilePreviewPanel"));
+const ProjectNotesSurface = lazy(() =>
+  import("./projectNotes/ProjectNotesSurface").then((module) => ({
+    default: module.ProjectNotesSurface,
+  })),
+);
 const EMPTY_PENDING_FILE_SURFACE_IDS: ReadonlySet<string> = new Set();
 const TYPE_TO_FOCUS_EDITABLE_SELECTOR = [
   "input",
@@ -1654,13 +1660,19 @@ function ChatViewContent(props: ChatViewProps) {
         : null,
     [activeProject],
   );
-  const activeProjectNotesTargetKey = activeProjectNotesTarget
-    ? projectNotesTargetKey(activeProjectNotesTarget)
+  const activeProjectNotesTargetKey = activeProjectRef ? scopedProjectKey(activeProjectRef) : null;
+  const visibleFloatingProjectNotesTarget = projectNotesTargetMatchesActiveProject({
+    targetProjectKey: floatingProjectNotesTarget
+      ? projectNotesTargetKey(floatingProjectNotesTarget)
+      : null,
+    activeProjectKey: activeProjectNotesTargetKey,
+  })
+    ? floatingProjectNotesTarget
     : null;
   const dockedProjectNotesSurfacePresent = rightPanelState.surfaces.some(
     (surface) => surface.kind === "notes",
   );
-  const projectNotesMode: ProjectNotesDisplayMode | null = floatingProjectNotesTarget
+  const projectNotesMode: ProjectNotesDisplayMode | null = visibleFloatingProjectNotesTarget
     ? "floating"
     : dockedProjectNotesSurfacePresent
       ? "panel"
@@ -5810,7 +5822,7 @@ function ChatViewContent(props: ChatViewProps) {
       {panelToggleControls}
     </div>
   );
-  const renderedProjectNotesTarget = floatingProjectNotesTarget ?? activeProjectNotesTarget;
+  const renderedProjectNotesTarget = visibleFloatingProjectNotesTarget ?? activeProjectNotesTarget;
   const rightPanelContent = activeThreadRef ? (
     activeRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
@@ -5862,19 +5874,21 @@ function ChatViewContent(props: ChatViewProps) {
         mode="embedded"
       />
     ) : activeRightPanelSurface?.kind === "notes" &&
-      !floatingProjectNotesTarget &&
+      !visibleFloatingProjectNotesTarget &&
       renderedProjectNotesTarget ? (
-      <ProjectNotesSurface
-        key={`${renderedProjectNotesTarget.environmentId}:${renderedProjectNotesTarget.projectId}`}
-        environmentId={renderedProjectNotesTarget.environmentId}
-        projectId={renderedProjectNotesTarget.projectId}
-        projectName={renderedProjectNotesTarget.projectName}
-        mode="panel"
-        keepOpenAcrossThreads={keepProjectNotesOpenAcrossThreads}
-        onModeChange={changeProjectNotesMode}
-        onKeepOpenAcrossThreadsChange={setKeepProjectNotesOpenAcrossThreads}
-        onClose={closeProjectNotes}
-      />
+      <Suspense fallback={null}>
+        <ProjectNotesSurface
+          key={`${renderedProjectNotesTarget.environmentId}:${renderedProjectNotesTarget.projectId}`}
+          environmentId={renderedProjectNotesTarget.environmentId}
+          projectId={renderedProjectNotesTarget.projectId}
+          projectName={renderedProjectNotesTarget.projectName}
+          mode="panel"
+          keepOpenAcrossThreads={keepProjectNotesOpenAcrossThreads}
+          onModeChange={changeProjectNotesMode}
+          onKeepOpenAcrossThreadsChange={setKeepProjectNotesOpenAcrossThreads}
+          onClose={closeProjectNotes}
+        />
+      </Suspense>
     ) : (activeRightPanelSurface?.kind === "files" || activeRightPanelSurface?.kind === "file") &&
       activeProject &&
       activeWorkspaceRoot ? (
@@ -6348,18 +6362,20 @@ function ChatViewContent(props: ChatViewProps) {
         </RightPanelSheet>
       ) : null}
 
-      {projectNotesMode === "floating" && floatingProjectNotesTarget ? (
-        <ProjectNotesSurface
-          key={`${floatingProjectNotesTarget.environmentId}:${floatingProjectNotesTarget.projectId}`}
-          environmentId={floatingProjectNotesTarget.environmentId}
-          projectId={floatingProjectNotesTarget.projectId}
-          projectName={floatingProjectNotesTarget.projectName}
-          mode="floating"
-          keepOpenAcrossThreads={keepProjectNotesOpenAcrossThreads}
-          onModeChange={changeProjectNotesMode}
-          onKeepOpenAcrossThreadsChange={setKeepProjectNotesOpenAcrossThreads}
-          onClose={closeProjectNotes}
-        />
+      {projectNotesMode === "floating" && visibleFloatingProjectNotesTarget ? (
+        <Suspense fallback={null}>
+          <ProjectNotesSurface
+            key={`${visibleFloatingProjectNotesTarget.environmentId}:${visibleFloatingProjectNotesTarget.projectId}`}
+            environmentId={visibleFloatingProjectNotesTarget.environmentId}
+            projectId={visibleFloatingProjectNotesTarget.projectId}
+            projectName={visibleFloatingProjectNotesTarget.projectName}
+            mode="floating"
+            keepOpenAcrossThreads={keepProjectNotesOpenAcrossThreads}
+            onModeChange={changeProjectNotesMode}
+            onKeepOpenAcrossThreadsChange={setKeepProjectNotesOpenAcrossThreads}
+            onClose={closeProjectNotes}
+          />
+        </Suspense>
       ) : null}
 
       {expandedImage && (

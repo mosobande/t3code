@@ -32,6 +32,13 @@ export function projectNotePendingDraftStorageKey(
 
 export type ProjectNotesNavigationAction = "stay" | "carry" | "leave" | "close";
 
+export function projectNotesTargetMatchesActiveProject(input: {
+  targetProjectKey: string | null;
+  activeProjectKey: string | null;
+}): boolean {
+  return input.targetProjectKey !== null && input.targetProjectKey === input.activeProjectKey;
+}
+
 export function resolveProjectNotesNavigation(input: {
   ownerProjectKey: string | null;
   activeProjectKey: string | null;

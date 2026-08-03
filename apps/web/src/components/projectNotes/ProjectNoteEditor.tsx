@@ -190,7 +190,7 @@ function NotesToolbar() {
     <div
       className="flex shrink-0 items-center gap-0.5 border-b border-border/70 px-2 py-1"
       aria-label="Note formatting"
-      role="toolbar"
+      role="group"
     >
       <ToolbarButton label="Heading" onClick={heading}>
         <Heading2Icon />

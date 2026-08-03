@@ -17,6 +17,8 @@ import { Button } from "../ui/button";
 import { Skeleton } from "../ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ProjectNoteEditor } from "./ProjectNoteEditor";
+import { ProjectNoteSaveFailure } from "./ProjectNoteSaveFailure";
+import { PROJECT_NOTES_SURFACE_ID, type ProjectNotesDisplayMode } from "./projectNotesConstants";
 import { projectNotePendingDraftStorageKey } from "~/projectNotesWindowState";
 import * as Schema from "effect/Schema";
 import {
@@ -37,8 +39,6 @@ import {
 import { projectNoteDraftCoordinator } from "./projectNoteDraftCoordinator";
 import { useProjectNotesWindow } from "./useProjectNotesWindow";
 
-export type ProjectNotesDisplayMode = "panel" | "floating";
-
 interface ProjectNotesSurfaceProps {
   readonly environmentId: EnvironmentId;
   readonly projectId: ProjectId;
@@ -56,7 +56,6 @@ interface SaveState {
   readonly error: string | null;
   readonly conflict: ProjectNote | null;
 }
-export const PROJECT_NOTES_SURFACE_ID = "project-notes-surface";
 const PROJECT_NOTES_KEYBOARD_HELP_ID = "project-notes-keyboard-help";
 const isProjectNoteConflictError = Schema.is(ProjectNoteConflictError);
 
@@ -88,7 +87,6 @@ interface ProjectNotesHeaderProps {
   readonly projectName: string;
   readonly mode: ProjectNotesDisplayMode;
   readonly saveStatus: SaveStatus;
-  readonly saveError: string | null;
   readonly statusText: string;
   readonly hasConflict: boolean;
   readonly onReloadConflict: () => void;
@@ -108,7 +106,6 @@ function ProjectNotesHeader({
   projectName,
   mode,
   saveStatus,
-  saveError,
   statusText,
   hasConflict,
   onReloadConflict,
@@ -152,7 +149,6 @@ function ProjectNotesHeader({
           className={
             saveStatus === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"
           }
-          title={saveError ?? undefined}
           aria-live="polite"
         >
           {statusText}
@@ -475,7 +471,6 @@ export function ProjectNotesSurface({
           projectName={projectName}
           mode={mode}
           saveStatus={saveStatus}
-          saveError={saveError}
           statusText={statusText}
           hasConflict={conflict !== null}
           onReloadConflict={reloadConflict}
@@ -490,6 +485,12 @@ export function ProjectNotesSurface({
           onPointerCancel={endDrag}
           onKeyDown={handleWindowKeyDown}
         />
+        {saveStatus === "error" ? (
+          <ProjectNoteSaveFailure
+            error={saveError ?? "Could not save this note."}
+            onRetry={() => void persistLatest()}
+          />
+        ) : null}
         {queryError ? (
           <div className="m-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
             <p>{queryError}</p>

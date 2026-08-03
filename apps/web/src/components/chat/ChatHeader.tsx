@@ -21,7 +21,7 @@ import { ProjectFavicon } from "../ProjectFavicon";
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { NotebookPenIcon } from "lucide-react";
-import { PROJECT_NOTES_SURFACE_ID } from "../projectNotes/ProjectNotesSurface";
+import { PROJECT_NOTES_SURFACE_ID } from "../projectNotes/projectNotesConstants";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
