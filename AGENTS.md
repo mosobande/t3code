@@ -1,46 +1,10 @@
-<!-- sigidi:start -->
-
-# SIGIDI downstream overlay
-
-This section overrides conflicting T3 Code defaults below for SIGIDI-specific work.
-
-## Product boundary
-
-- Treat SIGIDI as a separate downstream product. Treat T3 Code as the source of reusable capabilities and compatibility, not as the authority for SIGIDI product identity, data, releases, policy, or external services.
-- Preserve internal T3 identifiers when changing them would only increase sync cost. Do not expose those identifiers as SIGIDI product identity.
-- Read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md) before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior.
-
-## Change boundary
-
-Choose the first applicable option:
-
-1. Reuse a stable, product-neutral upstream capability unchanged.
-2. Add a thin SIGIDI adapter when identity, configuration, service ownership, or policy differs.
-3. Put SIGIDI behavior, persistence, and lifecycle in a standalone SIGIDI-owned module.
-4. Patch an upstream-owned file only when no stable seam exists. Add characterization proof and record the patch and its removal condition in the downstream-boundary document.
-5. Keep product-neutral improvements upstream-ready. Do not publish upstream without explicit user authority.
-
-Keep upstream host-file changes registration-only where practical. Registration-only changes import, register, mount, or render SIGIDI modules. They do not own SIGIDI state transitions, persistence, policy, retries, or side-effect sequencing.
-
-## Data and services
-
-- Use a separate SIGIDI migration lane and `sigidi_*` SQL names for SIGIDI-owned data. Never add SIGIDI migrations to the upstream T3 ledger.
-- Do not read or mutate installed T3 data automatically. Require an accepted migration or import decision first.
-- Do not publish, deploy, authenticate to, or update a T3-owned service as SIGIDI without an accepted ownership decision.
-
-## Git and durable authority
-
-- Base normal SIGIDI work on the current SIGIDI default branch.
-- Use the repository `t3code-sync` skill to integrate `upstream/main`. Do not rebase or squash the SIGIDI default branch or its sync merges. This overrides the upstream pull-request rebase default below.
-- Do not open an upstream pull request unless the user asks.
-- Treat tracked `AGENTS.md`, `docs/`, and repository skills as durable authority. Treat `.qp/` as working material until an accepted decision is moved into a tracked file.
-<!-- sigidi:end -->
-
 # T3 Code
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
 
 You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
+
+SIGIDI is a separate downstream product built from T3 Code. Reuse stable, product-neutral T3 Code capabilities. Keep SIGIDI product identity, data, releases, policy, and external services under SIGIDI ownership. Before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior, read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md).
 
 ## What makes T3 Code special?
 
@@ -110,7 +74,8 @@ The most common defect in this repo is a change that works on the path you teste
 - **Contracts.** Anything crossing the wire is typed in `packages/contracts`. Change the schema and the server, web, mobile, and desktop all follow.
 - **Reverse states.** If you added a way in, add the way out and the way to see it. Snooze needs unsnooze. Close needs reopen. A one-way door is a bug.
 - **Connection modes.** Local, remote/relay, and tunnel behave differently. Multi-device and multi-environment cases are real.
-- **Docs.** `docs/` splits by audience. Behavior changes that a user would notice belong in `docs/user/` (shipped-product voice, no repo tooling or source paths); architecture and contributor changes in `docs/internals/`; runbooks in `docs/operations/`; new vocabulary in `docs/internals/glossary.md`.
+- **Host integration.** Keep upstream host-file changes registration-only where practical. Import, register, mount, or render a SIGIDI-owned module instead of putting SIGIDI state transitions, persistence, policy, retries, or side-effect sequencing in the host file.
+- **Docs.** `docs/` splits by audience. Behavior changes that a user would notice belong in `docs/user/` (shipped-product voice, no repo tooling or source paths); architecture and contributor changes in `docs/internals/`, except SIGIDI downstream ownership and fork patches, which belong in `docs/architecture/sigidi-downstream-boundary.md`; runbooks in `docs/operations/`; new vocabulary in `docs/internals/glossary.md`. Treat tracked instructions, documents, and repository skills as durable authority; treat `.qp/` as working material.
 
 ## Dev servers
 
@@ -152,7 +117,8 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 - Never make a PR unless the developer explicitly asks you to do so.
 - Conventional commit titles, plain language: `fix(web): new threads no longer spike CPU`.
 - Body: the problem in a sentence or two, then how you fixed it. End with the model and harness that did the work.
-- **Rebase onto latest main before opening.** Stale branches conflict and burn a review round.
+- Base normal SIGIDI work on the current SIGIDI default branch. Use the repository `t3code-sync` skill to merge `upstream/main`. Do not rebase or squash the SIGIDI default branch or its sync merges.
+- Keep product-neutral changes upstream-ready when reasonable.
 - UI changes need before/after images. Motion or timing needs a short video.
 - One concern per PR. If the description says "also", split it.
 - When babysitting: poll checks and comments newer than the last push, verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
@@ -160,6 +126,8 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 ## How it works
 
 Clients send typed WebSocket requests. The server turns them into _commands_, a pure _decider_ turns commands into persisted _events_, and a _projector_ derives the read model the UI renders. Provider CLIs run as subprocesses; per-provider _adapters_ translate their native protocols into orchestration events. Side effects run in queue-backed _reactors_ that emit _receipts_ when milestones land. Each turn ends with a _checkpoint_, a hidden git ref, so the app can diff and restore.
+
+Keep SIGIDI-owned behavior, persistence, and lifecycle in standalone SIGIDI modules where practical. Use a separate SIGIDI migration lane and `sigidi_*` SQL names for SIGIDI-owned data. Never add SIGIDI migrations to the ordered T3 Code ledger or automatically mutate installed T3 data without an accepted migration or import decision.
 
 Full glossary with file links: `docs/internals/glossary.md`
 
@@ -170,6 +138,7 @@ Full glossary with file links: `docs/internals/glossary.md`
 - `packages/contracts` - Effect/Schema contracts plus small derived helpers. No heavy runtime logic.
 - `packages/shared` - shared runtime utils, subpath exports, no barrel.
 - `packages/client-runtime` - client code shared by web and mobile.
+- `apps/*/src/sigidi/<feature>` and `packages/sigidi-*` - SIGIDI-owned vertical modules and focused packages. Reuse T3 Code through stable public interfaces and keep translation at the SIGIDI adapter boundary.
 - `.repos/` - vendored read-only references. Prefer their patterns over invented ones. Never edit or import from them. Sync with `vpr sync:repos` when bumping the matching dependency.
 
 ## Taste
@@ -184,3 +153,5 @@ Full glossary with file links: `docs/internals/glossary.md`
 
 - Don't verify with browsers or computer use unless the user explicitly agrees or requests it.
 - Security is important, but should not be over-indexed on, especially for dev mode/maintainer-only features.
+- Preserve internal T3 compatibility identifiers when renaming them would only increase sync cost. Do not expose them as SIGIDI product identity.
+- Do not publish, deploy, authenticate to, or update a T3-owned service as SIGIDI without an accepted ownership decision.
