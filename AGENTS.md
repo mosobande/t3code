@@ -2,7 +2,7 @@
 
 SIGIDI is a local-first desktop development workspace for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, and OpenCode) and serves the desktop and web clients. The repository also contains an inherited React Native mobile client.
 
-SIGIDI is a separate downstream product built from the open-source T3 Code project. Reuse stable, product-neutral upstream capabilities. Keep SIGIDI product identity, data, releases, policy, and external services under SIGIDI ownership. Before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior, read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md).
+SIGIDI is a separate downstream product built from its open-source upstream project. Reuse stable, product-neutral upstream capabilities. Keep SIGIDI product identity, data, releases, policy, and external services under SIGIDI ownership. Before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior, read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md).
 
 ## Product constraints
 
