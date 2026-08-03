@@ -1,67 +1,63 @@
-# T3 Code
+# SIGIDI
 
-T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
+SIGIDI is a local-first desktop development workspace for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, and OpenCode) and serves the desktop and web clients. The repository also contains an inherited React Native mobile client.
 
-You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
+SIGIDI is a separate downstream product built from the open-source T3 Code project. Reuse stable, product-neutral upstream capabilities. Keep SIGIDI product identity, data, releases, policy, and external services under SIGIDI ownership. Before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior, read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md).
 
-SIGIDI is a separate downstream product built from T3 Code. Reuse stable, product-neutral T3 Code capabilities. Keep SIGIDI product identity, data, releases, policy, and external services under SIGIDI ownership. Before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior, read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md).
+## Product constraints
 
-## What makes T3 Code special?
+### 1. Performance without compromise
 
-We have over 100,000 users who love T3 Code. It's important we maintain the things they love as we continue to iterate on the product. Here's a brief list of the things we can never compromise on.
+Audit every change for performance regressions. Common causes include excessive WebSocket traffic, GPU-heavy CSS animation, and poorly bounded list rendering. SIGIDI users drive agents for long sessions and notice dropped frames, stale labels, and excess resource use.
 
-### 1. Open at the core
+### 2. Remote ready
 
-T3 Code is truly open. We share our roadmap, we share how we think about things, and of course we share all our code. A large number of our users run forks. We work in the open, and should strive to stay that way.
+SIGIDI's WebSocket layer supports local and remote control. Cover local networks, Tailscale, relay or tunnel modes, and multi-device use where applicable. T3 Connect remains an upstream-owned service until the SIGIDI service migration defines and deploys a replacement; do not present it as a SIGIDI service.
 
-### 2. Performance without compromise
+### 3. Multi-surface
 
-Lots of apps have gotten bogged down with bad tech decisions and "slop". We have not, and we're proud of the performance of T3 Code. We regularly audit for performance regressions, often caused by sending too much data over websockets, css animations causing gpu spikes, lists being hard to render, and more. Make sure all changes are considerate of performance impact.
+SIGIDI has three source surfaces: **web**, **desktop**, and **mobile**.
 
-### 3. Remote ready
+**Web** is locally hosted by the SIGIDI server. No public hosted SIGIDI web service is currently released.
 
-The architecture of T3 Code's websocket layer (npx t3) enables a lot of awesome remote features. These have become core to the product. Whether users are connecting directly over their local network, using Tailscale, or leaning in fully with T3 Connect (our tunnel solution, also in this repo), we need to make sure new features are properly supported.
+**Desktop** is the primary SIGIDI development surface. The Electron app bundles the server runner and can host remote client connections.
 
-### 4. Multi-surface
+**Mobile** is an inherited React Native client for iOS and Android. SIGIDI does not currently publish a mobile distribution.
 
-T3 Code has 3 key app surfaces: **web**, **desktop**, and **mobile**.
+### 4. Downstream maintainability
 
-**Web** is kind of two surfaces, as we have the public facing "app.t3.codes" as well as locally hosting the web app through the `npx t3` command. Both need to be supported by all new features where reasonable.
+Keep SIGIDI behavior in standalone modules and upstream host edits registration-only where practical. Preserve product-neutral upstream improvements. Record unavoidable fork patches and their removal conditions in the downstream-boundary document.
 
-**Desktop** is the main surface most users install first. It's a full Electron app that bundles the server runner as well. The desktop app can also be used as the host server, allowing remote connections from app.t3.codes or the mobile app.
-
-**Mobile** is a React Native app for both iOS and Android, available on the App Store and Google Play. The mobile app allows for connecting to any T3 Code server to control work remotely.
-
-## A note from Theo
+## Design direction
 
 I like ambitious ideas, simple systems, and software that feels obvious. Do not preserve complexity just because it already exists. Do not introduce machinery because it looks architecturally impressive. Understand the real constraint, then fight for the smallest model that makes the correct behavior unsurprising.
 
 Channel both "measure twice, cut once" and "yagni". Fight scope creep. Try to honor the dev's intent in both a minimal and realistic fashion.
 
-The rest of this document is meant to help you navigate the codebase and make changes effectively. Think of these instructions less as "hard rules", more as "good defaults". The developer's preferences should be able to override anything here.
+The rest of this document helps you navigate the codebase and make changes effectively. Treat these instructions as strong defaults. A direct developer instruction can override them.
 
-Of note: Most T3 Code contributions will come from T3 Code itself, often controlled remotely. This means you should be careful about accessing data, killing dev servers, and other things that may damage the T3 Code instance that the contributor is using.
+SIGIDI is often developed through a remote client connected to the same server and machine. Protect the running environment. Do not access live data, stop shared servers, or change active worktrees without confirming ownership and scope.
 
 ## A small glossary
 
 We need to be on the same page with terminology. When communicating, use this language:
 
-- **you** means the agent reading this file and changing T3 Code.
-- **we, us, and maintainers** mean Theo, Julius and the people building T3 Code. These are who you are talking to now.
-- **user** means the person using T3 Code to direct coding agents.
-- **agent** means the coding agent a user runs inside T3 Code. Depending on context, that may also include you.
-- **provider** means the agent runtime or harness T3 Code talks to, such as Codex, Claude, Cursor, or OpenCode.
+- **you** means the agent reading this file and changing SIGIDI.
+- **we, us, and maintainers** mean the people building SIGIDI.
+- **user** means the person using SIGIDI to direct coding agents.
+- **agent** means the coding agent a user runs inside SIGIDI. Depending on context, that may also include you.
+- **provider** means the agent runtime or harness SIGIDI talks to, such as Codex, Claude, Cursor, or OpenCode.
 - **client** means the web, desktop, or mobile UI.
-- **environment** means one running T3 server and the machine, filesystem, provider credentials, and state it owns.
+- **environment** means one running SIGIDI server and the machine, filesystem, provider credentials, and state it owns.
 - **project** means an environment-local workspace record rooted at a directory.
 - **thread** means the durable conversation and work history for a project.
 - **turn** means one user-to-agent cycle, including follow-up work such as checkpointing.
-- **T3 home** means the base data directory. Runtime state normally lives below its userdata directory.
+- **data home** means the base application data directory. The implementation and older documentation may call it **T3 home** for compatibility. Runtime state normally lives below its userdata directory.
 
 ## The three ways to hurt yourself
 
 1. **Killing by pattern.** Never `pkill -f`, `pgrep | kill`, or `kill` a PID you found by matching a name, path, or worktree string. Your own agent process has this worktree's path in its argv, and this machine runs several other dev servers at once. Kill only a PID you captured at spawn, or the owner of your port from `ss -H -ltnp` after confirming `/proc/<pid>/cwd` is your worktree.
-2. **Writing to the live install.** `~/.t3/userdata` is the developer's real T3 Code database, in use while you work. Reading it and copying from it are fine, and a good way to get real test data (see Test data). Never start a server against it, never open it read-write, never clean it up.
+2. **Writing to the live install.** `~/.t3/userdata` is the developer's real SIGIDI-compatible database, in use while you work. Reading it and copying from it are fine, and a good way to get real test data (see Test data). Never start a server against it, never open it read-write, never clean it up.
 3. **Baking in origins.** Never set `VITE_HTTP_URL` or `VITE_WS_URL` for dev. Dev is single-origin and Vite proxies `/api`, `/ws`, `/oauth`, and `/.well-known`. Setting them bakes localhost into the bundle and silently breaks every remote browser.
 
 ## Hit every surface
@@ -127,7 +123,7 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 
 Clients send typed WebSocket requests. The server turns them into _commands_, a pure _decider_ turns commands into persisted _events_, and a _projector_ derives the read model the UI renders. Provider CLIs run as subprocesses; per-provider _adapters_ translate their native protocols into orchestration events. Side effects run in queue-backed _reactors_ that emit _receipts_ when milestones land. Each turn ends with a _checkpoint_, a hidden git ref, so the app can diff and restore.
 
-Keep SIGIDI-owned behavior, persistence, and lifecycle in standalone SIGIDI modules where practical. Use a separate SIGIDI migration lane and `sigidi_*` SQL names for SIGIDI-owned data. Never add SIGIDI migrations to the ordered T3 Code ledger or automatically mutate installed T3 data without an accepted migration or import decision.
+Keep SIGIDI-owned behavior, persistence, and lifecycle in standalone SIGIDI modules where practical. Use a separate SIGIDI migration lane and `sigidi_*` SQL names for SIGIDI-owned data. Never add SIGIDI migrations to the ordered upstream ledger or automatically mutate installed upstream data without an accepted migration or import decision.
 
 Full glossary with file links: `docs/internals/glossary.md`
 
@@ -138,7 +134,7 @@ Full glossary with file links: `docs/internals/glossary.md`
 - `packages/contracts` - Effect/Schema contracts plus small derived helpers. No heavy runtime logic.
 - `packages/shared` - shared runtime utils, subpath exports, no barrel.
 - `packages/client-runtime` - client code shared by web and mobile.
-- `apps/*/src/sigidi/<feature>` and `packages/sigidi-*` - SIGIDI-owned vertical modules and focused packages. Reuse T3 Code through stable public interfaces and keep translation at the SIGIDI adapter boundary.
+- `apps/*/src/sigidi/<feature>` and `packages/sigidi-*` - SIGIDI-owned vertical modules and focused packages. Reuse upstream capabilities through stable public interfaces and keep translation at the SIGIDI adapter boundary.
 - `.repos/` - vendored read-only references. Prefer their patterns over invented ones. Never edit or import from them. Sync with `vpr sync:repos` when bumping the matching dependency.
 
 ## Taste
