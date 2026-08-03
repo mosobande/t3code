@@ -35,20 +35,19 @@ const initializeDatabase = async (databasePath: string, fixture: string) => {
   }
 };
 
-it("upgrades the pinned upstream-only fixture without losing representative data", async () => {
+it.effect("upgrades the pinned upstream-only fixture without losing representative data", () => {
   const fixture = NodeFS.readFileSync(
     NodePath.join(import.meta.dirname, "fixtures/upstream-f8707481.sql"),
     "utf8",
   );
-  const tempDirectory = NodeFS.mkdtempSync(
-    NodePath.join(NodeOS.tmpdir(), "sigidi-upstream-upgrade-"),
-  );
-  const databasePath = NodePath.join(tempDirectory, "state.sqlite");
-
-  try {
-    await initializeDatabase(databasePath, fixture);
-    await Effect.runPromise(
-      Effect.gen(function* () {
+  return Effect.acquireUseRelease(
+    Effect.sync(() =>
+      NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "sigidi-upstream-upgrade-")),
+    ),
+    (tempDirectory) => {
+      const databasePath = NodePath.join(tempDirectory, "state.sqlite");
+      return Effect.gen(function* () {
+        yield* Effect.promise(() => initializeDatabase(databasePath, fixture));
         const sql = yield* SqlClient.SqlClient;
         const before = yield* sql<{ readonly count: number }>`
           SELECT COUNT(*) AS count
@@ -85,9 +84,9 @@ it("upgrades the pinned upstream-only fixture without losing representative data
           WHERE event_id = 'fixture-event'
         `;
         assert.deepStrictEqual(events, [{ eventId: "fixture-event" }]);
-      }).pipe(Effect.provide(sqliteClient.layer({ filename: databasePath }))),
-    );
-  } finally {
-    NodeFS.rmSync(tempDirectory, { recursive: true, force: true });
-  }
+      }).pipe(Effect.provide(sqliteClient.layer({ filename: databasePath })));
+    },
+    (tempDirectory) =>
+      Effect.sync(() => NodeFS.rmSync(tempDirectory, { recursive: true, force: true })),
+  );
 });

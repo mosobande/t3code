@@ -19,14 +19,13 @@ const sqliteClient =
     ? await import("./NodeSqliteClient.ts")
     : await import("@effect/sql-sqlite-bun/SqliteClient");
 
-it("does not report success while another connection owns the migration write lock", async () => {
-  const tempDirectory = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "sigidi-concurrency-"));
-  const databasePath = NodePath.join(tempDirectory, "state.sqlite");
-  const layer = () => sqliteClient.layer({ filename: databasePath });
-
-  try {
-    await Effect.runPromise(
-      Effect.gen(function* () {
+it.effect("does not report success while another connection owns the migration write lock", () =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "sigidi-concurrency-"))),
+    (tempDirectory) => {
+      const databasePath = NodePath.join(tempDirectory, "state.sqlite");
+      const layer = () => sqliteClient.layer({ filename: databasePath });
+      return Effect.gen(function* () {
         const locked = yield* Deferred.make<void>();
         const release = yield* Deferred.make<void>();
         const holder = yield* Effect.forkChild(
@@ -68,9 +67,9 @@ it("does not report success while another connection owns the migration write lo
           upstream: migrationManifest.length,
           sigidi: sigidiMigrationManifest.length,
         });
-      }),
-    );
-  } finally {
-    NodeFS.rmSync(tempDirectory, { recursive: true, force: true });
-  }
-});
+      });
+    },
+    (tempDirectory) =>
+      Effect.sync(() => NodeFS.rmSync(tempDirectory, { recursive: true, force: true })),
+  ),
+);
