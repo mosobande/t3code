@@ -1,3 +1,41 @@
+<!-- sigidi:start -->
+
+# SIGIDI downstream overlay
+
+This section overrides conflicting T3 Code defaults below for SIGIDI-specific work.
+
+## Product boundary
+
+- Treat SIGIDI as a separate downstream product. Treat T3 Code as the source of reusable capabilities and compatibility, not as the authority for SIGIDI product identity, data, releases, policy, or external services.
+- Preserve internal T3 identifiers when changing them would only increase sync cost. Do not expose those identifiers as SIGIDI product identity.
+- Read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md) before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior.
+
+## Change boundary
+
+Choose the first applicable option:
+
+1. Reuse a stable, product-neutral upstream capability unchanged.
+2. Add a thin SIGIDI adapter when identity, configuration, service ownership, or policy differs.
+3. Put SIGIDI behavior, persistence, and lifecycle in a standalone SIGIDI-owned module.
+4. Patch an upstream-owned file only when no stable seam exists. Add characterization proof and record the patch and its removal condition in the downstream-boundary document.
+5. Keep product-neutral improvements upstream-ready. Do not publish upstream without explicit user authority.
+
+Keep upstream host-file changes registration-only where practical. Registration-only changes import, register, mount, or render SIGIDI modules. They do not own SIGIDI state transitions, persistence, policy, retries, or side-effect sequencing.
+
+## Data and services
+
+- Use a separate SIGIDI migration lane and `sigidi_*` SQL names for SIGIDI-owned data. Never add SIGIDI migrations to the upstream T3 ledger.
+- Do not read or mutate installed T3 data automatically. Require an accepted migration or import decision first.
+- Do not publish, deploy, authenticate to, or update a T3-owned service as SIGIDI without an accepted ownership decision.
+
+## Git and durable authority
+
+- Base normal SIGIDI work on the current SIGIDI default branch.
+- Use the repository `t3code-sync` skill to integrate `upstream/main`. Do not rebase or squash the SIGIDI default branch or its sync merges. This overrides the upstream pull-request rebase default below.
+- Do not open an upstream pull request unless the user asks.
+- Treat tracked `AGENTS.md`, `docs/`, and repository skills as durable authority. Treat `.qp/` as working material until an accepted decision is moved into a tracked file.
+<!-- sigidi:end -->
+
 # T3 Code
 
 T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
