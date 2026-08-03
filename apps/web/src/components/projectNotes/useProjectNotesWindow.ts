@@ -8,12 +8,25 @@ import {
   DEFAULT_PROJECT_NOTES_WINDOW_RECT,
   type ProjectNotesWindowRect,
   ProjectNotesWindowRect as ProjectNotesWindowRectSchema,
+  persistProjectNotesWindowRect,
   projectNotesWindowStorageKey,
 } from "~/projectNotesWindowState";
 
 type ProjectNotesWindowMode = "panel" | "floating";
 
 const decodeProjectNotesWindowRect = Schema.decodeUnknownSync(ProjectNotesWindowRectSchema);
+const WINDOW_RECT_PERSIST_DELAY_MS = 150;
+
+interface ProjectNotesWindowDrag {
+  readonly pointerId: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+  readonly startRect: ProjectNotesWindowRect;
+  readonly target: HTMLDivElement;
+  pendingX: number;
+  pendingY: number;
+  animationFrameId: number | null;
+}
 
 function readSavedRect(key: string): ProjectNotesWindowRect {
   if (typeof window === "undefined") return DEFAULT_PROJECT_NOTES_WINDOW_RECT;
@@ -41,8 +54,13 @@ export function useProjectNotesWindow({
       height: typeof window === "undefined" ? 800 : window.innerHeight,
     }),
   );
+  const rectRef = useRef(rect);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
-  const dragRef = useRef<{ pointerId: number; offsetX: number; offsetY: number } | null>(null);
+  const dragRef = useRef<ProjectNotesWindowDrag | null>(null);
+
+  useLayoutEffect(() => {
+    rectRef.current = rect;
+  }, [rect]);
 
   useLayoutEffect(() => {
     if (mode !== "floating" || !surfaceRef.current || typeof ResizeObserver === "undefined") return;
@@ -70,8 +88,24 @@ export function useProjectNotesWindow({
 
   useEffect(() => {
     if (mode !== "floating") return;
-    window.localStorage.setItem(storageKey, JSON.stringify(rect));
+    const timer = window.setTimeout(() => {
+      persistProjectNotesWindowRect(window.localStorage, storageKey, rect);
+    }, WINDOW_RECT_PERSIST_DELAY_MS);
+    return () => window.clearTimeout(timer);
   }, [mode, rect, storageKey]);
+
+  useEffect(
+    () => () => {
+      const drag = dragRef.current;
+      if (drag && drag.animationFrameId !== null) {
+        window.cancelAnimationFrame(drag.animationFrameId);
+      }
+      if (mode === "floating") {
+        persistProjectNotesWindowRect(window.localStorage, storageKey, rectRef.current);
+      }
+    },
+    [mode, storageKey],
+  );
 
   useEffect(() => {
     if (mode !== "floating") return;
@@ -87,35 +121,74 @@ export function useProjectNotesWindow({
   }, [mode]);
 
   const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (mode !== "floating" || (event.target as HTMLElement).closest("button")) return;
+    if (
+      mode !== "floating" ||
+      event.button !== 0 ||
+      (event.target as HTMLElement).closest("button")
+    ) {
+      return;
+    }
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      return;
+    }
+    event.preventDefault();
     dragRef.current = {
       pointerId: event.pointerId,
       offsetX: event.clientX - rect.x,
       offsetY: event.clientY - rect.y,
+      startRect: rect,
+      target: event.currentTarget,
+      pendingX: rect.x,
+      pendingY: rect.y,
+      animationFrameId: null,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    setRect((current) =>
-      clampProjectNotesWindowRect(
-        {
-          ...current,
-          x: event.clientX - drag.offsetX,
-          y: event.clientY - drag.offsetY,
-        },
-        { width: window.innerWidth, height: window.innerHeight },
-      ),
-    );
+    drag.pendingX = event.clientX - drag.offsetX;
+    drag.pendingY = event.clientY - drag.offsetY;
+    if (drag.animationFrameId !== null) return;
+    drag.animationFrameId = window.requestAnimationFrame(() => {
+      const active = dragRef.current;
+      if (!active || active.pointerId !== event.pointerId) return;
+      active.animationFrameId = null;
+      setRect((current) =>
+        clampProjectNotesWindowRect(
+          { ...current, x: active.pendingX, y: active.pendingY },
+          { width: window.innerWidth, height: window.innerHeight },
+        ),
+      );
+    });
   };
 
   const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (dragRef.current?.pointerId === event.pointerId) {
-      dragRef.current = null;
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (drag.animationFrameId !== null) {
+      window.cancelAnimationFrame(drag.animationFrameId);
     }
+    try {
+      if (drag.target.hasPointerCapture(event.pointerId)) {
+        drag.target.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // The browser may release pointer capture before the terminal event arrives.
+    }
+    const finalRect =
+      event.type === "pointercancel"
+        ? drag.startRect
+        : clampProjectNotesWindowRect(
+            { ...rectRef.current, x: drag.pendingX, y: drag.pendingY },
+            { width: window.innerWidth, height: window.innerHeight },
+          );
+    rectRef.current = finalRect;
+    setRect(finalRect);
+    persistProjectNotesWindowRect(window.localStorage, storageKey, finalRect);
   };
 
   const handleWindowKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {

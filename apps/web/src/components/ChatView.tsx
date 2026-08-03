@@ -228,6 +228,7 @@ import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
 import type { ProjectNotesDisplayMode } from "./projectNotes/projectNotesConstants";
+import { subscribeProjectNotesAction } from "./projectNotes/projectNotesActionBus";
 import {
   projectNotesTargetMatchesActiveProject,
   resolveProjectNotesNavigation,
@@ -3296,6 +3297,7 @@ function ChatViewContent(props: ChatViewProps) {
     }
     addProjectNotesSurface();
   }, [activeRightPanelKind, addProjectNotesSurface, closeProjectNotes, projectNotesMode]);
+  useEffect(() => subscribeProjectNotesAction(() => toggleProjectNotes()), [toggleProjectNotes]);
   const openFileSurface = useCallback(
     (relativePath: string) => {
       if (!activeThreadRef || !activeProject) return;

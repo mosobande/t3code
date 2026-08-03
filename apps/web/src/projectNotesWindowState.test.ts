@@ -3,6 +3,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   adjustProjectNotesWindowRect,
   clampProjectNotesWindowRect,
+  persistProjectNotesWindowRect,
   projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
   projectNotesTargetMatchesActiveProject,
@@ -85,6 +86,39 @@ describe("project notes window state", () => {
     expect(projectNotePendingDraftStorageKey("local", "project-a")).not.toBe(
       projectNotePendingDraftStorageKey("local", "project-b"),
     );
+  });
+
+  it("keeps floating notes usable when saved window geometry cannot be persisted", () => {
+    const storage = {
+      setItem: () => {
+        throw new Error("storage unavailable");
+      },
+    };
+
+    expect(
+      persistProjectNotesWindowRect(storage, "project-notes-window", {
+        x: 16,
+        y: 16,
+        width: 460,
+        height: 560,
+      }),
+    ).toBe(false);
+  });
+
+  it("serializes saved window geometry through the storage seam", () => {
+    const writes: Array<readonly [string, string]> = [];
+    const rect = { x: 16, y: 32, width: 460, height: 560 };
+
+    expect(
+      persistProjectNotesWindowRect(
+        {
+          setItem: (key, value) => writes.push([key, value]),
+        },
+        "project-notes-window",
+        rect,
+      ),
+    ).toBe(true);
+    expect(writes).toEqual([["project-notes-window", JSON.stringify(rect)]]);
   });
 
   it("fits inside a viewport that is smaller than the normal minimum size", () => {

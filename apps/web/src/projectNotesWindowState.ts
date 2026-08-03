@@ -8,6 +8,10 @@ export const ProjectNotesWindowRect = Schema.Struct({
 });
 export type ProjectNotesWindowRect = typeof ProjectNotesWindowRect.Type;
 
+export interface ProjectNotesWindowStorage {
+  readonly setItem: (key: string, value: string) => void;
+}
+
 export const DEFAULT_PROJECT_NOTES_WINDOW_RECT: ProjectNotesWindowRect = {
   x: 80,
   y: 80,
@@ -21,6 +25,19 @@ const VIEWPORT_MARGIN = 16;
 
 export function projectNotesWindowStorageKey(environmentId: string, projectId: string): string {
   return `t3.project-notes.window.v1:${environmentId}:${projectId}`;
+}
+
+export function persistProjectNotesWindowRect(
+  storage: ProjectNotesWindowStorage,
+  key: string,
+  rect: ProjectNotesWindowRect,
+): boolean {
+  try {
+    storage.setItem(key, JSON.stringify(rect));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function projectNotePendingDraftStorageKey(

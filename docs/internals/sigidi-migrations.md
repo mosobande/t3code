@@ -1,5 +1,7 @@
 # SIGIDI migration ownership
 
+> For maintainers. Using T3 Code? See the [user documentation](../README.md#using-t3-code).
+
 SIGIDI uses one SQLite database with two independently numbered migration lanes.
 
 The upstream lane remains unchanged:

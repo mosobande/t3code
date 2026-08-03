@@ -1,5 +1,6 @@
 import { LexicalComposer, type InitialConfigType } from "@lexical/react/LexicalComposer";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
+import { CheckListPlugin } from "@lexical/react/LexicalCheckListPlugin";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin";
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
@@ -277,6 +278,7 @@ export function ProjectNoteEditor({ initialMarkdown, onChange }: ProjectNoteEdit
           />
           <HistoryPlugin />
           <ListPlugin />
+          <CheckListPlugin />
           <LinkPlugin validateUrl={isSafeProjectNoteLinkUrl} />
           <MarkdownShortcutPlugin transformers={PROJECT_NOTE_MARKDOWN_TRANSFORMERS} />
           <OnChangePlugin
