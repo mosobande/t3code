@@ -10,10 +10,10 @@ const releaseWorkflow = NodeFS.readFileSync(
   NodePath.join(repoRoot, ".github/workflows/release.yml"),
   "utf8",
 );
-const marketingWorkflow = NodeFS.readFileSync(
-  NodePath.join(repoRoot, ".github/workflows/deploy-marketing.yml"),
-  "utf8",
-);
+const activeReleaseWorkflow = releaseWorkflow
+  .split("\n")
+  .filter((line) => !line.trimStart().startsWith("#"))
+  .join("\n");
 
 const workflowJob = (name: string, nextName: string) => {
   const start = releaseWorkflow.indexOf(`  ${name}:`);
@@ -26,24 +26,25 @@ const workflowJob = (name: string, nextName: string) => {
 };
 
 describe("release workflow", () => {
-  it("runs only the macOS application release and marketing deployment", () => {
+  it("runs only the macOS application release", () => {
     const buildJob = workflowJob("build", "publish_cli");
 
-    assert.notInclude(releaseWorkflow, 'cron: "0 */3 * * *"');
-    assert.notInclude(releaseWorkflow, "platform: linux");
-    assert.notInclude(releaseWorkflow, "platform: win");
-    assert.include(releaseWorkflow, "relay_public_config:\n    if: ${{ false }}");
+    assert.include(releaseWorkflow, 'cron: "0 */3 * * *"');
+    assert.notInclude(activeReleaseWorkflow, "platform: linux");
+    assert.notInclude(activeReleaseWorkflow, "platform: win");
+    assert.include(releaseWorkflow, "#   platform: linux");
+    assert.include(releaseWorkflow, "#   platform: win");
     assert.include(releaseWorkflow, "build_wsl_node_pty:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "publish_cli:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "deploy_web:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "finalize:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "announce_discord:\n    if: ${{ false }}");
-    assert.notInclude(buildJob, "Download relay client tracing config");
-    assert.notInclude(buildJob, "Load relay client tracing config");
-    assert.include(marketingWorkflow, "name: Deploy marketing website");
-    assert.include(
-      marketingWorkflow,
-      "if: ${{ github.ref_name == github.event.repository.default_branch }}",
+    assert.include(buildJob, "needs: [preflight, relay_public_config]");
+    assert.include(buildJob, "Download relay client tracing config");
+    assert.include(buildJob, "Load relay client tracing config");
+    assert.include(releaseWorkflow, "name: Mint release app token");
+    assert.isFalse(
+      NodeFS.existsSync(NodePath.join(repoRoot, ".github/workflows/deploy-marketing.yml")),
     );
   });
 });

@@ -5,6 +5,8 @@ on:
     tags:
       - "v*.*.*"
       - "!v*-nightly.*"
+  schedule:
+    - cron: "0 */3 * * *"
   workflow_dispatch:
     inputs:
       channel:
@@ -173,9 +175,9 @@ jobs:
             --github-output
 
   relay_public_config:
-    if: ${{ false }}
     name: Resolve T3 Connect public config
     needs: preflight
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 5
     environment:
@@ -270,6 +272,7 @@ jobs:
   # machine. node-pty is N-API, so one binary works across all WSL Node versions.
   build_wsl_node_pty:
     if: ${{ false }}
+    # Re-enable with: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
     name: Build WSL node-pty (linux-x64)
     needs: [preflight]
     runs-on: blacksmith-8vcpu-ubuntu-2404
@@ -317,10 +320,15 @@ jobs:
   build:
     name: Build ${{ matrix.label }}
     # The first release builds only the two macOS architectures.
-    needs: [preflight]
-    if: ${{ !cancelled() && needs.preflight.result == 'success' }}
+    needs: [preflight, relay_public_config]
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    env:
+      T3CODE_CLERK_PUBLISHABLE_KEY: ${{ needs.relay_public_config.outputs.clerk_publishable_key }}
+      T3CODE_CLERK_JWT_TEMPLATE: ${{ needs.relay_public_config.outputs.clerk_jwt_template }}
+      T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ needs.relay_public_config.outputs.clerk_cli_oauth_client_id }}
+      T3CODE_RELAY_URL: ${{ needs.relay_public_config.outputs.relay_url }}
     strategy:
       fail-fast: false
       matrix:
@@ -340,6 +348,25 @@ jobs:
             rust_target: x86_64-apple-darwin
             resource_key: darwin-x64
           # Linux and Windows release targets are disabled for the first release.
+          # - label: Linux x64
+          #   runner: blacksmith-32vcpu-ubuntu-2404
+          #   platform: linux
+          #   target: AppImage
+          #   arch: x64
+          #   rust_target: x86_64-unknown-linux-gnu
+          #   resource_key: linux-x64
+          # - label: Windows x64
+          #   runner: blacksmith-32vcpu-windows-2025
+          #   platform: win
+          #   target: nsis
+          #   arch: x64
+          #   rust_target: x86_64-pc-windows-msvc
+          #   resource_key: win32-x64
+          # - label: Windows arm64
+          #   runner: windows-11-arm
+          #   platform: win
+          #   target: nsis
+          #   arch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -365,6 +392,20 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.rust_target }}
+
+      - name: Download relay client tracing config
+        uses: actions/download-artifact@v8
+        with:
+          name: relay-client-tracing-config
+          path: ${{ runner.temp }}/relay-client-tracing
+
+      - name: Load relay client tracing config
+        shell: bash
+        run: |
+          config_path="$RUNNER_TEMP/relay-client-tracing/relay-client-tracing.env"
+          tracing_token="$(sed -n 's/^T3CODE_RELAY_CLIENT_OTLP_TRACES_TOKEN=//p' "$config_path")"
+          echo "::add-mask::$tracing_token"
+          cat "$config_path" >> "$GITHUB_ENV"
 
       - name: Align package versions to release version
         run: node scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
@@ -634,6 +675,7 @@ jobs:
 
   publish_cli:
     if: ${{ false }}
+    # Re-enable with: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build.result == 'success' }}
     name: Publish CLI to npm
     needs: [preflight, relay_public_config, build]
     runs-on: blacksmith-4vcpu-ubuntu-2404 # blacksmith-8vcpu-ubuntu-2404
@@ -717,9 +759,15 @@ jobs:
     if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
-    permissions:
-      contents: write
     steps:
+      - id: app_token
+        name: Mint release app token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -800,8 +848,12 @@ jobs:
             release-assets/*.dmg
             release-assets/*.zip
             release-assets/*.yml
+          # Non-macOS artifacts remain documented but disabled:
+          # release-assets/*.AppImage
+          # release-assets/*.exe
+          # release-assets/*.blockmap
           fail_on_unmatched_files: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app_token.outputs.token }}
 
       - name: Publish first release
         if: needs.preflight.outputs.previous_tag == ''
@@ -817,11 +869,16 @@ jobs:
             release-assets/*.dmg
             release-assets/*.zip
             release-assets/*.yml
+          # Non-macOS artifacts remain documented but disabled:
+          # release-assets/*.AppImage
+          # release-assets/*.exe
+          # release-assets/*.blockmap
           fail_on_unmatched_files: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app_token.outputs.token }}
 
   deploy_web:
     if: ${{ false }}
+    # Re-enable with: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.release.result == 'success' }}
     name: Deploy hosted web app
     needs: [preflight, relay_public_config, release]
     runs-on: blacksmith-8vcpu-ubuntu-2404
@@ -941,6 +998,7 @@ jobs:
 
   finalize:
     if: ${{ false }}
+    # Re-enable with: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.release.result == 'success' && needs.preflight.outputs.release_channel == 'stable' }}
     name: Finalize release
     needs: [preflight, release]
     runs-on: blacksmith-8vcpu-ubuntu-2404
@@ -1021,6 +1079,13 @@ jobs:
 
   announce_discord:
     if: ${{ false }}
+    # Re-enable with:
+    # always() && !cancelled() &&
+    # needs.preflight.result == 'success' &&
+    # needs.relay_public_config.result == 'success' &&
+    # needs.release.result == 'success' &&
+    # needs.deploy_web.result == 'success' &&
+    # (needs.finalize.result == 'success' || needs.finalize.result == 'skipped')
     name: Announce release on Discord
     needs: [preflight, relay_public_config, release, deploy_web, finalize]
     runs-on: blacksmith-8vcpu-ubuntu-2404
