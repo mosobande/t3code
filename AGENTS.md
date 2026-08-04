@@ -115,7 +115,6 @@ An empty database is a bad test. Seed your worktree's `.sigidi` with a copy of r
 - Body: the problem in a sentence or two, then how you fixed it. End with the model and harness that did the work.
 - Base normal SIGIDI work on the current SIGIDI default branch. Use the repository `t3code-sync` skill to merge `upstream/main`. Do not rebase or squash the SIGIDI default branch or its sync merges.
 - Keep the release workflow macOS-only. Preserve Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths as disabled unless a maintainer explicitly expands the release surface.
-- Keep marketing deployment separate from the release workflow and limited to the repository default branch.
 - Keep product-neutral changes upstream-ready when reasonable.
 - UI changes need before/after images. Motion or timing needs a short video.
 - One concern per PR. If the description says "also", split it.

@@ -68,7 +68,7 @@ Classify each overlap:
 
 Use the downstream-boundary document and fork-patch register as authority. A missing record does not prove upstream ownership. Update the register when a resolution adds or changes non-registration logic in an upstream-owned file.
 
-Preserve the current release policy: the release workflow publishes macOS desktop artifacts only. Keep Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths disabled. Keep marketing deployment separate and default-branch-only. Expanding that surface requires an explicit maintainer decision.
+Preserve the current release policy: the release workflow publishes macOS desktop artifacts only. Keep Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths disabled. Preserve the repository's existing marketing deployment mechanism without replacing or duplicating it. Expanding either surface requires an explicit maintainer decision.
 
 ## 3. Create the isolated merge
 

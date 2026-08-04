@@ -76,7 +76,7 @@ Do not automatically read or mutate an installed T3 database. An import or migra
 
 Classify each endpoint, credential, updater, signing identity, deployment, and release channel as T3-owned, SIGIDI-owned, product-neutral, or unsupported. A T3-owned service is not a SIGIDI service merely because the client code is available. Use a SIGIDI adapter or disable the integration until ownership is accepted.
 
-SIGIDI's current release workflow publishes signed macOS desktop artifacts only. Keep Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths disabled until a maintainer explicitly expands the release surface. Keep marketing deployment in its separate default-branch workflow so a desktop release cannot deploy the site implicitly.
+SIGIDI's current release workflow publishes signed macOS desktop artifacts only. Keep Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths disabled until a maintainer explicitly expands the release surface. Preserve the repository's existing marketing deployment mechanism; an upstream sync must not replace or duplicate it as part of release reconciliation.
 
 ## Upstream sync integration
 
