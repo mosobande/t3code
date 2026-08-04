@@ -42,6 +42,12 @@ it.effect("parses keybinding rules", () =>
     });
     assert.strictEqual(parsedRightPanelToggle.command, "rightPanel.toggle");
 
+    const parsedProjectNotesToggle = yield* decode(KeybindingRule, {
+      key: "mod+shift+p",
+      command: "projectNotes.toggle",
+    });
+    assert.strictEqual(parsedProjectNotesToggle.command, "projectNotes.toggle");
+
     const parsedClose = yield* decode(KeybindingRule, {
       key: "mod+w",
       command: "terminal.close",

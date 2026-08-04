@@ -44,6 +44,7 @@ export function createProjectEnvironmentAtoms<R, E>(
 ) {
   const projectScheduler = createAtomCommandScheduler();
   const fileScheduler = createAtomCommandScheduler();
+  const noteScheduler = createAtomCommandScheduler();
   const optimisticFileFamily = Atom.family((key: string) =>
     Atom.make<OptimisticProjectFile | null>(null).pipe(
       Atom.withLabel(`environment-data:projects:optimistic-file:${key}`),
@@ -70,6 +71,12 @@ export function createProjectEnvironmentAtoms<R, E>(
       label: "environment-data:projects:read-file",
       tag: WS_METHODS.projectsReadFile,
       staleTimeMs: 30_000,
+      idleTtlMs: 5 * 60_000,
+    }),
+    getNote: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:projects:get-note",
+      tag: WS_METHODS.projectsGetNote,
+      staleTimeMs: 0,
       idleTtlMs: 5 * 60_000,
     }),
     optimisticFile: (target: OptimisticProjectFileTarget) =>
@@ -100,6 +107,15 @@ export function createProjectEnvironmentAtoms<R, E>(
         mode: "serial",
         key: ({ environmentId, input }) =>
           JSON.stringify([environmentId, input.cwd, input.relativePath]),
+      },
+    }),
+    updateNote: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:projects:update-note",
+      tag: WS_METHODS.projectsUpdateNote,
+      scheduler: noteScheduler,
+      concurrency: {
+        mode: "latest",
+        key: ({ environmentId, input }) => JSON.stringify([environmentId, input.projectId]),
       },
     }),
   };

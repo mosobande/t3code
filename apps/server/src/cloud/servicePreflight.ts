@@ -2,6 +2,7 @@ import * as NodeSqlite from "node:sqlite";
 
 import packageJson from "../../package.json" with { type: "json" };
 import { migrationManifest } from "../persistence/Migrations.ts";
+import { sigidiMigrationManifest } from "../persistence/SigidiMigrations.ts";
 import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
 
 export type ServicePreflightResult =
@@ -29,6 +30,25 @@ const isMigrationRow = (
   "name" in value &&
   typeof value.name === "string";
 
+const ledgerMatches = (
+  database: NodeSqlite.DatabaseSync,
+  table: "effect_sql_migrations" | "sigidi_sql_migrations",
+  manifest: ReadonlyArray<readonly [number, string]>,
+) => {
+  const rows: ReadonlyArray<unknown> = database
+    .prepare(`SELECT migration_id, name FROM ${table} ORDER BY migration_id`)
+    .all();
+  return (
+    rows.length === manifest.length &&
+    rows.every((row, index) => {
+      const expected = manifest[index];
+      return (
+        isMigrationRow(row) && row.migration_id === expected?.[0] && row.name === expected?.[1]
+      );
+    })
+  );
+};
+
 export function runServicePreflight(input: {
   readonly databasePath: string;
   readonly launcherProtocol: number;
@@ -47,17 +67,9 @@ export function runServicePreflight(input: {
   try {
     const database = new NodeSqlite.DatabaseSync(input.databasePath, { readOnly: true });
     try {
-      const rows: ReadonlyArray<unknown> = database
-        .prepare("SELECT migration_id, name FROM effect_sql_migrations ORDER BY migration_id")
-        .all();
       const exact =
-        rows.length === migrationManifest.length &&
-        rows.every((row, index) => {
-          const expected = migrationManifest[index];
-          return (
-            isMigrationRow(row) && row.migration_id === expected?.[0] && row.name === expected?.[1]
-          );
-        });
+        ledgerMatches(database, "effect_sql_migrations", migrationManifest) &&
+        ledgerMatches(database, "sigidi_sql_migrations", sigidiMigrationManifest);
       if (!exact) return { status: "blocked", version, reason: localUpdateReason(version) };
     } finally {
       database.close();

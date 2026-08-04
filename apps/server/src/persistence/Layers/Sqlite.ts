@@ -5,7 +5,7 @@ import * as Path from "effect/Path";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
 import type { SqlError } from "effect/unstable/sql/SqlError";
 
-import { runMigrations } from "../Migrations.ts";
+import { runDatabaseMigrations } from "../DatabaseMigrations.ts";
 import { ServerConfig } from "../../config.ts";
 import * as ServiceLauncherClient from "../../cloud/serviceLauncherClient.ts";
 
@@ -38,7 +38,7 @@ const setup = (trial: boolean) =>
       yield* sql`PRAGMA foreign_keys = ON;`;
       if (!trial) {
         yield* sql`PRAGMA journal_mode = WAL;`;
-        yield* runMigrations();
+        yield* runDatabaseMigrations();
       }
     }),
   );

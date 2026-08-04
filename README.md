@@ -6,6 +6,7 @@ SIGIDI currently supports Codex, Claude Code, Cursor, Grok Build, and OpenCode.
 
 > [!IMPORTANT]
 > SIGIDI is in pre-release development. This repository does not currently publish SIGIDI installers, package releases, or a hosted SIGIDI service. Build and run it from source.
+> The first release pipeline targets signed macOS desktop artifacts only. Linux, Windows, CLI, hosted-web, and mobile publication remain disabled.
 
 ## Relationship to T3 Code
 

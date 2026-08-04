@@ -57,7 +57,7 @@ We need to be on the same page with terminology. When communicating, use this la
 ## The three ways to hurt yourself
 
 1. **Killing by pattern.** Never `pkill -f`, `pgrep | kill`, or `kill` a PID you found by matching a name, path, or worktree string. Your own agent process has this worktree's path in its argv, and this machine runs several other dev servers at once. Kill only a PID you captured at spawn, or the owner of your port from `ss -H -ltnp` after confirming `/proc/<pid>/cwd` is your worktree.
-2. **Writing to the live install.** `~/.t3/userdata` is the developer's real SIGIDI-compatible database, in use while you work. Reading it and copying from it are fine, and a good way to get real test data (see Test data). Never start a server against it, never open it read-write, never clean it up.
+2. **Writing to the live install.** `~/.sigidi/userdata` is the developer's real SIGIDI database, in use while you work. Reading it and copying from it are fine, and a good way to get real test data (see Test data). Never start a server against it, never open it read-write, never clean it up.
 3. **Baking in origins.** Never set `VITE_HTTP_URL` or `VITE_WS_URL` for dev. Dev is single-origin and Vite proxies `/api`, `/ws`, `/oauth`, and `/.well-known`. Setting them bakes localhost into the bundle and silently breaks every remote browser.
 
 ## Hit every surface
@@ -76,7 +76,7 @@ The most common defect in this repo is a change that works on the path you teste
 ## Dev servers
 
 - `vp i` installs. Worktrees get this from the t3.json setup script; if module resolution looks broken, it probably did not run.
-- `vp run dev` starts server and web. In a worktree, state defaults to that worktree's gitignored `.t3`, which deliberately outranks an ambient `T3CODE_HOME` so you cannot land on shared state by accident. An explicit `--home-dir` still wins.
+- `vp run dev` starts server and web. In a worktree, state defaults to that worktree's gitignored `.sigidi`, which deliberately outranks an ambient `T3CODE_HOME` so you cannot land on shared state by accident. An explicit `--home-dir` still wins.
 - Ports derive from the worktree path and are stable across restarts, but read the real ones from the `[dev-runner]` line since occupied ports shift.
 - `--share` publishes over the tailnet. Do not open the URL when you use this, just send it to the user with the pairing code included in url
 - The web app requires pairing. Hand over the pairing URL, not the bare origin. A URL without its token is useless to whoever you gave it to.
@@ -84,15 +84,15 @@ The most common defect in this repo is a change that works on the path you teste
 
 ## Test data
 
-An empty database is a bad test. Seed your worktree's `.t3` with a copy of real data instead of pointing at live state:
+An empty database is a bad test. Seed your worktree's `.sigidi` with a copy of real data instead of pointing at live state:
 
-- Copy from `~/.t3/userdata` (the developer's real data, the most realistic test set) or `~/.t3/dev`. Worktree state lives at `<worktree>/.t3/userdata`.
+- Copy from `~/.sigidi/userdata` (the developer's real data, the most realistic test set) or `~/.sigidi/dev`. Worktree state lives at `<worktree>/.sigidi/userdata`.
 - Snapshot the database with `VACUUM INTO`, which is safe even while a server has the source open and yields one consistent file:
 
   ```bash
-  mkdir -p .t3/userdata
-  rm -f .t3/userdata/state.sqlite*  # VACUUM INTO refuses to overwrite
-  bun -e "new (require('bun:sqlite').Database)(process.env.HOME + '/.t3/userdata/state.sqlite', { readonly: true }).run(\"VACUUM INTO '.t3/userdata/state.sqlite'\")"
+  mkdir -p .sigidi/userdata
+  rm -f .sigidi/userdata/state.sqlite*  # VACUUM INTO refuses to overwrite
+  bun -e "new (require('bun:sqlite').Database)(process.env.HOME + '/.sigidi/userdata/state.sqlite', { readonly: true }).run(\"VACUUM INTO '.sigidi/userdata/state.sqlite'\")"
   ```
 
   A plain `cp` is only safe when no server has the source open, and must bring the `-wal` and `-shm` siblings along. A live file copy is a corrupt copy.
@@ -114,10 +114,20 @@ An empty database is a bad test. Seed your worktree's `.t3` with a copy of real 
 - Conventional commit titles, plain language: `fix(web): new threads no longer spike CPU`.
 - Body: the problem in a sentence or two, then how you fixed it. End with the model and harness that did the work.
 - Base normal SIGIDI work on the current SIGIDI default branch. Use the repository `t3code-sync` skill to merge `upstream/main`. Do not rebase or squash the SIGIDI default branch or its sync merges.
+- Keep the release workflow macOS-only. Preserve Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths as disabled unless a maintainer explicitly expands the release surface.
+- Keep marketing deployment separate from the release workflow and limited to the repository default branch.
 - Keep product-neutral changes upstream-ready when reasonable.
 - UI changes need before/after images. Motion or timing needs a short video.
 - One concern per PR. If the description says "also", split it.
 - When babysitting: poll checks and comments newer than the last push, verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
+
+## Migration ownership
+
+- Keep upstream migrations in `apps/server/src/persistence/Migrations.ts`, `Migrations/`, and `effect_sql_migrations`. Do not allocate an upstream migration ID for a SIGIDI feature.
+- Keep SIGIDI migrations in `apps/server/src/persistence/SigidiMigrations.ts`, `SigidiMigrations/`, and `sigidi_sql_migrations`. Start and order SIGIDI IDs independently.
+- Create or alter only `sigidi_*` tables from a SIGIDI migration unless a maintainer approves and records an explicit exception.
+- Run `pnpm migrations:check` after an upstream sync or any change to migration sources, manifests, the Effect engine identity, SQLite adapters, startup migration wiring, or service preflight.
+- Update `packages/shared/src/sigidiMigrationCompatibility.ts` only after the focused Node and Bun migration tests, supported upgrade proof, concurrency proof, and two-ledger preflight tests pass.
 
 ## How it works
 
