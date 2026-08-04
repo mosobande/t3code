@@ -37,3 +37,11 @@ node_modules/
 *.log
 .env*
 !.env.example
+
+# Track the repository-owned SIGIDI sync skill despite global agent-file ignores.
+!.agents/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/t3code-sync/
+!.agents/skills/t3code-sync/**

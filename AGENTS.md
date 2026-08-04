@@ -1,60 +1,58 @@
-# T3 Code
+# SIGIDI
 
-T3 Code is a minimal GUI for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, OpenCode) and serves web, desktop, and mobile clients.
+SIGIDI is a local-first desktop development workspace for coding agents. A Node WebSocket server wraps provider CLIs (Codex, Claude Code, Cursor, Grok, and OpenCode) and serves the desktop and web clients. The repository also contains an inherited React Native mobile client.
 
-You can think of T3 Code as an open source "bring-your-own-subscription" alternative to apps like Claude Desktop, Codex App, Cursor Glass and Conductor.
+SIGIDI is a separate downstream product built from its open-source upstream project. Reuse stable, product-neutral upstream capabilities. Keep SIGIDI product identity, data, releases, policy, and external services under SIGIDI ownership. Before adding SIGIDI state, contracts, external services, host-file patches, or multi-surface behavior, read [`docs/architecture/sigidi-downstream-boundary.md`](docs/architecture/sigidi-downstream-boundary.md).
 
-## What makes T3 Code special?
+## Product constraints
 
-We have over 100,000 users who love T3 Code. It's important we maintain the things they love as we continue to iterate on the product. Here's a brief list of the things we can never compromise on.
+### 1. Performance without compromise
 
-### 1. Open at the core
+Audit every change for performance regressions. Common causes include excessive WebSocket traffic, GPU-heavy CSS animation, and poorly bounded list rendering. SIGIDI users drive agents for long sessions and notice dropped frames, stale labels, and excess resource use.
 
-T3 Code is truly open. We share our roadmap, we share how we think about things, and of course we share all our code. A large number of our users run forks. We work in the open, and should strive to stay that way.
+### 2. Remote ready
 
-### 2. Performance without compromise
+SIGIDI's WebSocket layer supports local and remote control. Cover local networks, Tailscale, relay or tunnel modes, and multi-device use where applicable. T3 Connect remains an upstream-owned service until the SIGIDI service migration defines and deploys a replacement; do not present it as a SIGIDI service.
 
-Lots of apps have gotten bogged down with bad tech decisions and "slop". We have not, and we're proud of the performance of T3 Code. We regularly audit for performance regressions, often caused by sending too much data over websockets, css animations causing gpu spikes, lists being hard to render, and more. Make sure all changes are considerate of performance impact.
+### 3. Multi-surface
 
-### 3. Remote ready
+SIGIDI has three source surfaces: **web**, **desktop**, and **mobile**.
 
-The architecture of T3 Code's websocket layer (npx t3) enables a lot of awesome remote features. These have become core to the product. Whether users are connecting directly over their local network, using Tailscale, or leaning in fully with T3 Connect (our tunnel solution, also in this repo), we need to make sure new features are properly supported.
+**Web** is locally hosted by the SIGIDI server. No public hosted SIGIDI web service is currently released.
 
-### 4. Multi-surface
+**Desktop** is the primary SIGIDI development surface. The Electron app bundles the server runner and can host remote client connections.
 
-T3 Code has 3 key app surfaces: **web**, **desktop**, and **mobile**.
+**Mobile** is an inherited React Native client for iOS and Android. SIGIDI does not currently publish a mobile distribution.
 
-**Web** is kind of two surfaces, as we have the public facing "app.t3.codes" as well as locally hosting the web app through the `npx t3` command. Both need to be supported by all new features where reasonable.
+### 4. Downstream maintainability
 
-**Desktop** is the main surface most users install first. It's a full Electron app that bundles the server runner as well. The desktop app can also be used as the host server, allowing remote connections from app.t3.codes or the mobile app.
+Keep SIGIDI behavior in standalone modules and upstream host edits registration-only where practical. Preserve product-neutral upstream improvements. Record unavoidable fork patches and their removal conditions in the downstream-boundary document.
 
-**Mobile** is a React Native app for both iOS and Android, available on the App Store and Google Play. The mobile app allows for connecting to any T3 Code server to control work remotely.
-
-## A note from Theo
+## Design direction
 
 I like ambitious ideas, simple systems, and software that feels obvious. Do not preserve complexity just because it already exists. Do not introduce machinery because it looks architecturally impressive. Understand the real constraint, then fight for the smallest model that makes the correct behavior unsurprising.
 
 Channel both "measure twice, cut once" and "yagni". Fight scope creep. Try to honor the dev's intent in both a minimal and realistic fashion.
 
-The rest of this document is meant to help you navigate the codebase and make changes effectively. Think of these instructions less as "hard rules", more as "good defaults". The developer's preferences should be able to override anything here.
+The rest of this document helps you navigate the codebase and make changes effectively. Treat these instructions as strong defaults. A direct developer instruction can override them.
 
-Of note: Most T3 Code contributions will come from T3 Code itself, often controlled remotely. This means you should be careful about accessing data, killing dev servers, and other things that may damage the T3 Code instance that the contributor is using.
+SIGIDI is often developed through a remote client connected to the same server and machine. Protect the running environment. Do not access live data, stop shared servers, or change active worktrees without confirming ownership and scope.
 
 ## A small glossary
 
 We need to be on the same page with terminology. When communicating, use this language:
 
-- **you** means the agent reading this file and changing T3 Code.
-- **we, us, and maintainers** mean Theo, Julius and the people building T3 Code. These are who you are talking to now.
-- **user** means the person using T3 Code to direct coding agents.
-- **agent** means the coding agent a user runs inside T3 Code. Depending on context, that may also include you.
-- **provider** means the agent runtime or harness T3 Code talks to, such as Codex, Claude, Cursor, or OpenCode.
+- **you** means the agent reading this file and changing SIGIDI.
+- **we, us, and maintainers** mean the people building SIGIDI.
+- **user** means the person using SIGIDI to direct coding agents.
+- **agent** means the coding agent a user runs inside SIGIDI. Depending on context, that may also include you.
+- **provider** means the agent runtime or harness SIGIDI talks to, such as Codex, Claude, Cursor, or OpenCode.
 - **client** means the web, desktop, or mobile UI.
-- **environment** means one running T3 server and the machine, filesystem, provider credentials, and state it owns.
+- **environment** means one running SIGIDI server and the machine, filesystem, provider credentials, and state it owns.
 - **project** means an environment-local workspace record rooted at a directory.
 - **thread** means the durable conversation and work history for a project.
 - **turn** means one user-to-agent cycle, including follow-up work such as checkpointing.
-- **T3 home** means the base data directory. Runtime state normally lives below its userdata directory.
+- **data home** means the base application data directory. The implementation and older documentation may call it **T3 home** for compatibility. Runtime state normally lives below its userdata directory.
 
 ## The three ways to hurt yourself
 
@@ -72,7 +70,8 @@ The most common defect in this repo is a change that works on the path you teste
 - **Contracts.** Anything crossing the wire is typed in `packages/contracts`. Change the schema and the server, web, mobile, and desktop all follow.
 - **Reverse states.** If you added a way in, add the way out and the way to see it. Snooze needs unsnooze. Close needs reopen. A one-way door is a bug.
 - **Connection modes.** Local, remote/relay, and tunnel behave differently. Multi-device and multi-environment cases are real.
-- **Docs.** `docs/` splits by audience. Behavior changes that a user would notice belong in `docs/user/` (shipped-product voice, no repo tooling or source paths); architecture and contributor changes in `docs/internals/`; runbooks in `docs/operations/`; new vocabulary in `docs/internals/glossary.md`.
+- **Host integration.** Keep upstream host-file changes registration-only where practical. Import, register, mount, or render a SIGIDI-owned module instead of putting SIGIDI state transitions, persistence, policy, retries, or side-effect sequencing in the host file.
+- **Docs.** `docs/` splits by audience. Behavior changes that a user would notice belong in `docs/user/` (shipped-product voice, no repo tooling or source paths); architecture and contributor changes in `docs/internals/`, except SIGIDI downstream ownership and fork patches, which belong in `docs/architecture/sigidi-downstream-boundary.md`; runbooks in `docs/operations/`; new vocabulary in `docs/internals/glossary.md`. Treat tracked instructions, documents, and repository skills as durable authority; treat `.qp/` as working material.
 
 ## Dev servers
 
@@ -114,7 +113,9 @@ An empty database is a bad test. Seed your worktree's `.sigidi` with a copy of r
 - Never make a PR unless the developer explicitly asks you to do so.
 - Conventional commit titles, plain language: `fix(web): new threads no longer spike CPU`.
 - Body: the problem in a sentence or two, then how you fixed it. End with the model and harness that did the work.
-- **Rebase onto latest main before opening.** Stale branches conflict and burn a review round.
+- Base normal SIGIDI work on the current SIGIDI default branch. Use the repository `t3code-sync` skill to merge `upstream/main`. Do not rebase or squash the SIGIDI default branch or its sync merges.
+- Keep the release workflow macOS-only. Preserve Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths as disabled unless a maintainer explicitly expands the release surface.
+- Keep product-neutral changes upstream-ready when reasonable.
 - UI changes need before/after images. Motion or timing needs a short video.
 - One concern per PR. If the description says "also", split it.
 - When babysitting: poll checks and comments newer than the last push, verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
@@ -131,6 +132,8 @@ An empty database is a bad test. Seed your worktree's `.sigidi` with a copy of r
 
 Clients send typed WebSocket requests. The server turns them into _commands_, a pure _decider_ turns commands into persisted _events_, and a _projector_ derives the read model the UI renders. Provider CLIs run as subprocesses; per-provider _adapters_ translate their native protocols into orchestration events. Side effects run in queue-backed _reactors_ that emit _receipts_ when milestones land. Each turn ends with a _checkpoint_, a hidden git ref, so the app can diff and restore.
 
+Keep SIGIDI-owned behavior, persistence, and lifecycle in standalone SIGIDI modules where practical. Use a separate SIGIDI migration lane and `sigidi_*` SQL names for SIGIDI-owned data. Never add SIGIDI migrations to the ordered upstream ledger or automatically mutate installed upstream data without an accepted migration or import decision.
+
 Full glossary with file links: `docs/internals/glossary.md`
 
 ## Where code lives
@@ -140,6 +143,7 @@ Full glossary with file links: `docs/internals/glossary.md`
 - `packages/contracts` - Effect/Schema contracts plus small derived helpers. No heavy runtime logic.
 - `packages/shared` - shared runtime utils, subpath exports, no barrel.
 - `packages/client-runtime` - client code shared by web and mobile.
+- `apps/*/src/sigidi/<feature>` and `packages/sigidi-*` - SIGIDI-owned vertical modules and focused packages. Reuse upstream capabilities through stable public interfaces and keep translation at the SIGIDI adapter boundary.
 - `.repos/` - vendored read-only references. Prefer their patterns over invented ones. Never edit or import from them. Sync with `vpr sync:repos` when bumping the matching dependency.
 
 ## Taste
@@ -154,3 +158,5 @@ Full glossary with file links: `docs/internals/glossary.md`
 
 - Don't verify with browsers or computer use unless the user explicitly agrees or requests it.
 - Security is important, but should not be over-indexed on, especially for dev mode/maintainer-only features.
+- Preserve internal T3 compatibility identifiers when renaming them would only increase sync cost. Do not expose them as SIGIDI product identity.
+- Do not publish, deploy, authenticate to, or update a T3-owned service as SIGIDI without an accepted ownership decision.
