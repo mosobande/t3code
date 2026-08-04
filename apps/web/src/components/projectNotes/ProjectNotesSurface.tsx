@@ -251,18 +251,26 @@ export function ProjectNotesSurface({
   const query = useAtomValue(queryAtom);
   const loaded = Option.getOrNull(AsyncResult.value(query));
   const updateNote = useAtomCommand(projectEnvironment.updateNote, { reportFailure: false });
+  const [initialSession] = useState(() => {
+    const server = projectNoteDraftCoordinator.readServer(key);
+    if (server === null) return null;
+    return initializeProjectNoteSaveSession(
+      server,
+      projectNoteDraftCoordinator.read(key) ?? readPendingDraft(pendingDraftKey),
+    );
+  });
   const [markdown, setMarkdown] = useState(
-    () => projectNoteDraftCoordinator.read(key)?.markdown ?? "",
+    () => initialSession?.draft?.markdown ?? initialSession?.server.markdown ?? "",
   );
   const [saveState, setSaveState] = useState<SaveState>({
-    status: "idle",
+    status: initialSession?.conflict ? "conflict" : "idle",
     error: null,
-    conflict: null,
+    conflict: initialSession?.conflict ?? null,
   });
   const { status: saveStatus, error: saveError, conflict } = saveState;
   const [editorVersion, setEditorVersion] = useState(0);
-  const saveSession = useRef<ProjectNoteSaveSession | null>(null);
-  const saveActive = useRef(false);
+  const saveSession = useRef<ProjectNoteSaveSession | null>(initialSession);
+  const savePromise = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
 
   useEffect(() => {
@@ -274,6 +282,7 @@ export function ProjectNotesSurface({
 
   useEffect(() => {
     if (!loaded) return;
+    projectNoteDraftCoordinator.writeServer(key, loaded);
     if (saveSession.current !== null) {
       const current = saveSession.current;
       const next = reconcileLoadedProjectNote(current, loaded);
@@ -325,76 +334,89 @@ export function ProjectNotesSurface({
     [draftOwner, key, pendingDraftKey],
   );
 
-  const persistLatest = useCallback(async () => {
-    if (saveActive.current) return;
-    saveActive.current = true;
+  const persistLatest = useCallback((): Promise<void> => {
+    if (savePromise.current) return savePromise.current;
 
-    try {
-      while (true) {
-        const current = saveSession.current;
-        if (current === null) return;
-        const started = beginProjectNoteSave(current);
-        saveSession.current = started.session;
-        if (started.request === null) return;
+    const pending = (async () => {
+      try {
+        while (true) {
+          const current = saveSession.current;
+          if (current === null) return;
+          const started = beginProjectNoteSave(current);
+          saveSession.current = started.session;
+          if (started.request === null) return;
 
-        if (mounted.current) {
-          setSaveState((state) => ({ ...state, status: "saving", error: null }));
-        }
-        const result = await updateNote({
-          environmentId,
-          input: { projectId, ...started.request },
-        });
+          if (mounted.current) {
+            setSaveState((state) => ({ ...state, status: "saving", error: null }));
+          }
+          const result = await updateNote({
+            environmentId,
+            input: { projectId, ...started.request },
+          });
 
-        if (result._tag === "Success") {
+          if (result._tag === "Success") {
+            const active = saveSession.current;
+            if (active === null) return;
+            const next = confirmProjectNoteSave(active, result.value);
+            saveSession.current = next;
+            projectNoteDraftCoordinator.writeServer(key, result.value);
+            const stillOwnsDraft = projectNoteDraftCoordinator.replaceOwned(
+              key,
+              draftOwner,
+              next.draft,
+            );
+            if (!stillOwnsDraft) return;
+            storePendingDraft(pendingDraftKey, next.draft);
+            if (mounted.current) {
+              setSaveState({
+                status: next.draft === null ? "saved" : "saving",
+                error: null,
+                conflict: null,
+              });
+            }
+            continue;
+          }
+
+          const nextConflict = conflictFromCause(result.cause);
+          if (nextConflict) {
+            const active = saveSession.current;
+            if (active === null) return;
+            const next = conflictProjectNoteSave(active, nextConflict.current);
+            saveSession.current = next;
+            projectNoteDraftCoordinator.writeServer(key, nextConflict.current);
+            if (mounted.current) {
+              setSaveState({ status: "conflict", error: null, conflict: next.conflict });
+            }
+            return;
+          }
+
           const active = saveSession.current;
           if (active === null) return;
-          const next = confirmProjectNoteSave(active, result.value);
-          saveSession.current = next;
-          const stillOwnsDraft = projectNoteDraftCoordinator.replaceOwned(
-            key,
-            draftOwner,
-            next.draft,
-          );
-          if (!stillOwnsDraft) return;
-          storePendingDraft(pendingDraftKey, next.draft);
+          saveSession.current = failProjectNoteSave(active);
           if (mounted.current) {
             setSaveState({
-              status: next.draft === null ? "saved" : "saving",
-              error: null,
+              status: "error",
+              error: errorMessage(result.cause),
               conflict: null,
             });
           }
-          continue;
-        }
-
-        const nextConflict = conflictFromCause(result.cause);
-        if (nextConflict) {
-          const active = saveSession.current;
-          if (active === null) return;
-          const next = conflictProjectNoteSave(active, nextConflict.current);
-          saveSession.current = next;
-          if (mounted.current) {
-            setSaveState({ status: "conflict", error: null, conflict: next.conflict });
-          }
           return;
         }
-
-        const active = saveSession.current;
-        if (active === null) return;
-        saveSession.current = failProjectNoteSave(active);
-        if (mounted.current) {
-          setSaveState({
-            status: "error",
-            error: errorMessage(result.cause),
-            conflict: null,
-          });
-        }
-        return;
+      } finally {
+        savePromise.current = null;
       }
-    } finally {
-      saveActive.current = false;
-    }
+    })();
+    savePromise.current = pending;
+    return pending;
   }, [draftOwner, environmentId, key, pendingDraftKey, projectId, updateNote]);
+
+  const changeMode = useCallback(
+    async (nextMode: ProjectNotesDisplayMode) => {
+      await persistLatest();
+      onModeChange(nextMode);
+    },
+    [onModeChange, persistLatest],
+  );
 
   useEffect(() => {
     if (saveSession.current === null || loaded === null || conflict !== null) return;
@@ -475,7 +497,7 @@ export function ProjectNotesSurface({
           hasConflict={conflict !== null}
           onReloadConflict={reloadConflict}
           onKeepLocalDraft={keepLocalDraft}
-          onModeChange={onModeChange}
+          onModeChange={(nextMode) => void changeMode(nextMode)}
           onClose={onClose}
           keepOpenAcrossThreads={keepOpenAcrossThreads}
           onKeepOpenAcrossThreadsChange={onKeepOpenAcrossThreadsChange}
