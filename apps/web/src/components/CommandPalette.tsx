@@ -35,6 +35,7 @@ import {
   FolderPlusIcon,
   LinkIcon,
   MessageSquareIcon,
+  NotebookPenIcon,
   SettingsIcon,
   SquarePenIcon,
   TextSearchIcon,
@@ -81,6 +82,7 @@ import {
   resolveProjectPathForDispatch,
 } from "../lib/projectPaths";
 import { onOpenCommandPalette } from "../commandPaletteBus";
+import { dispatchProjectNotesAction } from "./projectNotes/projectNotesActionBus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
@@ -1418,6 +1420,20 @@ function OpenCommandPaletteDialog(props: {
       openOverlayMode("content");
     },
   });
+
+  if (currentProjectId !== null) {
+    actionItems.push({
+      kind: "action",
+      value: "action:toggle-project-notes",
+      searchTerms: ["project notes", "scratchpad", "note", "toggle", "open"],
+      title: "Toggle project notes",
+      icon: <NotebookPenIcon className={ITEM_ICON_CLASS} />,
+      shortcutCommand: "projectNotes.toggle",
+      run: async () => {
+        dispatchProjectNotesAction("toggle");
+      },
+    });
+  }
 
   actionItems.push({
     kind: "action",
