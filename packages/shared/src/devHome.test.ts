@@ -95,12 +95,25 @@ describe("resolveGitWorktreePath", () => {
 });
 
 describe("resolveWorktreeT3Home", () => {
-  it.effect("answers with .t3 before the dev runner creates it", () =>
+  it.effect("answers with .sigidi before the dev runner creates it", () =>
     Effect.gen(function* () {
       const { root, nested } = yield* makeRepo("worktree");
       const home = yield* resolveWorktreeT3Home(nested);
-      assert.equal(home, NodePath.join(NodePath.resolve(root), ".t3"));
+      assert.equal(home, NodePath.join(NodePath.resolve(root), ".sigidi"));
       assert.isFalse(NodeFS.existsSync(home ?? ""));
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect("uses .sigidi without inspecting unrelated sibling directories", () =>
+    Effect.gen(function* () {
+      const { root, nested } = yield* makeRepo("worktree");
+      NodeFS.mkdirSync(NodePath.join(root, ".other-data", "userdata"), { recursive: true });
+      NodeFS.writeFileSync(NodePath.join(root, ".other-data", "userdata", "settings.json"), "{}\n");
+
+      assert.equal(
+        yield* resolveWorktreeT3Home(nested),
+        NodePath.join(NodePath.resolve(root), ".sigidi"),
+      );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 });

@@ -36,7 +36,7 @@ Bundle or package presence proves the correct variant, not native compatibility.
 
 ## Start one disposable T3 environment
 
-Run backend commands from the repository root. Use the ignored, worktree-local `.t3` directory or create a fresh directory with the host OS's temporary-directory mechanism. An explicit base directory stores state in `<base-dir>/userdata`; never point testing at shared `~/.t3` state.
+Run backend commands from the repository root. Use the ignored, worktree-local `.sigidi` directory or create a fresh directory with the host OS's temporary-directory mechanism. An explicit base directory stores state in `<base-dir>/userdata`; never point testing at shared `~/.sigidi` state.
 
 Seed a small number of meaningful Git projects before starting the backend:
 
@@ -66,7 +66,7 @@ Use these client origins:
 - Android Emulator: `http://10.0.2.2:<server-port>`
 - Physical device: bind the backend to `0.0.0.0` and use the host's reachable LAN origin
 
-Always enter the complete `http://` origin; the mobile host field otherwise assumes HTTPS. When testing web and mobile together, run `vp run dev --home-dir <base-dir> --host 127.0.0.1` instead and do not launch a second backend over the same base directory.
+Enter the complete `http://` origin to make the test transport explicit. Bare IP addresses default to HTTP, while bare hostnames default to HTTPS. When testing web and mobile together, run `vp run dev --home-dir <base-dir> --host 127.0.0.1` instead and do not launch a second backend over the same base directory.
 
 ## Start or reuse Metro safely
 

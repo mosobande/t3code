@@ -1595,6 +1595,15 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       executableName: identity.linuxExecutableName,
       icon: "icons",
       category: "Development",
+      // electron-builder turns these into MimeType=x-scheme-handler/<scheme>;
+      // in the .desktop entry (Exec already gets %U), so browsers can hand
+      // OAuth callbacks to the channel-specific app protocol.
+      protocols: [
+        {
+          name: resolveDesktopProductName(version),
+          schemes: [identity.protocolScheme],
+        },
+      ],
       desktop: {
         entry: {
           StartupWMClass: identity.linuxWmClass,

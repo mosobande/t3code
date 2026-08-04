@@ -103,6 +103,10 @@
       "types": "./src/orchestrationTiming.ts",
       "import": "./src/orchestrationTiming.ts"
     },
+    "./sigidiMigrationCompatibility": {
+      "types": "./src/sigidiMigrationCompatibility.ts",
+      "import": "./src/sigidiMigrationCompatibility.ts"
+    },
     "./remote": {
       "types": "./src/remote.ts",
       "import": "./src/remote.ts"
