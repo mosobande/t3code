@@ -39,6 +39,7 @@ import { formatShortcutLabel } from "../../keybindings";
 import { cn } from "../../lib/utils";
 import {
   primaryServerAvailableEditorsAtom,
+  primaryServerConfigAtom,
   primaryServerKeybindingsAtom,
   primaryServerKeybindingsConfigPathAtom,
   serverEnvironment,
@@ -61,6 +62,7 @@ import {
   DEFAULT_WHEN_VARIABLE,
   isKnownWhenVariable,
   keybindingConflictLabels,
+  keybindingCommandDisabledReason,
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
   type KeybindingCommandOption,
@@ -1084,6 +1086,9 @@ function NewKeybindingTableRow({
 
 export function KeybindingsSettingsPanel() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
+  const supportsPromptClarification =
+    primaryServerConfig?.environment.capabilities.promptClarification === true;
   const keybindingsConfigPath = useAtomValue(primaryServerKeybindingsConfigPathAtom);
   const availableEditors = useAtomValue(primaryServerAvailableEditorsAtom);
   const primaryEnvironment = usePrimaryEnvironment();
@@ -1151,6 +1156,18 @@ export function KeybindingsSettingsPanel() {
   const saveKeybinding = useCallback(
     (input: ServerUpsertKeybindingInput) => {
       if (!primaryEnvironment) return;
+      const disabledReason = keybindingCommandDisabledReason(
+        input.command,
+        supportsPromptClarification,
+      );
+      if (disabledReason) {
+        toastManager.add({
+          title: "Unable to save keybinding",
+          description: disabledReason,
+          type: "warning",
+        });
+        return;
+      }
       setSavingCommand(input.command);
       const payload: ServerUpsertKeybindingInput = {
         command: input.command,
@@ -1178,7 +1195,7 @@ export function KeybindingsSettingsPanel() {
         }
       })();
     },
-    [primaryEnvironment, upsertKeybinding],
+    [primaryEnvironment, supportsPromptClarification, upsertKeybinding],
   );
 
   const removeKeybinding = useCallback(

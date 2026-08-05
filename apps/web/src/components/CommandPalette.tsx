@@ -36,6 +36,7 @@ import {
   LinkIcon,
   MessageSquareIcon,
   NotebookPenIcon,
+  SparklesIcon,
   SettingsIcon,
   SquarePenIcon,
   TextSearchIcon,
@@ -530,6 +531,7 @@ function OpenCommandPaletteDialog(props: {
   readonly clearOpenIntent: () => void;
 }) {
   const navigate = useNavigate();
+  const composerHandleRef = useComposerHandleContext();
   const { clearOpenIntent, openIntent, openOverlayMode, setOpen } = props;
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
@@ -1355,6 +1357,21 @@ function OpenCommandPaletteDialog(props: {
   ]);
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
+
+  const clarifyDisabledReason =
+    composerHandleRef?.current?.clarifyDisabledReason() ?? "Open a chat to clarify a draft";
+  actionItems.push({
+    kind: "action",
+    value: "action:clarify-draft",
+    searchTerms: ["clarify", "draft", "rewrite", "prompt"],
+    title: "Clarify draft",
+    description: clarifyDisabledReason ?? "Rewrite the current draft before sending",
+    icon: <SparklesIcon className={ITEM_ICON_CLASS} />,
+    disabled: clarifyDisabledReason !== null,
+    run: async () => {
+      composerHandleRef?.current?.clarify();
+    },
+  });
 
   if (projects.length > 0) {
     const activeProjectTitle =

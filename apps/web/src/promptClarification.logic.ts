@@ -1,3 +1,28 @@
+import type { ModelSelection, ServerProvider } from "@t3tools/contracts";
+
+/** Clarify never reroutes to another provider or model. */
+export function promptClarificationSelectionUnavailableReason(input: {
+  readonly selection: ModelSelection;
+  readonly providers: ReadonlyArray<ServerProvider>;
+}): string | null {
+  const provider = input.providers.find(
+    (candidate) => candidate.instanceId === input.selection.instanceId,
+  );
+  if (!provider) return "Configured Clarify provider is missing";
+  if (!provider.enabled || provider.status === "disabled") {
+    return "Configured Clarify provider is disabled";
+  }
+  if (!provider.installed) return "Configured Clarify provider is unavailable";
+  if (provider.availability === "unavailable") {
+    return "Configured Clarify provider is unavailable";
+  }
+  if (provider.status !== "ready") return "Configured Clarify provider is stale";
+  if (!provider.models.some((model) => model.slug === input.selection.model)) {
+    return "Configured Clarify model is stale";
+  }
+  return null;
+}
+
 export function promptClarificationDisabledReason(input: {
   readonly text: string;
   readonly supportsCapability: boolean;
