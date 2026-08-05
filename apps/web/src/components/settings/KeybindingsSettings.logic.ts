@@ -29,6 +29,10 @@ export interface KeybindingRow {
 export type WhenVariableOption = string;
 export type KeybindingCommandOption = KeybindingCommand;
 
+const STATIC_UNBOUND_KEYBINDING_COMMANDS = [
+  "composer.clarify",
+] as const satisfies ReadonlyArray<KeybindingCommand>;
+
 const CORE_WHEN_VARIABLES = ["terminalFocus", "terminalOpen", "true", "false"] as const;
 
 const DEFAULT_WHEN_VARIABLES = new Set<string>(CORE_WHEN_VARIABLES);
@@ -258,6 +262,9 @@ export function buildKeybindingCommandOptions(
   const commands = new Set<KeybindingCommand>();
   for (const binding of DEFAULT_RESOLVED_KEYBINDINGS) {
     commands.add(binding.command);
+  }
+  for (const command of STATIC_UNBOUND_KEYBINDING_COMMANDS) {
+    commands.add(command);
   }
   for (const binding of keybindings) {
     commands.add(binding.command);

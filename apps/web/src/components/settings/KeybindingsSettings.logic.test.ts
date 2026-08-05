@@ -126,6 +126,10 @@ describe("KeybindingsSettings.logic", () => {
     expect(commandLabel("script.setup-db.run")).toBe("Run Script: Setup Db");
   });
 
+  it("keeps the unbound Clarify command discoverable in Settings", () => {
+    expect(buildKeybindingCommandOptions([])).toContain("composer.clarify");
+  });
+
   it("builds known when variable options from defaults without frontend labels", () => {
     const options = buildWhenVariableOptions();
 

@@ -1640,6 +1640,23 @@ export function GeneralSettingsPanel() {
     settings.textGenerationModelSelection ?? null,
     DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
   );
+  const promptClarificationSelection = settings.promptClarificationModelSelection;
+  const promptClarificationInstanceId = promptClarificationSelection.instanceId;
+  const promptClarificationModel = promptClarificationSelection.model;
+  const promptClarificationInstanceEntry = textGenerationModelInstanceEntries.find(
+    (entry) => entry.instanceId === promptClarificationInstanceId,
+  );
+  const promptClarificationOptions = promptClarificationSelection.options;
+  const promptClarificationOptionsByInstance = getCustomModelOptionsByInstance(
+    settings,
+    serverProviders,
+    promptClarificationInstanceId,
+    promptClarificationModel,
+  );
+  const isPromptClarificationDirty = !Equal.equals(
+    settings.promptClarificationModelSelection,
+    DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
+  );
   const resolvedBackgroundActivity = resolveServerBackgroundActivitySettings(settings);
   const activeBackgroundActivityProfile = resolvedBackgroundActivity.profile;
   const backgroundActivityProfileOption = resolveBackgroundActivityProfileOption(settings);
@@ -2148,6 +2165,63 @@ export function GeneralSettingsPanel() {
                     ),
                   });
                 }}
+              />
+            </div>
+          }
+        />
+
+        <SettingsRow
+          {...searchableSetting("prompt-clarification-model")}
+          title="Clarify model"
+          description="Independent model for rewriting a draft before you send it."
+          resetAction={
+            isPromptClarificationDirty ? (
+              <SettingResetButton
+                label="Clarify model"
+                onClick={() =>
+                  updateSettings({
+                    promptClarificationModelSelection:
+                      DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <ProviderModelPicker
+                activeInstanceId={promptClarificationInstanceId}
+                model={promptClarificationModel}
+                lockedProvider={null}
+                instanceEntries={textGenerationModelInstanceEntries}
+                modelOptionsByInstance={promptClarificationOptionsByInstance}
+                triggerVariant="outline"
+                triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
+                onInstanceModelChange={(instanceId, model) =>
+                  updateSettings({
+                    promptClarificationModelSelection: createModelSelection(instanceId, model),
+                  })
+                }
+              />
+              <TraitsPicker
+                provider={promptClarificationInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND}
+                models={promptClarificationInstanceEntry?.models ?? []}
+                model={promptClarificationModel}
+                prompt=""
+                onPromptChange={() => {}}
+                modelOptions={promptClarificationOptions}
+                allowPromptInjectedEffort={false}
+                triggerVariant="outline"
+                triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
+                onModelOptionsChange={(nextOptions) =>
+                  updateSettings({
+                    promptClarificationModelSelection: createModelSelection(
+                      promptClarificationInstanceId,
+                      promptClarificationModel,
+                      nextOptions,
+                    ),
+                  })
+                }
               />
             </div>
           }
