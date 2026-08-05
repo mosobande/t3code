@@ -238,6 +238,20 @@ it.layer(NodeServices.layer)("PromptClarification", (it) => {
     }),
   );
 
+  it.effect("sanitizes provider defects into the public error category", () =>
+    Effect.gen(function* () {
+      const privateDefect = "private provider defect stdout=secret-result";
+      const error = yield* rewrite("session-defect", input).pipe(
+        Effect.flip,
+        Effect.provide(layer([provider()], () => Effect.die(privateDefect))),
+      );
+
+      expect(error).toBeInstanceOf(PromptClarificationError);
+      expect(error.category).toBe("provider_failed");
+      expect(error).not.toHaveProperty("detail");
+    }),
+  );
+
   it.effect("rejects blank and over-limit provider output without returning it", () =>
     Effect.gen(function* () {
       const privateOversizedOutput = `private-provider-output ${"x".repeat(
