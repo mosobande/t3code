@@ -112,7 +112,10 @@ import { buildExpandedImagePreview, type ExpandedImagePreview } from "./Expanded
 import { basenameOfPath } from "../../pierre-icons";
 import { cn, randomUUID } from "~/lib/utils";
 import { Separator } from "../ui/separator";
-import { promptClarificationDisabledReason } from "../../promptClarification.logic";
+import {
+  promptClarificationDisabledReason,
+  promptClarificationDraftKey,
+} from "../../promptClarification.logic";
 
 type ComposerClarificationAction = {
   readonly disabledReason: string | null;
@@ -1084,6 +1087,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const isMobileViewport = useMediaQuery("max-sm");
   const isComposerCollapsedMobile =
     isMobileViewport && !forceExpandedOnMobile && !isComposerFocused;
+  const clarificationDraftKey =
+    routeKind === "server"
+      ? promptClarificationDraftKey({ routeKind, threadRef: routeThreadRef })
+      : promptClarificationDraftKey({ routeKind, draftId: String(composerDraftTarget) });
 
   // ------------------------------------------------------------------
   // Refs
@@ -1119,7 +1126,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const clarificationObservedPromptRef = useRef(prompt);
   const clarificationSnapshotRef = useRef<PromptClarificationSnapshot>({
     environmentId: String(environmentId),
-    draftKey: `${routeKind}:${String(composerDraftTarget)}`,
+    draftKey: clarificationDraftKey,
     text: prompt,
     revision: 0,
   });
@@ -1434,7 +1441,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const showMobilePendingAnswerActions =
     isMobileViewport && !isComposerCollapsedMobile && pendingPrimaryAction !== null;
 
-  const clarificationDraftKey = `${routeKind}:${String(composerDraftTarget)}`;
   const clarificationPhase = isComposerApprovalState
     ? "approval"
     : pendingUserInputs.length > 0
@@ -1528,7 +1534,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   }, [clarificationReview]);
   const isClarificationActive = useMemo(
     () => clarificationController.isActive(clarificationSnapshotRef.current),
-    [clarificationController, clarificationDraftKey, clarificationRequestVersion, environmentId],
+    [
+      clarificationController,
+      clarificationDraftKey,
+      clarificationPhase,
+      clarificationRequestVersion,
+      environmentId,
+      environmentUnavailable,
+    ],
   );
   const clarificationAction: ComposerClarificationAction = {
     disabledReason: clarificationDisabledReason,

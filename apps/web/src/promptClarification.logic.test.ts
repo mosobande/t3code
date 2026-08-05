@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vite-plus/test";
-import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
-import { promptClarificationDisabledReason } from "./promptClarification.logic";
-import { promptClarificationSelectionUnavailableReason } from "./promptClarification.logic";
+import {
+  EnvironmentId,
+  ProviderDriverKind,
+  ProviderInstanceId,
+  ThreadId,
+  type ServerProvider,
+} from "@t3tools/contracts";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import {
+  createPromptClarificationController,
+  type PromptClarificationRewriteResult,
+} from "@t3tools/client-runtime/promptClarification";
+import {
+  promptClarificationDisabledReason,
+  promptClarificationDraftKey,
+  promptClarificationSelectionUnavailableReason,
+} from "./promptClarification.logic";
 
 const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
   instanceId: ProviderInstanceId.make("codex"),
@@ -19,6 +33,54 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
 });
 
 describe("prompt clarification availability", () => {
+  it("isolates same-environment server threads and abandons a late result", async () => {
+    const environmentId = EnvironmentId.make("env");
+    const threadAKey = promptClarificationDraftKey({
+      routeKind: "server",
+      threadRef: scopeThreadRef(environmentId, ThreadId.make("thread-a")),
+    });
+    const threadBKey = promptClarificationDraftKey({
+      routeKind: "server",
+      threadRef: scopeThreadRef(environmentId, ThreadId.make("thread-b")),
+    });
+    expect(threadAKey).not.toBe(threadBKey);
+
+    let resolve!: (result: PromptClarificationRewriteResult) => void;
+    const resultA = new Promise<PromptClarificationRewriteResult>((nextResolve) => {
+      resolve = nextResolve;
+    });
+    const resultB = new Promise<PromptClarificationRewriteResult>(() => {});
+    let rewriteIndex = 0;
+    let current = {
+      environmentId: String(environmentId),
+      draftKey: threadAKey,
+      text: "rough",
+      revision: 0,
+    };
+    const applied: string[] = [];
+    const offered: string[] = [];
+    const controller = createPromptClarificationController({
+      rewrite: () => (rewriteIndex++ === 0 ? resultA : resultB),
+      readCurrent: () => current,
+      applyText: (text) => applied.push(text),
+      offerReview: (rewrite) => offered.push(rewrite.text),
+    });
+
+    expect(controller.start(current)).toBe(true);
+    controller.invalidate(current);
+    current = { ...current, draftKey: threadBKey };
+    expect(controller.start(current)).toBe(true);
+    resolve({
+      text: "clarified A",
+      providerInstanceId: ProviderInstanceId.make("codex"),
+      model: "gpt-5",
+    });
+    await Promise.resolve();
+
+    expect(applied).toEqual([]);
+    expect(offered).toEqual([]);
+  });
+
   it.each([
     [[], "Configured Clarify provider is missing"],
     [[provider({ enabled: false })], "Configured Clarify provider is disabled"],
