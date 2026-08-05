@@ -623,7 +623,7 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
         operation: "generatePromptClarification",
         cwd: input.cwd,
         prompt: input.prompt,
-        outputSchemaJson: Schema.Struct({ text: Schema.String }),
+        outputSchemaJson: TextGeneration.PromptClarificationOutputSchema,
         modelSelection: input.modelSelection,
       });
       return { text: generated.text.trim() };

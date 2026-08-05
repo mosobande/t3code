@@ -66,6 +66,7 @@ export const layer = Layer.effect(
           !snapshot ||
           !snapshot.enabled ||
           !snapshot.installed ||
+          snapshot.status !== "ready" ||
           snapshot.availability === "unavailable" ||
           !snapshot.models.some((model) => model.slug === selection.model)
         ) {
@@ -75,12 +76,12 @@ export const layer = Layer.effect(
         const cwd = yield* fileSystem
           .makeTempDirectoryScoped({ prefix: "sigidi-prompt-clarify-" })
           .pipe(Effect.mapError(() => new PromptClarificationError({ category: "unavailable" })));
-        const payload = buildPromptClarificationPayload(input.text);
+        const prompt = buildPromptClarificationPayload(input.text);
         if (!textGeneration.generatePromptClarification) {
           return yield* new PromptClarificationError({ category: "unavailable" });
         }
         const generated = yield* textGeneration
-          .generatePromptClarification({ cwd, prompt: payload.prompt, modelSelection: selection })
+          .generatePromptClarification({ cwd, prompt, modelSelection: selection })
           .pipe(
             Effect.timeoutOption(PROMPT_CLARIFICATION_TIMEOUT_MS),
             Effect.flatMap(

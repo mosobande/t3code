@@ -395,7 +395,17 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(RepositoryIdentityResolver.layer),
   Layer.provideMerge(ServerEnvironment.layer),
   Layer.provideMerge(AuthLayerLive),
-  Layer.provideMerge(Layer.mergeAll(ServerSecretStore.layer, PromptClarification.layer)),
+  Layer.provideMerge(
+    Layer.mergeAll(
+      ServerSecretStore.layer,
+      PromptClarification.layer.pipe(
+        Layer.provide(TextGeneration.layer),
+        Layer.provide(ProviderRegistryLive),
+        Layer.provide(ProviderInstanceRegistryHydrationLive),
+        Layer.provide(ServerSettingsLayerLive),
+      ),
+    ),
+  ),
   Layer.provideMerge(
     Layer.mergeAll(
       CloudCliTokenManager.layer.pipe(

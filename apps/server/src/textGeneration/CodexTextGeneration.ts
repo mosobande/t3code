@@ -411,7 +411,7 @@ export const makeCodexTextGeneration = Effect.fn("makeCodexTextGeneration")(func
   const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
     Effect.fn("CodexTextGeneration.generatePromptClarification")(function* (input) {
       const prompt = input.prompt;
-      const outputSchema = Schema.Struct({ text: Schema.String });
+      const outputSchema = TextGeneration.PromptClarificationOutputSchema;
       const generated = yield* runCodexJson({
         operation: "generatePromptClarification",
         cwd: input.cwd,
