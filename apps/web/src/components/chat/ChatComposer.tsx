@@ -115,6 +115,8 @@ import { Separator } from "../ui/separator";
 import {
   promptClarificationDisabledReason,
   promptClarificationDraftKey,
+  promptClarificationRequestText,
+  promptClarificationResultText,
 } from "../../promptClarification.logic";
 
 type ComposerClarificationAction = {
@@ -1091,6 +1093,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     routeKind === "server"
       ? promptClarificationDraftKey({ routeKind, threadRef: routeThreadRef })
       : promptClarificationDraftKey({ routeKind, draftId: String(composerDraftTarget) });
+  const clarificationTerminalContextCount = composerTerminalContexts.length;
 
   // ------------------------------------------------------------------
   // Refs
@@ -1158,7 +1161,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         return rewrite({
           environmentId: EnvironmentId.make(snapshot.environmentId),
           draftKey: snapshot.draftKey,
-          text: snapshot.text,
+          text: promptClarificationRequestText(snapshot.text),
         });
       },
       readCurrent: () =>
@@ -1462,17 +1465,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   });
   const applyClarifiedText = useCallback(
     (text: string) => {
-      writeComposerDraftText(text);
-      const nextCursor = collapseExpandedComposerCursor(text, text.length);
+      const draftText = promptClarificationResultText(text, clarificationTerminalContextCount);
+      writeComposerDraftText(draftText);
+      const nextCursor = collapseExpandedComposerCursor(draftText, draftText.length);
       setComposerHighlightedItemId(null);
       setComposerCursor(nextCursor);
-      setComposerTrigger(detectComposerTrigger(text, text.length));
+      setComposerTrigger(detectComposerTrigger(draftText, draftText.length));
       setClarificationRequestVersion((version) => version + 1);
       window.requestAnimationFrame(() => {
         composerEditorRef.current?.focusAt(nextCursor);
       });
     },
-    [writeComposerDraftText],
+    [clarificationTerminalContextCount, writeComposerDraftText],
   );
 
   useLayoutEffect(() => {

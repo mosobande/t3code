@@ -1,6 +1,9 @@
 import type { ModelSelection, ScopedThreadRef, ServerProvider } from "@t3tools/contracts";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { stripInlineTerminalContextPlaceholders } from "./lib/terminalContext";
+import {
+  ensureInlineTerminalContextPlaceholders,
+  stripInlineTerminalContextPlaceholders,
+} from "./lib/terminalContext";
 
 export function promptClarificationDraftKey(
   scope:
@@ -10,6 +13,16 @@ export function promptClarificationDraftKey(
   return scope.routeKind === "server"
     ? `server:${scopedThreadKey(scope.threadRef)}`
     : `draft:${scope.draftId}`;
+}
+
+/** Provider input contains only text the user can see, never editor placeholder markers. */
+export function promptClarificationRequestText(prompt: string): string {
+  return stripInlineTerminalContextPlaceholders(prompt);
+}
+
+/** Reattach the current terminal-context chips without changing their stored data or order. */
+export function promptClarificationResultText(text: string, terminalContextCount: number): string {
+  return ensureInlineTerminalContextPlaceholders(text, terminalContextCount);
 }
 
 /** Clarify never reroutes to another provider or model. */
@@ -46,7 +59,7 @@ export function promptClarificationDisabledReason(input: {
   if (!input.supportsCapability) return "Prompt clarification requires a newer server";
   if (!input.environmentAvailable) return "Environment unavailable";
   if (input.selectionUnavailableReason !== null) return input.selectionUnavailableReason;
-  if (stripInlineTerminalContextPlaceholders(input.text).trim().length === 0) {
+  if (promptClarificationRequestText(input.text).trim().length === 0) {
     return "Enter text to clarify";
   }
   if (input.phase === "approval") return "Resolve the approval before clarifying";
