@@ -8,6 +8,7 @@ import { resolveThreadRouteRef, resolveThreadRouteRenderState } from "../threadR
 import { resolveThreadSyncPhase } from "../threadSync";
 import { SidebarInset } from "~/components/ui/sidebar";
 import {
+  setLastViewedChatEnvironmentId,
   useEnvironmentThreadRefs,
   useThreadDetail,
   useThreadShell,
@@ -56,6 +57,10 @@ function ChatThreadRouteView() {
   });
   const serverThreadStarted = threadHasStarted(serverThreadDetail);
   const environmentHasAnyThreads = environmentHasServerThreads || environmentHasDraftThreads;
+
+  useEffect(() => {
+    if (threadRef) setLastViewedChatEnvironmentId(threadRef.environmentId);
+  }, [threadRef]);
 
   useEffect(() => {
     if (!threadRef || !bootstrapComplete) {
