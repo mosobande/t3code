@@ -46,6 +46,31 @@ describe("prompt clarification availability", () => {
       }),
     ).toBe("Enter text to clarify");
   });
+
+  it("rejects expired terminal-context placeholders without text", () => {
+    expect(
+      promptClarificationDisabledReason({
+        text: " \uFFFC ",
+        supportsCapability: true,
+        environmentAvailable: true,
+        selectionUnavailableReason: null,
+        phase: "idle",
+      }),
+    ).toBe("Enter text to clarify");
+  });
+
+  it("allows text alongside terminal-context placeholders", () => {
+    expect(
+      promptClarificationDisabledReason({
+        text: "Rewrite this \uFFFC",
+        supportsCapability: true,
+        environmentAvailable: true,
+        selectionUnavailableReason: null,
+        phase: "idle",
+      }),
+    ).toBeNull();
+  });
+
   it.each([
     ["approval", "Resolve the approval before clarifying"],
     ["pending-input", "Complete the requested input before clarifying"],

@@ -1,3 +1,7 @@
+import type { PromptClarificationRewriteResult } from "@t3tools/contracts";
+
+export type { PromptClarificationRewriteResult } from "@t3tools/contracts";
+
 export interface PromptClarificationSnapshot {
   readonly environmentId: string;
   readonly draftKey: string;
@@ -7,11 +11,14 @@ export interface PromptClarificationSnapshot {
 }
 
 export interface PromptClarificationControllerOptions {
-  readonly rewrite: (snapshot: PromptClarificationSnapshot) => Promise<string>;
+  readonly rewrite: (
+    snapshot: PromptClarificationSnapshot,
+  ) => Promise<PromptClarificationRewriteResult>;
   readonly readCurrent: () => PromptClarificationSnapshot;
   /** This deliberately receives text only; callers preserve all non-text draft fields. */
   readonly applyText: (text: string) => void;
-  readonly offerReview?: (text: string) => void;
+  readonly onApplied?: (result: PromptClarificationRewriteResult) => void;
+  readonly offerReview?: (result: PromptClarificationRewriteResult) => void;
   readonly onError?: (error: unknown) => void;
 }
 
@@ -49,13 +56,14 @@ export function createPromptClarificationController(options: PromptClarification
     active.set(key, token);
     void options
       .rewrite(snapshot)
-      .then((text) => {
+      .then((result) => {
         if (active.get(key) !== token) return;
         active.delete(key);
         if (matches(snapshot, options.readCurrent())) {
-          options.applyText(text);
+          options.applyText(result.text);
+          options.onApplied?.(result);
         } else {
-          options.offerReview?.(text);
+          options.offerReview?.(result);
         }
       })
       .catch((error: unknown) => {

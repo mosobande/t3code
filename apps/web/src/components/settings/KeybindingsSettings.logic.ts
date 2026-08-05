@@ -31,11 +31,9 @@ export type KeybindingCommandOption = KeybindingCommand;
 
 export function keybindingCommandDisabledReason(
   command: KeybindingCommand,
-  supportsPromptClarification: boolean,
+  promptClarificationUnavailableReason: string | null,
 ): string | null {
-  return command === "composer.clarify" && !supportsPromptClarification
-    ? "Prompt clarification requires a newer server"
-    : null;
+  return command === "composer.clarify" ? promptClarificationUnavailableReason : null;
 }
 
 const STATIC_UNBOUND_KEYBINDING_COMMANDS = [

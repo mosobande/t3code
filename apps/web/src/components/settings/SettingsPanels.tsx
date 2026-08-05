@@ -79,6 +79,7 @@ import {
 import { ensureLocalApi, readLocalApi } from "../../localApi";
 import {
   primaryServerObservabilityAtom,
+  primaryServerConfigAtom,
   primaryServerProvidersAtom,
   serverEnvironment,
 } from "../../state/server";
@@ -567,6 +568,10 @@ export function useSettingsRestore(onRestored?: () => void) {
     settings.textGenerationModelSelection ?? null,
     DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
   );
+  const isPromptClarificationModelDirty = !Equal.equals(
+    settings.promptClarificationModelSelection ?? null,
+    DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection ?? null,
+  );
   const isBackgroundActivityDirty = hasChangedBackgroundActivitySettings(settings);
 
   const changedSettingLabels = useMemo(
@@ -619,9 +624,11 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Delete confirmation"]
         : []),
       ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
+      ...(isPromptClarificationModelDirty ? ["Clarify model"] : []),
     ],
     [
       isTextGenerationModelDirty,
+      isPromptClarificationModelDirty,
       isBackgroundActivityDirty,
       settings.autoOpenPlanSidebar,
       settings.confirmThreadArchive,
@@ -674,6 +681,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
+      promptClarificationModelSelection: DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
     });
     onRestored?.();
   }, [changedSettingLabels, onRestored, setTheme, updateSettings]);
@@ -1124,11 +1132,18 @@ export function GeneralSettingsPanel() {
     readLastEnabledProjectGroupingMode(),
   );
   const observability = useAtomValue(primaryServerObservabilityAtom);
+  const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
   const activeEnvironmentId = useAtomValue(activeEnvironmentIdAtom);
   const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
   const isClarifySettingsReadOnly =
     activeEnvironmentId !== null && activeEnvironmentId !== primaryEnvironmentId;
+  const clarifySettingsUnavailableReason =
+    primaryServerConfig?.environment.capabilities.promptClarification !== true
+      ? "Prompt clarification requires a newer server"
+      : isClarifySettingsReadOnly
+        ? "Configure this environment from a client where it is primary"
+        : null;
   const diagnosticsDescription = formatDiagnosticsDescription({
     localTracingEnabled: observability?.localTracingEnabled ?? false,
     otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
@@ -1693,12 +1708,11 @@ export function GeneralSettingsPanel() {
           {...searchableSetting("prompt-clarification-model")}
           title="Clarify model"
           description={
-            isClarifySettingsReadOnly
-              ? "Configure this environment from a client where it is primary"
-              : "Independent model for rewriting a draft before you send it."
+            clarifySettingsUnavailableReason ??
+            "Independent model for rewriting a draft before you send it."
           }
           resetAction={
-            !isClarifySettingsReadOnly && isPromptClarificationDirty ? (
+            clarifySettingsUnavailableReason === null && isPromptClarificationDirty ? (
               <SettingResetButton
                 label="Clarify model"
                 onClick={() =>
@@ -1711,7 +1725,7 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            isClarifySettingsReadOnly ? null : (
+            clarifySettingsUnavailableReason !== null ? null : (
               <div className="flex flex-wrap items-center justify-end gap-1.5">
                 <ProviderModelPicker
                   activeInstanceId={promptClarificationInstanceId}

@@ -2183,7 +2183,7 @@ function ChatViewContent(props: ChatViewProps) {
           environmentId: input.environmentId,
           input: { draftKey: input.draftKey, text: input.text },
         });
-        if (result._tag === "Success") return result.value.text;
+        if (result._tag === "Success") return result.value;
         throw squashAtomCommandFailure(result);
       },
     }),
