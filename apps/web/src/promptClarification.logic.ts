@@ -9,6 +9,11 @@ export function promptClarificationDisabledReason(input: {
   if (!input.environmentAvailable) return "Environment unavailable";
   if (!input.selectionValid) return "Configured Clarify provider or model is unavailable";
   if (input.text.trim().length === 0) return "Enter text to clarify";
-  if (input.phase !== "idle") return "Clarify is available only for an idle draft";
+  if (input.phase === "approval") return "Resolve the approval before clarifying";
+  if (input.phase === "pending-input") {
+    return "Complete the requested input before clarifying";
+  }
+  if (input.phase === "running") return "Wait for the running turn before clarifying";
+  if (input.phase === "plan-follow-up") return "Finish the plan follow-up before clarifying";
   return null;
 }
