@@ -83,6 +83,8 @@ import {
   serverEnvironment,
 } from "../../state/server";
 import { usePrimaryEnvironment } from "../../state/environments";
+import { activeEnvironmentIdAtom } from "../../state/entities";
+import { primaryEnvironmentIdAtom } from "../../state/primaryEnvironment";
 import { useProjects } from "../../state/entities";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
 import { formatRelativeTimeLabel, getRelativeTimeState } from "../../timestampFormat";
@@ -1123,6 +1125,10 @@ export function GeneralSettingsPanel() {
   );
   const observability = useAtomValue(primaryServerObservabilityAtom);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
+  const activeEnvironmentId = useAtomValue(activeEnvironmentIdAtom);
+  const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
+  const isClarifySettingsReadOnly =
+    activeEnvironmentId !== null && activeEnvironmentId !== primaryEnvironmentId;
   const diagnosticsDescription = formatDiagnosticsDescription({
     localTracingEnabled: observability?.localTracingEnabled ?? false,
     otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
@@ -1686,9 +1692,13 @@ export function GeneralSettingsPanel() {
         <SettingsRow
           {...searchableSetting("prompt-clarification-model")}
           title="Clarify model"
-          description="Independent model for rewriting a draft before you send it."
+          description={
+            isClarifySettingsReadOnly
+              ? "Configure this environment from a client where it is primary"
+              : "Independent model for rewriting a draft before you send it."
+          }
           resetAction={
-            isPromptClarificationDirty ? (
+            !isClarifySettingsReadOnly && isPromptClarificationDirty ? (
               <SettingResetButton
                 label="Clarify model"
                 onClick={() =>
@@ -1710,6 +1720,7 @@ export function GeneralSettingsPanel() {
                 modelOptionsByInstance={promptClarificationOptionsByInstance}
                 triggerVariant="outline"
                 triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
+                disabled={isClarifySettingsReadOnly}
                 onInstanceModelChange={(instanceId, model) =>
                   updateSettings({
                     promptClarificationModelSelection: createModelSelection(instanceId, model),
@@ -1726,6 +1737,7 @@ export function GeneralSettingsPanel() {
                 allowPromptInjectedEffort={false}
                 triggerVariant="outline"
                 triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
+                disabled={isClarifySettingsReadOnly}
                 onModelOptionsChange={(nextOptions) =>
                   updateSettings({
                     promptClarificationModelSelection: createModelSelection(
