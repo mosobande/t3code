@@ -33,6 +33,7 @@ import { EnvironmentRegistry } from "../connection/registry.ts";
 import { EnvironmentSupervisor } from "../connection/supervisor.ts";
 import { safeErrorLogAttributes } from "../errors/safeLog.ts";
 import { EnvironmentCacheStore } from "../platform/persistence.ts";
+import { promptClarificationRequestKey } from "../promptClarification.ts";
 import {
   isRpcClientError,
   request,
@@ -724,6 +725,15 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverUpdateSettings,
       scheduler: configScheduler,
       concurrency: configConcurrency,
+    }),
+    promptClarificationRewrite: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:prompt-clarification-rewrite",
+      tag: WS_METHODS.promptClarificationRewrite,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId, input }) =>
+          promptClarificationRequestKey({ environmentId, draftKey: input.draftKey }),
+      },
     }),
     signalProcess: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:signal-process",

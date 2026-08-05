@@ -15,8 +15,9 @@ export interface PromptClarificationControllerOptions {
   readonly onError?: (error: unknown) => void;
 }
 
-const keyOf = (snapshot: Pick<PromptClarificationSnapshot, "environmentId" | "draftKey">) =>
-  `${snapshot.environmentId}\u0000${snapshot.draftKey}`;
+export const promptClarificationRequestKey = (
+  snapshot: Pick<PromptClarificationSnapshot, "environmentId" | "draftKey">,
+) => `${snapshot.environmentId}\u0000${snapshot.draftKey}`;
 
 const matches = (left: PromptClarificationSnapshot, right: PromptClarificationSnapshot) =>
   left.environmentId === right.environmentId &&
@@ -33,16 +34,16 @@ export function createPromptClarificationController(options: PromptClarification
   const active = new Map<string, number>();
 
   const isActive = (snapshot: Pick<PromptClarificationSnapshot, "environmentId" | "draftKey">) =>
-    active.has(keyOf(snapshot));
+    active.has(promptClarificationRequestKey(snapshot));
 
   const cancel = (snapshot: Pick<PromptClarificationSnapshot, "environmentId" | "draftKey">) => {
-    active.delete(keyOf(snapshot));
+    active.delete(promptClarificationRequestKey(snapshot));
   };
 
   const invalidate = cancel;
 
   const start = (snapshot: PromptClarificationSnapshot): boolean => {
-    const key = keyOf(snapshot);
+    const key = promptClarificationRequestKey(snapshot);
     if (active.has(key)) return false;
     const token = ++nextToken;
     active.set(key, token);
