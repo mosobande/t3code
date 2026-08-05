@@ -171,7 +171,9 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
           resolveClaudeApiModelId(modelSelection),
           ...(cliEffort ? ["--effort", cliEffort] : []),
           ...(settingsJson ? ["--settings", settingsJson] : []),
-          "--dangerously-skip-permissions",
+          ...(operation === "generatePromptClarification"
+            ? ["--tools", ""]
+            : ["--dangerously-skip-permissions"]),
         ],
         { env: claudeEnvironment },
       );
@@ -364,7 +366,7 @@ export const makeClaudeTextGeneration = Effect.fn("makeClaudeTextGeneration")(fu
   const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
     Effect.fn("ClaudeTextGeneration.generatePromptClarification")(function* (input) {
       const prompt = input.prompt;
-      const outputSchema = Schema.Struct({ text: Schema.String });
+      const outputSchema = TextGeneration.PromptClarificationOutputSchema;
       const generated = yield* runClaudeJson({
         operation: "generatePromptClarification",
         cwd: input.cwd,

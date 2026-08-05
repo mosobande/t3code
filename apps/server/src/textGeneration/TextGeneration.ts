@@ -1,6 +1,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import type { ChatAttachment, ModelSelection, ProviderInstanceId } from "@t3tools/contracts";
 import { TextGenerationError } from "@t3tools/contracts";
 
@@ -83,6 +84,9 @@ export interface PromptClarificationGenerationInput {
 export interface PromptClarificationGenerationResult {
   text: string;
 }
+
+/** Generic structured-output shape used by product-owned rewrite policies. */
+export const PromptClarificationOutputSchema = Schema.Struct({ text: Schema.String });
 
 export interface TextGenerationService {
   generateCommitMessage(

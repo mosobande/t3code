@@ -255,7 +255,7 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
   const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
     Effect.fn("GrokTextGeneration.generatePromptClarification")(function* (input) {
       const prompt = input.prompt;
-      const outputSchema = Schema.Struct({ text: Schema.String });
+      const outputSchema = TextGeneration.PromptClarificationOutputSchema;
       const generated = yield* runGrokJson({
         operation: "generatePromptClarification",
         cwd: input.cwd,
