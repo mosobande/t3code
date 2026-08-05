@@ -1843,7 +1843,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       activePendingProgress?.activeQuestion,
       pendingUserInputs.length,
       onChangeActivePendingUserInputCustomAnswer,
-      promptRef,
       setPrompt,
       composerDraftTarget,
       composerTerminalContexts,
@@ -2248,8 +2247,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             : entry.prompt;
       const promptChanged = nextPrompt !== currentPrompt;
       if (promptChanged) {
-        promptRef.current = nextPrompt;
-        setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+        writeComposerDraftText(nextPrompt);
         setComposerCursor(collapseExpandedComposerCursor(nextPrompt, nextPrompt.length));
         setComposerTrigger(null);
       }
@@ -2331,8 +2329,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerDraftTarget,
       composerImagesRef,
       promptRef,
-      setComposerDraftPrompt,
       takeStashEntry,
+      writeComposerDraftText,
     ],
   );
 
@@ -2420,6 +2418,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       // Only the prompt and images are cleared — terminal/element contexts,
       // preview annotations, and review comments are not stashable, so
       // destroying them here would be unrecoverable.
+      noteClarificationPromptMutation("");
       promptRef.current = "";
       clearComposerDraftPromptAndImages(stashTarget);
       setComposerCursor(0);
@@ -2504,6 +2503,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     composerDraftTarget,
     composerImagesRef,
     finalizeStashEntryImages,
+    noteClarificationPromptMutation,
     promptRef,
     pulseStashBadge,
     stashEntryToQueue,
