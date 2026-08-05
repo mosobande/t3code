@@ -216,9 +216,10 @@ export function applyServerSettingsPatch(
 
   const applySelectionPatch = (
     selection: ServerSettings["textGenerationModelSelection"],
-    selectionPatch:
+    selectionPatch: NonNullable<
       | ServerSettingsPatch["textGenerationModelSelection"]
-      | ServerSettingsPatch["promptClarificationModelSelection"],
+      | ServerSettingsPatch["promptClarificationModelSelection"]
+    >,
   ) => {
     const instanceId = selectionPatch.instanceId ?? selection.instanceId;
     const model = selectionPatch.model ?? selection.model;

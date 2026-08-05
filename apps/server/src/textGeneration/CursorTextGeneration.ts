@@ -54,7 +54,8 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generatePromptClarification";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -259,10 +260,25 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       } satisfies TextGeneration.ThreadTitleGenerationResult;
     });
 
+  const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
+    Effect.fn("CursorTextGeneration.generatePromptClarification")(function* (input) {
+      const prompt = input.prompt;
+      const outputSchema = Schema.Struct({ text: Schema.String });
+      const generated = yield* runCursorJson({
+        operation: "generatePromptClarification",
+        cwd: input.cwd,
+        prompt,
+        outputSchemaJson: outputSchema,
+        modelSelection: input.modelSelection,
+      });
+      return { text: generated.text.trim() };
+    });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generatePromptClarification,
   } satisfies TextGeneration.TextGeneration["Service"];
 });
