@@ -69,14 +69,21 @@ function withFakeAcpGrok<A, E, R>(
   }).pipe(Effect.scoped);
 }
 
-function readJsonRpcRequests(
-  filePath: string,
-): ReadonlyArray<{ readonly method?: string; readonly params?: Record<string, unknown> }> {
+function readJsonRpcRequests(filePath: string): ReadonlyArray<{
+  readonly method?: string;
+  readonly params?: Record<string, unknown>;
+}> {
   return NodeFS.readFileSync(filePath, "utf8")
     .trim()
     .split("\n")
     .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as { method?: string; params?: Record<string, unknown> });
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          method?: string;
+          params?: Record<string, unknown>;
+        },
+    );
 }
 
 it.layer(GrokTextGenerationTestLayer)("GrokTextGeneration", (it) => {
@@ -144,6 +151,51 @@ it.layer(GrokTextGenerationTestLayer)("GrokTextGeneration", (it) => {
         }),
     ),
   );
+
+  it.effect("uses the safe ACP capability set and text-only input for clarification", () => {
+    const requestLogDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeOS.tmpdir(), "t3code-grok-clarify-log-"),
+    );
+    const requestLogPath = NodePath.join(requestLogDir, "requests.ndjson");
+
+    return withFakeAcpGrok(
+      {
+        T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+        T3_ACP_PROMPT_RESPONSE_TEXT: JSON.stringify({
+          text: "Clarify the expected result.",
+        }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generated = yield* textGeneration.generatePromptClarification!({
+            cwd: requestLogDir,
+            prompt: "Rewrite this prompt.",
+            modelSelection: createModelSelection(ProviderInstanceId.make("grok"), "grok-mock-alt"),
+          });
+          expect(generated).toEqual({ text: "Clarify the expected result." });
+
+          const requests = readJsonRpcRequests(requestLogPath);
+          expect(
+            requests.find((request) => request.method === "initialize")?.params?.clientCapabilities,
+          ).toMatchObject({
+            fs: { readTextFile: false, writeTextFile: false },
+            terminal: false,
+          });
+          expect(
+            requests.some(
+              (request) =>
+                request.method === "session/set_model" &&
+                request.params?.modelId === "grok-mock-alt",
+            ),
+          ).toBe(true);
+          expect(
+            requests.find((request) => request.method === "session/prompt")?.params?.prompt,
+          ).toEqual([{ type: "text", text: "Rewrite this prompt." }]);
+
+          NodeFS.rmSync(requestLogDir, { recursive: true, force: true });
+        }),
+    );
+  });
 
   it.effect("surfaces ACP request failures as text generation errors", () =>
     withFakeAcpGrok(

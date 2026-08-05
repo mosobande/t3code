@@ -37,6 +37,7 @@ function makeFakeCodexBinary(
     forbidReasoningEffort?: boolean;
     requireArg?: string;
     forbidArg?: string;
+    cwdMustContain?: string;
     stdinMustContain?: string;
     stdinMustNotContain?: string;
   },
@@ -90,6 +91,14 @@ function makeFakeCodexBinary(
         "  shift",
         "done",
         'stdin_content="$(cat)"',
+        ...(input.cwdMustContain !== undefined
+          ? [
+              `case "$PWD" in *${input.cwdMustContain}*) ;; *)`,
+              '  printf "%s\\n" "unexpected cwd: $PWD" >&2',
+              "  exit 10",
+              "esac",
+            ]
+          : []),
         ...(input.requireArg !== undefined
           ? [
               `case " $original_args " in *" ${input.requireArg} "*) ;; *)`,
@@ -141,7 +150,9 @@ function makeFakeCodexBinary(
         ...(input.stdinMustContain !== undefined
           ? [
               // @effect-diagnostics-next-line preferSchemaOverJson:off
-              `if ! printf "%s" "$stdin_content" | grep -F -- ${JSON.stringify(input.stdinMustContain)} >/dev/null; then`,
+              `if ! printf "%s" "$stdin_content" | grep -F -- ${JSON.stringify(
+                input.stdinMustContain,
+              )} >/dev/null; then`,
               '  printf "%s\\n" "stdin missing expected content" >&2',
               `  exit 3`,
               "fi",
@@ -150,7 +161,9 @@ function makeFakeCodexBinary(
         ...(input.stdinMustNotContain !== undefined
           ? [
               // @effect-diagnostics-next-line preferSchemaOverJson:off
-              `if printf "%s" "$stdin_content" | grep -F -- ${JSON.stringify(input.stdinMustNotContain)} >/dev/null; then`,
+              `if printf "%s" "$stdin_content" | grep -F -- ${JSON.stringify(
+                input.stdinMustNotContain,
+              )} >/dev/null; then`,
               '  printf "%s\\n" "stdin contained forbidden content" >&2',
               `  exit 4`,
               "fi",
@@ -187,6 +200,7 @@ function withFakeCodexEnv<A, E, R>(
     forbidReasoningEffort?: boolean;
     requireArg?: string;
     forbidArg?: string;
+    cwdMustContain?: string;
     stdinMustContain?: string;
     stdinMustNotContain?: string;
     launchArgs?: string;
@@ -196,9 +210,14 @@ function withFakeCodexEnv<A, E, R>(
 ) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
-    const tempDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3code-codex-text-" });
+    const tempDir = yield* fs.makeTempDirectoryScoped({
+      prefix: "t3code-codex-text-",
+    });
     const codexPath = yield* makeFakeCodexBinary(tempDir, input);
-    const config = decodeCodexSettings({ binaryPath: codexPath, launchArgs: input.launchArgs });
+    const config = decodeCodexSettings({
+      binaryPath: codexPath,
+      launchArgs: input.launchArgs,
+    });
     const textGeneration = yield* makeCodexTextGeneration(config, input.environment);
     return yield* effectFn(textGeneration);
   }).pipe(Effect.scoped);
@@ -290,7 +309,9 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
           body: "",
         }),
         launchArgs: "--enable settings-feature",
-        environment: { T3CODE_CODEX_LAUNCH_ARGS: " --strict-config --listen off " },
+        environment: {
+          T3CODE_CODEX_LAUNCH_ARGS: " --strict-config --listen off ",
+        },
         requireArg: "--strict-config",
         forbidArg: "settings-feature",
       },
@@ -419,6 +440,30 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
           expect(generated.title).toBe("Investigate websocket reconnect regressions aft...");
         }),
     ),
+  );
+
+  it.effect("runs prompt clarification in its supplied temp cwd without image attachments", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped({
+        prefix: "t3code-clarify-codex-cwd-",
+      });
+      const generated = yield* withFakeCodexEnv(
+        {
+          output: '{"text":"Clarify the requested behavior."}',
+          cwdMustContain: "t3code-clarify-codex-cwd-",
+          forbidArg: "--image",
+        },
+        (textGeneration) =>
+          textGeneration.generatePromptClarification!({
+            cwd,
+            prompt: "Rewrite this prompt.",
+            modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+          }),
+      );
+
+      expect(generated).toEqual({ text: "Clarify the requested behavior." });
+    }),
   );
 
   it.effect("falls back when thread title normalization becomes whitespace-only", () =>
