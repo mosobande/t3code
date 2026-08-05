@@ -87,6 +87,7 @@ Keep internal compatibility identifiers such as `.t3` or `T3CODE_*` when they ar
 ## Current examples
 
 - Project Notes demonstrates a useful deep storage module, but its lifecycle integration is spread through upstream host files. Future delivery should move behavior behind a SIGIDI module and leave host files registration-only where practical.
+- Prompt clarification owns its bounded `sigidi.promptClarification.rewrite` behavior and local draft lifecycle. It reuses the product-neutral text-generation runtime and model-selection machinery. See [the feature record](../internals/prompt-clarification.md). Its web host registrations are entry-point wiring only, so no fork-patch row is required.
 - Generic icon packaging behavior can remain upstream-ready. SIGIDI icon sources, product identity, and release artifacts remain SIGIDI-owned.
 - Thread settlement behavior belongs to upstream T3 Code unless SIGIDI later adopts a distinct product rule. Do not fork it merely because SIGIDI imports the behavior.
 

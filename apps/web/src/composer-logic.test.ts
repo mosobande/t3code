@@ -6,6 +6,7 @@ import {
   detectComposerTrigger,
   expandCollapsedComposerCursor,
   isCollapsedCursorAdjacentToInlineToken,
+  parsePromptClarificationSlashCommand,
   parseStandaloneComposerSlashCommand,
   replaceTextRange,
   shouldSubmitComposerOnEnter,
@@ -144,6 +145,25 @@ describe("detectComposerTrigger", () => {
     expect(trigger).not.toBeNull();
     expect(trigger?.kind).toBe("path");
     expect(trigger?.query).toBe("");
+  });
+});
+
+describe("parsePromptClarificationSlashCommand", () => {
+  it("recognizes /clarify before provider slash-command handling", () => {
+    expect(parsePromptClarificationSlashCommand("/clarify Rewrite this")).toEqual({
+      kind: "arguments",
+      text: "Rewrite this",
+    });
+  });
+
+  it("keeps a bare /clarify local and gives its add-text hint", () => {
+    expect(parsePromptClarificationSlashCommand("/clarify")).toEqual({
+      kind: "missing-arguments",
+    });
+  });
+
+  it("does not intercept similarly named provider commands", () => {
+    expect(parsePromptClarificationSlashCommand("/clarify-more text")).toBeNull();
   });
 });
 
