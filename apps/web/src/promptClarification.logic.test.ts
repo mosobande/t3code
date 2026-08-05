@@ -42,7 +42,10 @@ describe("prompt clarification availability", () => {
     );
     expect(requestText).toBe("Inspect  then ");
 
-    const resultText = promptClarificationResultText("Inspect both terminals", 2);
+    const resultText = promptClarificationResultText(
+      `Inspect${INLINE_TERMINAL_CONTEXT_PLACEHOLDER} both terminals`,
+      2,
+    );
     expect(promptClarificationRequestText(resultText)).toBe("Inspect both terminals");
     expect(
       [...resultText].filter((character) => character === INLINE_TERMINAL_CONTEXT_PLACEHOLDER),

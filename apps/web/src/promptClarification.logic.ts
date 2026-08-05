@@ -22,7 +22,10 @@ export function promptClarificationRequestText(prompt: string): string {
 
 /** Reattach the current terminal-context chips without changing their stored data or order. */
 export function promptClarificationResultText(text: string, terminalContextCount: number): string {
-  return ensureInlineTerminalContextPlaceholders(text, terminalContextCount);
+  return ensureInlineTerminalContextPlaceholders(
+    stripInlineTerminalContextPlaceholders(text),
+    terminalContextCount,
+  );
 }
 
 /** Clarify never reroutes to another provider or model. */
