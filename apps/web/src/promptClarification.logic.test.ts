@@ -14,8 +14,11 @@ import {
 import {
   promptClarificationDisabledReason,
   promptClarificationDraftKey,
+  promptClarificationRequestText,
+  promptClarificationResultText,
   promptClarificationSelectionUnavailableReason,
 } from "./promptClarification.logic";
+import { INLINE_TERMINAL_CONTEXT_PLACEHOLDER } from "./lib/terminalContext";
 
 const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
   instanceId: ProviderInstanceId.make("codex"),
@@ -33,6 +36,19 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
 });
 
 describe("prompt clarification availability", () => {
+  it("sends visible text and restores every terminal-context placeholder", () => {
+    const requestText = promptClarificationRequestText(
+      `Inspect ${INLINE_TERMINAL_CONTEXT_PLACEHOLDER} then ${INLINE_TERMINAL_CONTEXT_PLACEHOLDER}`,
+    );
+    expect(requestText).toBe("Inspect  then ");
+
+    const resultText = promptClarificationResultText("Inspect both terminals", 2);
+    expect(promptClarificationRequestText(resultText)).toBe("Inspect both terminals");
+    expect(
+      [...resultText].filter((character) => character === INLINE_TERMINAL_CONTEXT_PLACEHOLDER),
+    ).toHaveLength(2);
+  });
+
   it("isolates same-environment server threads and abandons a late result", async () => {
     const environmentId = EnvironmentId.make("env");
     const threadAKey = promptClarificationDraftKey({
