@@ -1,5 +1,16 @@
-import type { ModelSelection, ServerProvider } from "@t3tools/contracts";
+import type { ModelSelection, ScopedThreadRef, ServerProvider } from "@t3tools/contracts";
+import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { stripInlineTerminalContextPlaceholders } from "./lib/terminalContext";
+
+export function promptClarificationDraftKey(
+  scope:
+    | { readonly routeKind: "server"; readonly threadRef: ScopedThreadRef }
+    | { readonly routeKind: "draft"; readonly draftId: string },
+): string {
+  return scope.routeKind === "server"
+    ? `server:${scopedThreadKey(scope.threadRef)}`
+    : `draft:${scope.draftId}`;
+}
 
 /** Clarify never reroutes to another provider or model. */
 export function promptClarificationSelectionUnavailableReason(input: {
