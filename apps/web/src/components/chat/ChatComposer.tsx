@@ -1450,7 +1450,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (clarificationObservedPromptRef.current !== prompt) {
       noteClarificationPromptMutation(prompt);
     }
-    clarificationResultsAllowedRef.current = clarificationPhase === "idle";
+    clarificationResultsAllowedRef.current =
+      clarificationPhase === "idle" && environmentUnavailable === null && phase !== "disconnected";
     clarificationSnapshotRef.current = {
       environmentId: String(environmentId),
       draftKey: clarificationDraftKey,
@@ -1460,8 +1461,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   }, [
     clarificationDraftKey,
     clarificationPhase,
+    environmentUnavailable,
     environmentId,
     noteClarificationPromptMutation,
+    phase,
     prompt,
   ]);
 
