@@ -1533,14 +1533,18 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     applyClarifiedTextRef.current(clarificationReview.text);
   }, [clarificationReview]);
   const isClarificationActive = useMemo(
-    () => clarificationController.isActive(clarificationSnapshotRef.current),
+    () =>
+      clarificationDisabledReason === null &&
+      clarificationController.isActive({
+        environmentId: String(environmentId),
+        draftKey: clarificationDraftKey,
+      }),
     [
       clarificationController,
+      clarificationDisabledReason,
       clarificationDraftKey,
-      clarificationPhase,
       clarificationRequestVersion,
       environmentId,
-      environmentUnavailable,
     ],
   );
   const clarificationAction: ComposerClarificationAction = {
