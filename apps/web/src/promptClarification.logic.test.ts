@@ -8,7 +8,7 @@ describe("prompt clarification availability", () => {
         text: "  ",
         supportsCapability: true,
         environmentAvailable: true,
-        selectionValid: true,
+        selectionUnavailableReason: null,
         phase: "idle",
       }),
     ).toBe("Enter text to clarify");
@@ -24,7 +24,7 @@ describe("prompt clarification availability", () => {
         text: "draft",
         supportsCapability: true,
         environmentAvailable: true,
-        selectionValid: true,
+        selectionUnavailableReason: null,
         phase,
       }),
     ).toBe(reason);
@@ -32,16 +32,28 @@ describe("prompt clarification availability", () => {
 
   it.each([
     [
-      { supportsCapability: false, environmentAvailable: true, selectionValid: true },
+      { supportsCapability: false, environmentAvailable: true, selectionUnavailableReason: null },
       "Prompt clarification requires a newer server",
     ],
     [
-      { supportsCapability: true, environmentAvailable: false, selectionValid: true },
+      { supportsCapability: true, environmentAvailable: false, selectionUnavailableReason: null },
       "Environment unavailable",
     ],
     [
-      { supportsCapability: true, environmentAvailable: true, selectionValid: false },
-      "Configured Clarify provider or model is unavailable",
+      {
+        supportsCapability: true,
+        environmentAvailable: true,
+        selectionUnavailableReason: "The selected Clarify model is disabled",
+      },
+      "The selected Clarify model is disabled",
+    ],
+    [
+      {
+        supportsCapability: true,
+        environmentAvailable: true,
+        selectionUnavailableReason: "The selected Clarify provider is stale",
+      },
+      "The selected Clarify provider is stale",
     ],
   ])("reports strict availability facts", (availability, reason) => {
     expect(
