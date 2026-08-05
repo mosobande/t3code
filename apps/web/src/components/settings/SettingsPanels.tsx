@@ -2198,44 +2198,44 @@ export function GeneralSettingsPanel() {
             ) : null
           }
           control={
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              <ProviderModelPicker
-                activeInstanceId={promptClarificationInstanceId}
-                model={promptClarificationModel}
-                lockedProvider={null}
-                instanceEntries={textGenerationModelInstanceEntries}
-                modelOptionsByInstance={promptClarificationOptionsByInstance}
-                triggerVariant="outline"
-                triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
-                disabled={isClarifySettingsReadOnly}
-                onInstanceModelChange={(instanceId, model) =>
-                  updateSettings({
-                    promptClarificationModelSelection: createModelSelection(instanceId, model),
-                  })
-                }
-              />
-              <TraitsPicker
-                provider={promptClarificationInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND}
-                models={promptClarificationInstanceEntry?.models ?? []}
-                model={promptClarificationModel}
-                prompt=""
-                onPromptChange={() => {}}
-                modelOptions={promptClarificationOptions}
-                allowPromptInjectedEffort={false}
-                triggerVariant="outline"
-                triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
-                disabled={isClarifySettingsReadOnly}
-                onModelOptionsChange={(nextOptions) =>
-                  updateSettings({
-                    promptClarificationModelSelection: createModelSelection(
-                      promptClarificationInstanceId,
-                      promptClarificationModel,
-                      nextOptions,
-                    ),
-                  })
-                }
-              />
-            </div>
+            isClarifySettingsReadOnly ? null : (
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <ProviderModelPicker
+                  activeInstanceId={promptClarificationInstanceId}
+                  model={promptClarificationModel}
+                  lockedProvider={null}
+                  instanceEntries={textGenerationModelInstanceEntries}
+                  modelOptionsByInstance={promptClarificationOptionsByInstance}
+                  triggerVariant="outline"
+                  triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
+                  onInstanceModelChange={(instanceId, model) =>
+                    updateSettings({
+                      promptClarificationModelSelection: createModelSelection(instanceId, model),
+                    })
+                  }
+                />
+                <TraitsPicker
+                  provider={promptClarificationInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND}
+                  models={promptClarificationInstanceEntry?.models ?? []}
+                  model={promptClarificationModel}
+                  prompt=""
+                  onPromptChange={() => {}}
+                  modelOptions={promptClarificationOptions}
+                  allowPromptInjectedEffort={false}
+                  triggerVariant="outline"
+                  triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
+                  onModelOptionsChange={(nextOptions) =>
+                    updateSettings({
+                      promptClarificationModelSelection: createModelSelection(
+                        promptClarificationInstanceId,
+                        promptClarificationModel,
+                        nextOptions,
+                      ),
+                    })
+                  }
+                />
+              </div>
+            )
           }
         />
       </SettingsSection>

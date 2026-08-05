@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { createPromptClarificationController } from "./promptClarification.ts";
+import {
+  createPromptClarificationController,
+  promptClarificationRequestKey,
+} from "./promptClarification.ts";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -11,6 +14,15 @@ function deferred<T>() {
 }
 
 describe("prompt clarification controller", () => {
+  it("keys single-flight work by environment and draft", () => {
+    expect(promptClarificationRequestKey({ environmentId: "env-a", draftKey: "draft" })).toBe(
+      "env-a\u0000draft",
+    );
+    expect(promptClarificationRequestKey({ environmentId: "env-b", draftKey: "draft" })).not.toBe(
+      promptClarificationRequestKey({ environmentId: "env-a", draftKey: "draft" }),
+    );
+  });
+
   it("applies a fresh result only to the captured text field", async () => {
     const result = deferred<string>();
     let current = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
