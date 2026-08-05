@@ -1,10 +1,11 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
+import { ProviderInstanceId, TextGenerationError, type ServerProvider } from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Metric from "effect/Metric";
 import * as Stream from "effect/Stream";
 import { expect } from "vite-plus/test";
 
@@ -69,6 +70,9 @@ const rewrite = (sessionId: string, rewriteInput: typeof input) =>
     service.rewrite(sessionId, rewriteInput),
   );
 
+const metricSnapshotsFor = (snapshots: ReadonlyArray<Metric.Metric.Snapshot>, id: string) =>
+  snapshots.filter((snapshot) => snapshot.id === id);
+
 it.layer(NodeServices.layer)("PromptClarification", (it) => {
   it.effect(
     "rejects missing, disabled, unavailable, and stale selections before provider invocation",
@@ -120,6 +124,99 @@ it.layer(NodeServices.layer)("PromptClarification", (it) => {
       yield* Deferred.succeed(gate, undefined);
       expect((yield* Fiber.join(first)).text).toBe("rewritten");
       expect((yield* Fiber.join(distinct)).text).toBe("rewritten");
+    }),
+  );
+
+  it.effect("records only allowlisted rewrite metrics when the provider echoes private text", () =>
+    Effect.gen(function* () {
+      const privateInput = {
+        draftKey: "draft-secret-key",
+        text: "private-input /tmp/secret stderr=secret-detail",
+      };
+      const privateOutput = "private-output stdout=secret-result";
+      const result = yield* rewrite("session-private", privateInput).pipe(
+        Effect.provide(layer([provider()], () => Effect.succeed({ text: privateOutput }))),
+      );
+      expect(result.text).toBe(privateOutput);
+
+      const snapshots = yield* Metric.snapshot;
+      const metrics = [
+        ...metricSnapshotsFor(snapshots, "sigidi_prompt_clarification_requests_total"),
+        ...metricSnapshotsFor(snapshots, "sigidi_prompt_clarification_request_duration"),
+      ].filter((metric) => metric.attributes?.inputChars === String(privateInput.text.length));
+      expect(metrics).toHaveLength(2);
+      for (const metric of metrics) {
+        expect(metric.attributes).toMatchObject({
+          provider: "codex",
+          model: "clarify-model",
+          inputChars: String(privateInput.text.length),
+          outputChars: String(privateOutput.length),
+          outcome: "success",
+          errorCategory: "none",
+        });
+        expect(
+          Object.keys(metric.attributes ?? {}).every((key) =>
+            [
+              "provider",
+              "model",
+              "inputChars",
+              "outputChars",
+              "outcome",
+              "errorCategory",
+              "time_unit",
+            ].includes(key),
+          ),
+        ).toBe(true);
+        const values = Object.values(metric.attributes ?? {});
+        expect(values).not.toContain(privateInput.draftKey);
+        expect(values).not.toContain(privateInput.text);
+        expect(values).not.toContain(privateOutput);
+      }
+    }),
+  );
+
+  it.effect("sanitizes provider failure metrics and returns only the error category", () =>
+    Effect.gen(function* () {
+      const privateInput = {
+        draftKey: "draft-failure-key",
+        text: "private-failure-input stderr=secret-detail",
+      };
+      const privateFailure = "private-failure stdout=secret-result";
+      const error = yield* rewrite("session-failure", privateInput).pipe(
+        Effect.flip,
+        Effect.provide(
+          layer([provider()], () =>
+            Effect.fail(
+              new TextGenerationError({
+                operation: "generatePromptClarification",
+                detail: privateFailure,
+              }),
+            ),
+          ),
+        ),
+      );
+      expect(error.category).toBe("provider_failed");
+
+      const snapshots = yield* Metric.snapshot;
+      const metrics = [
+        ...metricSnapshotsFor(snapshots, "sigidi_prompt_clarification_requests_total"),
+        ...metricSnapshotsFor(snapshots, "sigidi_prompt_clarification_request_duration"),
+      ].filter((metric) => metric.attributes?.inputChars === String(privateInput.text.length));
+      expect(metrics).toHaveLength(2);
+      for (const metric of metrics) {
+        expect(metric.attributes).toMatchObject({
+          provider: "codex",
+          model: "clarify-model",
+          inputChars: String(privateInput.text.length),
+          outputChars: "0",
+          outcome: "failure",
+          errorCategory: "provider_failed",
+        });
+        const values = Object.values(metric.attributes ?? {});
+        expect(values).not.toContain(privateInput.draftKey);
+        expect(values).not.toContain(privateInput.text);
+        expect(values).not.toContain(privateFailure);
+      }
     }),
   );
 });
