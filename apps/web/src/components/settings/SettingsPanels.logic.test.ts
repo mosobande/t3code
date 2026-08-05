@@ -150,6 +150,13 @@ describe("Clarify Settings environment scope", () => {
       "Prompt clarification requires a newer server",
       false,
     ],
+    [
+      false,
+      "remote-environment",
+      "primary-environment",
+      "Configure this environment from a client where it is primary",
+      false,
+    ],
   ])(
     "applies restore policy only when Clarify is editable",
     (
