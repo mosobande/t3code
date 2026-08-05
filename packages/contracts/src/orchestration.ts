@@ -140,7 +140,8 @@ export type ProviderApprovalDecision = typeof ProviderApprovalDecision.Type;
 export const ProviderUserInputAnswers = Schema.Record(Schema.String, Schema.Unknown);
 export type ProviderUserInputAnswers = typeof ProviderUserInputAnswers.Type;
 
-export const PROVIDER_SEND_TURN_MAX_INPUT_CHARS = 120_000;
+export const COMPOSER_MAX_INPUT_CHARS = 120_000;
+export const PROVIDER_SEND_TURN_MAX_INPUT_CHARS = COMPOSER_MAX_INPUT_CHARS;
 export const PROVIDER_SEND_TURN_MAX_ATTACHMENTS = 8;
 export const PROVIDER_SEND_TURN_MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const PROVIDER_SEND_TURN_MAX_IMAGE_DATA_URL_CHARS = 14_000_000;
