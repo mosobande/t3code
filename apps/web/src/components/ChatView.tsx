@@ -73,8 +73,10 @@ import { readLocalApi } from "../localApi";
 import { useDiffPanelStore } from "../diffPanelStore";
 import {
   collapseExpandedComposerCursor,
+  parsePromptClarificationSlashCommand,
   parseStandaloneComposerSlashCommand,
 } from "../composer-logic";
+import { promptClarificationSelectionUnavailableReason } from "../promptClarification.logic";
 import {
   derivePendingApprovals,
   derivePendingUserInputs,
@@ -1197,6 +1199,9 @@ function ChatViewContent(props: ChatViewProps) {
   const upsertKeybinding = useAtomCommand(serverEnvironment.upsertKeybinding, {
     reportFailure: false,
   });
+  const promptClarificationRewrite = useAtomCommand(serverEnvironment.promptClarificationRewrite, {
+    reportFailure: false,
+  });
   const openTerminal = useAtomCommand(terminalEnvironment.open, "terminal open");
   const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
   const closeTerminalMutation = useAtomCommand(terminalEnvironment.close, "terminal close");
@@ -2171,6 +2176,35 @@ function ChatViewContent(props: ChatViewProps) {
     versionMismatchServerLabel,
   ]);
   const providerStatuses = serverConfig?.providers ?? EMPTY_PROVIDERS;
+  const promptClarification = useMemo(
+    () => ({
+      supportsCapability: serverConfig?.environment.capabilities.promptClarification === true,
+      environmentAvailable: !activeEnvironmentUnavailable,
+      selectionUnavailableReason: promptClarificationSelectionUnavailableReason({
+        selection: settings.promptClarificationModelSelection,
+        providers: providerStatuses,
+      }),
+      rewrite: async (input: {
+        readonly environmentId: EnvironmentId;
+        readonly draftKey: string;
+        readonly text: string;
+      }) => {
+        const result = await promptClarificationRewrite({
+          environmentId: input.environmentId,
+          input: { draftKey: input.draftKey, text: input.text },
+        });
+        if (result._tag === "Success") return result.value.text;
+        throw squashAtomCommandFailure(result);
+      },
+    }),
+    [
+      activeEnvironmentUnavailable,
+      promptClarificationRewrite,
+      providerStatuses,
+      serverConfig,
+      settings.promptClarificationModelSelection,
+    ],
+  );
   const unlockedSelectedProvider = resolveSelectableProvider(
     providerStatuses,
     selectedProviderByThreadId ?? threadProvider,
@@ -4752,6 +4786,13 @@ function ChatViewContent(props: ChatViewProps) {
         return;
       }
 
+      if (command === "composer.clarify") {
+        event.preventDefault();
+        event.stopPropagation();
+        composerRef.current?.clarify();
+        return;
+      }
+
       const scriptId = projectScriptIdFromCommand(command);
       if (!scriptId || !activeProject) return;
       const script = activeProject.scripts.find((entry) => entry.id === scriptId);
@@ -4860,6 +4901,21 @@ function ChatViewContent(props: ChatViewProps) {
         }),
       );
     };
+    const clarificationSlashCommand = parsePromptClarificationSlashCommand(promptRef.current);
+    if (clarificationSlashCommand) {
+      if (clarificationSlashCommand.kind === "missing-arguments") {
+        toastManager.add(
+          stackedThreadToast({
+            type: "warning",
+            title: "Add text after /clarify",
+            description: "For example: /clarify Draft a release note",
+          }),
+        );
+        return;
+      }
+       composerRef.current?.clarify(clarificationSlashCommand.text);
+       return;
+     }
     if (
       !activeThread ||
       isSendBusy ||
@@ -6326,6 +6382,7 @@ function ChatViewContent(props: ChatViewProps) {
                             keybindings={keybindings}
                             terminalOpen={Boolean(terminalUiState.terminalOpen)}
                             gitCwd={gitCwd}
+                            promptClarification={promptClarification}
                             promptRef={promptRef}
                             composerImagesRef={composerImagesRef}
                             composerTerminalContextsRef={composerTerminalContextsRef}

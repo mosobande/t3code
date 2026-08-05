@@ -29,6 +29,15 @@ export interface KeybindingRow {
 export type WhenVariableOption = string;
 export type KeybindingCommandOption = KeybindingCommand;
 
+export function keybindingCommandDisabledReason(
+  command: KeybindingCommand,
+  supportsPromptClarification: boolean,
+): string | null {
+  return command === "composer.clarify" && !supportsPromptClarification
+    ? "Prompt clarification requires a newer server"
+    : null;
+}
+
 const STATIC_UNBOUND_KEYBINDING_COMMANDS = [
   "composer.clarify",
 ] as const satisfies ReadonlyArray<KeybindingCommand>;

@@ -1,7 +1,40 @@
 import { describe, expect, it } from "vite-plus/test";
+import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
 import { promptClarificationDisabledReason } from "./promptClarification.logic";
+import { promptClarificationSelectionUnavailableReason } from "./promptClarification.logic";
+
+const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
+  instanceId: ProviderInstanceId.make("codex"),
+  driver: ProviderDriverKind.make("codex"),
+  enabled: true,
+  installed: true,
+  version: null,
+  status: "ready",
+  auth: { status: "authenticated" },
+  checkedAt: "2026-08-05T00:00:00.000Z",
+  models: [{ slug: "gpt-5", name: "GPT-5", isCustom: false, capabilities: null }],
+  slashCommands: [],
+  skills: [],
+  ...overrides,
+});
 
 describe("prompt clarification availability", () => {
+  it.each([
+    [[], "Configured Clarify provider is missing"],
+    [[provider({ enabled: false })], "Configured Clarify provider is disabled"],
+    [[provider({ installed: false })], "Configured Clarify provider is unavailable"],
+    [[provider({ status: "warning" })], "Configured Clarify provider is stale"],
+    [[provider({ availability: "unavailable" })], "Configured Clarify provider is unavailable"],
+    [[provider({ models: [] })], "Configured Clarify model is stale"],
+  ] as const)("keeps the configured selection exact", (providers, expected) => {
+    expect(
+      promptClarificationSelectionUnavailableReason({
+        selection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+        providers,
+      }),
+    ).toBe(expected);
+  });
+
   it("uses the exact non-text reason", () => {
     expect(
       promptClarificationDisabledReason({

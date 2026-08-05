@@ -545,7 +545,9 @@ export interface ChatComposerHandle {
   toggleModelPicker: () => void;
   isModelPickerOpen: () => boolean;
   /** Start the composer-owned clarification request when the idle draft permits it. */
-  clarify: () => boolean;
+  clarify: (textOverride?: string) => boolean;
+  /** Explain why clarify cannot start for this exact composer snapshot. */
+  clarifyDisabledReason: () => string | null;
   readSnapshot: () => {
     value: string;
     cursor: number;
@@ -1458,13 +1460,23 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     });
   }
   const clarificationController = clarificationControllerRef.current;
-  const startClarification = useCallback(() => {
-    if (clarificationDisabledReason !== null || !clarificationRewriteRef.current) return false;
-    setClarificationReview(null);
-    const started = clarificationController.start(clarificationSnapshotRef.current);
-    if (started) setClarificationRequestVersion((version) => version + 1);
-    return started;
-  }, [clarificationController, clarificationDisabledReason]);
+  const startClarification = useCallback(
+    (textOverride?: string) => {
+      const disabledReason =
+        textOverride !== undefined && clarificationDisabledReason === "Enter text to clarify"
+          ? null
+          : clarificationDisabledReason;
+      if (disabledReason !== null || !clarificationRewriteRef.current) return false;
+      if (textOverride !== undefined) {
+        applyClarifiedTextRef.current(textOverride);
+      }
+      setClarificationReview(null);
+      const started = clarificationController.start(clarificationSnapshotRef.current);
+      if (started) setClarificationRequestVersion((version) => version + 1);
+      return started;
+    },
+    [clarificationController, clarificationDisabledReason],
+  );
   const cancelClarification = useCallback(() => {
     clarificationController.cancel(clarificationSnapshotRef.current);
     setClarificationReview(null);
@@ -2822,6 +2834,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       },
       isModelPickerOpen: () => isComposerModelPickerOpen,
       clarify: startClarification,
+      clarifyDisabledReason: () => clarificationDisabledReason,
       readSnapshot: () => {
         return readComposerSnapshot();
       },

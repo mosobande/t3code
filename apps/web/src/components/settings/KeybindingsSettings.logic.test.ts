@@ -4,6 +4,7 @@ import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import {
   buildKeybindingRows,
   buildKeybindingCommandOptions,
+  keybindingCommandDisabledReason,
   buildWhenVariableOptions,
   commandLabel,
   keybindingConflictLabels,
@@ -15,6 +16,12 @@ import {
 } from "./KeybindingsSettings.logic";
 
 describe("KeybindingsSettings.logic", () => {
+  it("blocks Clarify bindings on an older server", () => {
+    expect(keybindingCommandDisabledReason("composer.clarify", false)).toBe(
+      "Prompt clarification requires a newer server",
+    );
+  });
+
   it("builds searchable rows with readable key and when values", () => {
     const rows = buildKeybindingRows(
       [
