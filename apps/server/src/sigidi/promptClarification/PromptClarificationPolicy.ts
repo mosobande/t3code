@@ -6,7 +6,7 @@ export function buildPromptClarificationPayload(text: string) {
     "Rules:",
     "- Preserve intent, language, names, paths, numbers, exact errors, constraints, UI copy, and acceptance criteria.",
     "- Do not answer the request or add scope, solutions, stack choices, or new requirements.",
-    "- Return only the rewritten prompt text.",
+    "- The text field must contain only the rewritten prompt.",
     "",
     "Draft:",
     text,
