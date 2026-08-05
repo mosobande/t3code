@@ -17,9 +17,18 @@ import {
 
 describe("KeybindingsSettings.logic", () => {
   it("blocks Clarify bindings on an older server", () => {
-    expect(keybindingCommandDisabledReason("composer.clarify", false)).toBe(
-      "Prompt clarification requires a newer server",
-    );
+    expect(
+      keybindingCommandDisabledReason(
+        "composer.clarify",
+        "Prompt clarification requires a newer server",
+      ),
+    ).toBe("Prompt clarification requires a newer server");
+  });
+
+  it("keeps the configured Clarify selection reason exact", () => {
+    expect(
+      keybindingCommandDisabledReason("composer.clarify", "Configured Clarify provider is stale"),
+    ).toBe("Configured Clarify provider is stale");
   });
 
   it("builds searchable rows with readable key and when values", () => {

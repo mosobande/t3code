@@ -1,4 +1,5 @@
 import type { ModelSelection, ServerProvider } from "@t3tools/contracts";
+import { stripInlineTerminalContextPlaceholders } from "./lib/terminalContext";
 
 /** Clarify never reroutes to another provider or model. */
 export function promptClarificationSelectionUnavailableReason(input: {
@@ -34,7 +35,9 @@ export function promptClarificationDisabledReason(input: {
   if (!input.supportsCapability) return "Prompt clarification requires a newer server";
   if (!input.environmentAvailable) return "Environment unavailable";
   if (input.selectionUnavailableReason !== null) return input.selectionUnavailableReason;
-  if (input.text.trim().length === 0) return "Enter text to clarify";
+  if (stripInlineTerminalContextPlaceholders(input.text).trim().length === 0) {
+    return "Enter text to clarify";
+  }
   if (input.phase === "approval") return "Resolve the approval before clarifying";
   if (input.phase === "pending-input") {
     return "Complete the requested input before clarifying";
