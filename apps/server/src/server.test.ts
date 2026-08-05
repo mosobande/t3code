@@ -4367,6 +4367,94 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
+  it.effect("routes prompt clarification over the websocket with its session and full result", () =>
+    Effect.gen(function* () {
+      const received = yield* Deferred.make<{
+        readonly sessionId: string;
+        readonly draftKey: string;
+        readonly text: string;
+      }>();
+      const input = {
+        draftKey: "draft-rpc-proof",
+        text: "Clarify this request before sending it.",
+      };
+      const expected = {
+        text: "Please clarify the acceptance criteria.",
+        providerInstanceId: ProviderInstanceId.make("claudeAgent"),
+        model: "claude-opus",
+      };
+      yield* buildAppUnderTest({
+        layers: {
+          promptClarification: {
+            rewrite: (sessionId, rewriteInput) =>
+              Deferred.succeed(received, {
+                sessionId,
+                draftKey: rewriteInput.draftKey,
+                text: rewriteInput.text,
+              }).pipe(Effect.as(expected)),
+          },
+        },
+      });
+
+      const wsUrl = yield* getWsServerUrl("/ws");
+      const result = yield* Effect.scoped(
+        withWsRpcClient(wsUrl, (client) => client[WS_METHODS.promptClarificationRewrite](input)),
+      );
+
+      assert.deepEqual(result, expected);
+      const routed = yield* Deferred.await(received);
+      assert.isTrue(routed.sessionId.length > 0);
+      assert.deepEqual({ draftKey: routed.draftKey, text: routed.text }, input);
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
+  it.effect("requires orchestration:operate for prompt clarification RPC", () =>
+    Effect.gen(function* () {
+      yield* buildAppUnderTest({
+        layers: {
+          promptClarification: {
+            rewrite: () =>
+              Effect.succeed({
+                text: "This should never be returned.",
+                providerInstanceId: ProviderInstanceId.make("codex"),
+                model: "gpt-5-codex",
+              }),
+          },
+        },
+      });
+
+      const { response: tokenResponse, body: tokenBody } = yield* exchangeAccessToken(
+        defaultDesktopBootstrapToken,
+        { scope: "access:write" },
+      );
+      assert.equal(tokenResponse.status, 200);
+      assert.equal(tokenBody.scope, "access:write");
+      assert.isDefined(tokenBody.access_token);
+
+      const ticketResponse = yield* HttpClient.post("/api/auth/websocket-ticket", {
+        headers: { authorization: `Bearer ${tokenBody.access_token ?? ""}` },
+      });
+      const ticketBody = (yield* ticketResponse.json) as { readonly ticket: string };
+      assert.equal(ticketResponse.status, 200);
+
+      const wsUrl = `${yield* getWsServerUrl("/ws", { authenticated: false })}?wsTicket=${encodeURIComponent(ticketBody.ticket)}`;
+      const error = yield* Effect.flip(
+        Effect.scoped(
+          withWsRpcClient(wsUrl, (client) =>
+            client[WS_METHODS.promptClarificationRewrite]({
+              draftKey: "draft-read-only-token",
+              text: "Do not invoke the provider.",
+            }),
+          ),
+        ),
+      );
+      assert.equal(error._tag, "EnvironmentAuthorizationError");
+      if (error._tag === "EnvironmentAuthorizationError") {
+        assert.equal(error.requiredScope, "orchestration:operate");
+      }
+    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+  );
+
   it.effect("shares one preview automation broker across websocket sessions", () =>
     Effect.scoped(
       Effect.gen(function* () {

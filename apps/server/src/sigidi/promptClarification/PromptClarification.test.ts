@@ -1,12 +1,20 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { ProviderInstanceId, TextGenerationError, type ServerProvider } from "@t3tools/contracts";
+import {
+  COMPOSER_MAX_INPUT_CHARS,
+  PromptClarificationError,
+  ProviderInstanceId,
+  TextGenerationError,
+  type ServerProvider,
+} from "@t3tools/contracts";
 import * as Deferred from "effect/Deferred";
+import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Metric from "effect/Metric";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 import { expect } from "vite-plus/test";
 
 import * as ProviderRegistry from "../../provider/Services/ProviderRegistry.ts";
@@ -14,7 +22,10 @@ import * as ServerSettings from "../../serverSettings.ts";
 import * as TextGeneration from "../../textGeneration/TextGeneration.ts";
 import * as PromptClarification from "./PromptClarification.ts";
 
-const selection = { instanceId: ProviderInstanceId.make("codex"), model: "clarify-model" };
+const selection = {
+  instanceId: ProviderInstanceId.make("codex"),
+  model: "clarify-model",
+};
 const input = { draftKey: "draft-1", text: "Keep /tmp/example and error E42" };
 
 const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider =>
@@ -27,7 +38,14 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider =>
     auth: { status: "authenticated" },
     checkedAt: "2026-01-01T00:00:00.000Z",
     version: "1",
-    models: [{ slug: selection.model, name: selection.model, isCustom: false, capabilities: null }],
+    models: [
+      {
+        slug: selection.model,
+        name: selection.model,
+        isCustom: false,
+        capabilities: null,
+      },
+    ],
     slashCommands: [],
     skills: [],
     ...overrides,
@@ -218,5 +236,56 @@ it.layer(NodeServices.layer)("PromptClarification", (it) => {
         expect(values).not.toContain(privateFailure);
       }
     }),
+  );
+
+  it.effect("rejects blank and over-limit provider output without returning it", () =>
+    Effect.gen(function* () {
+      const privateOversizedOutput = `private-provider-output ${"x".repeat(
+        COMPOSER_MAX_INPUT_CHARS,
+      )}`;
+
+      for (const output of ["   \n\t", privateOversizedOutput]) {
+        const error = yield* rewrite("session-invalid-output", input).pipe(
+          Effect.flip,
+          Effect.provide(layer([provider()], () => Effect.succeed({ text: output }))),
+        );
+        expect(error._tag).toBe("PromptClarificationError");
+        expect(error.category).toBe("invalid_output");
+        expect(Object.values(error)).not.toContain(output);
+      }
+    }),
+  );
+
+  it.effect("releases a timed-out session and draft key for a later rewrite", () =>
+    Effect.gen(function* () {
+      const started = yield* Deferred.make<void>();
+      let calls = 0;
+      const live = layer([provider()], () => {
+        calls += 1;
+        return calls === 1
+          ? Deferred.succeed(started, undefined).pipe(
+              Effect.andThen(Effect.never as Effect.Effect<{ readonly text: string }>),
+            )
+          : Effect.succeed({ text: "second rewrite" });
+      });
+      const context = yield* Layer.build(live);
+      const first = yield* Effect.forkScoped(
+        rewrite("session-timeout", input).pipe(Effect.provide(context), Effect.result),
+      );
+      yield* Deferred.await(started);
+      yield* TestClock.adjust(Duration.millis(60_000));
+      yield* Effect.yieldNow;
+      const firstResult = yield* Fiber.join(first);
+      expect(firstResult._tag).toBe("Failure");
+      if (firstResult._tag === "Failure") {
+        const firstError = firstResult.failure;
+        expect(firstError).toBeInstanceOf(PromptClarificationError);
+        expect(firstError).toMatchObject({ category: "timeout" });
+      }
+
+      const second = yield* rewrite("session-timeout", input).pipe(Effect.provide(context));
+      expect(second).toMatchObject({ text: "second rewrite" });
+      expect(calls).toBe(2);
+    }).pipe(Effect.provide(TestClock.layer())),
   );
 });
