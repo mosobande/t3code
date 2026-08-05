@@ -25,6 +25,7 @@ import {
   ProjectId,
   ProviderDriverKind,
   ProviderInstanceId,
+  PromptClarificationError,
   ResolvedKeybindingRule,
   ThreadId,
   WS_METHODS,
@@ -91,6 +92,7 @@ import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import * as PromptClarification from "./sigidi/promptClarification/PromptClarification.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as PreviewManager from "./preview/Manager.ts";
 import * as PortScanner from "./preview/PortScanner.ts";
@@ -365,6 +367,7 @@ const buildAppUnderTest = (options?: {
     desktopTelemetryReceiver?: Partial<
       DesktopTelemetryReceiver.DesktopTelemetryReceiver["Service"]
     >;
+    promptClarification?: Partial<PromptClarification.PromptClarification["Service"]>;
   };
 }) =>
   Effect.gen(function* () {
@@ -704,6 +707,10 @@ const buildAppUnderTest = (options?: {
             retain: Effect.void,
             registerTerminalProcesses: () => Effect.void,
             unregisterTerminal: () => Effect.void,
+          }),
+          Layer.mock(PromptClarification.PromptClarification)({
+            rewrite: () => Effect.fail(new PromptClarificationError({ category: "unavailable" })),
+            ...options?.layers?.promptClarification,
           }),
         ),
       ),

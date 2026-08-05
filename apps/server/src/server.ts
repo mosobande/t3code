@@ -360,7 +360,7 @@ const ProviderRuntimeLayerLive = ProviderSessionReaperLive.pipe(
   Layer.provideMerge(OrchestrationLayerLive),
 );
 
-const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
+const RuntimeCoreDependenciesWithoutPromptLive = ReactorLayerLive.pipe(
   // Core Services
   Layer.provideMerge(ServerSettingsLayerLive),
   Layer.provideMerge(CheckpointingLayerLive),
@@ -395,17 +395,7 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
   Layer.provideMerge(RepositoryIdentityResolver.layer),
   Layer.provideMerge(ServerEnvironment.layer),
   Layer.provideMerge(AuthLayerLive),
-  Layer.provideMerge(
-    Layer.mergeAll(
-      ServerSecretStore.layer,
-      PromptClarification.layer.pipe(
-        Layer.provide(TextGeneration.layer),
-        Layer.provide(ProviderRegistryLive),
-        Layer.provide(ProviderInstanceRegistryHydrationLive),
-        Layer.provide(ServerSettingsLayerLive),
-      ),
-    ),
-  ),
+  Layer.provideMerge(ServerSecretStore.layer),
   Layer.provideMerge(
     Layer.mergeAll(
       CloudCliTokenManager.layer.pipe(
@@ -415,6 +405,10 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
       CloudManagedEndpointRuntimeLive,
     ),
   ),
+);
+
+const RuntimeCoreDependenciesLive = PromptClarification.layer.pipe(
+  Layer.provideMerge(RuntimeCoreDependenciesWithoutPromptLive),
 );
 
 const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(
