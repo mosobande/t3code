@@ -104,6 +104,16 @@ it.effect("parses keybinding rules", () =>
   }),
 );
 
+it.effect("accepts the unbound composer clarify command", () =>
+  Effect.gen(function* () {
+    const parsed = yield* decode(KeybindingRule, {
+      key: "mod+shift+c",
+      command: "composer.clarify",
+    });
+    assert.strictEqual(parsed.command, "composer.clarify");
+  }),
+);
+
 it.effect("rejects invalid command values", () =>
   Effect.gen(function* () {
     const result = yield* Effect.exit(
