@@ -97,7 +97,14 @@ const observeRewrite = <A, R>(
       Metric.withAttributes(promptClarificationRequestDuration, attributes),
       duration,
     );
-    return yield* Effect.failCause(exit.cause);
+    if (Cause.hasInterruptsOnly(exit.cause)) {
+      return yield* Effect.failCause(exit.cause);
+    }
+    const error = Option.getOrNull(Cause.findErrorOption(exit.cause));
+    if (error !== null && isPromptClarificationError(error)) {
+      return yield* error;
+    }
+    return yield* new PromptClarificationError({ category: "provider_failed" });
   });
 
 export const layer = Layer.effect(
