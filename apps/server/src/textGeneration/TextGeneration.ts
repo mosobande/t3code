@@ -73,6 +73,17 @@ export interface ThreadTitleGenerationResult {
   title: string;
 }
 
+export interface PromptClarificationGenerationInput {
+  cwd: string;
+  /** Product-owned policy constructs this structured text-only payload. */
+  prompt: string;
+  modelSelection: ModelSelection;
+}
+
+export interface PromptClarificationGenerationResult {
+  text: string;
+}
+
 export interface TextGenerationService {
   generateCommitMessage(
     input: CommitMessageGenerationInput,
@@ -80,6 +91,9 @@ export interface TextGenerationService {
   generatePrContent(input: PrContentGenerationInput): Promise<PrContentGenerationResult>;
   generateBranchName(input: BranchNameGenerationInput): Promise<BranchNameGenerationResult>;
   generateThreadTitle(input: ThreadTitleGenerationInput): Promise<ThreadTitleGenerationResult>;
+  generatePromptClarification(
+    input: PromptClarificationGenerationInput,
+  ): Promise<PromptClarificationGenerationResult>;
 }
 
 /**
@@ -113,6 +127,9 @@ export class TextGeneration extends Context.Service<
     readonly generateThreadTitle: (
       input: ThreadTitleGenerationInput,
     ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
+    readonly generatePromptClarification?: (
+      input: PromptClarificationGenerationInput,
+    ) => Effect.Effect<PromptClarificationGenerationResult, TextGenerationError>;
   }
 >()("t3/textGeneration/TextGeneration") {}
 
@@ -123,7 +140,8 @@ type TextGenerationOp =
   | "generateCommitMessage"
   | "generatePrContent"
   | "generateBranchName"
-  | "generateThreadTitle";
+  | "generateThreadTitle"
+  | "generatePromptClarification";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -162,6 +180,23 @@ export const makeTextGenerationFromRegistry = (
     generateThreadTitle: (input) =>
       resolveInstance(registry, "generateThreadTitle", input.modelSelection.instanceId).pipe(
         Effect.flatMap((textGeneration) => textGeneration.generateThreadTitle(input)),
+      ),
+    generatePromptClarification: (input) =>
+      resolveInstance(
+        registry,
+        "generatePromptClarification",
+        input.modelSelection.instanceId,
+      ).pipe(
+        Effect.flatMap((textGeneration) =>
+          textGeneration.generatePromptClarification
+            ? textGeneration.generatePromptClarification(input)
+            : Effect.fail(
+                new TextGenerationError({
+                  operation: "generatePromptClarification",
+                  detail: "Provider does not support prompt clarification.",
+                }),
+              ),
+        ),
       ),
   });
 
