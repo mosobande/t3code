@@ -84,9 +84,8 @@ import {
   serverEnvironment,
 } from "../../state/server";
 import { usePrimaryEnvironment } from "../../state/environments";
-import { activeEnvironmentIdAtom } from "../../state/entities";
+import { lastViewedChatEnvironmentIdAtom, useProjects } from "../../state/entities";
 import { primaryEnvironmentIdAtom } from "../../state/primaryEnvironment";
-import { useProjects } from "../../state/entities";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
 import { formatRelativeTimeLabel, getRelativeTimeState } from "../../timestampFormat";
 import { Button } from "../ui/button";
@@ -125,6 +124,8 @@ import {
   backgroundActivitySharedPolicySettings,
   buildProviderInstanceUpdatePatch,
   formatDiagnosticsDescription,
+  resolveClarifySettingsUnavailableReason,
+  shouldRestorePromptClarificationSelection,
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
   projectGroupingModeFromToggle,
@@ -563,6 +564,18 @@ export function useSettingsRestore(onRestored?: () => void) {
   const { theme, setTheme } = useTheme();
   const settings = usePrimarySettings();
   const updateSettings = useUpdatePrimarySettings();
+  const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
+  const lastViewedChatEnvironmentId = useAtomValue(lastViewedChatEnvironmentIdAtom);
+  const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
+  const clarifySettingsUnavailableReason = resolveClarifySettingsUnavailableReason({
+    supportsPromptClarification:
+      primaryServerConfig?.environment.capabilities.promptClarification === true,
+    settingsContextEnvironmentId: lastViewedChatEnvironmentId,
+    primaryEnvironmentId,
+  });
+  const shouldRestorePromptClarification = shouldRestorePromptClarificationSelection(
+    clarifySettingsUnavailableReason,
+  );
 
   const isTextGenerationModelDirty = !Equal.equals(
     settings.textGenerationModelSelection ?? null,
@@ -624,11 +637,14 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Delete confirmation"]
         : []),
       ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
-      ...(isPromptClarificationModelDirty ? ["Clarify model"] : []),
+      ...(shouldRestorePromptClarification && isPromptClarificationModelDirty
+        ? ["Clarify model"]
+        : []),
     ],
     [
       isTextGenerationModelDirty,
       isPromptClarificationModelDirty,
+      shouldRestorePromptClarification,
       isBackgroundActivityDirty,
       settings.autoOpenPlanSidebar,
       settings.confirmThreadArchive,
@@ -681,10 +697,21 @@ export function useSettingsRestore(onRestored?: () => void) {
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
-      promptClarificationModelSelection: DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
+      ...(shouldRestorePromptClarification
+        ? {
+            promptClarificationModelSelection:
+              DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
+          }
+        : {}),
     });
     onRestored?.();
-  }, [changedSettingLabels, onRestored, setTheme, updateSettings]);
+  }, [
+    changedSettingLabels,
+    onRestored,
+    setTheme,
+    shouldRestorePromptClarification,
+    updateSettings,
+  ]);
 
   return {
     changedSettingLabels,
@@ -1134,16 +1161,14 @@ export function GeneralSettingsPanel() {
   const observability = useAtomValue(primaryServerObservabilityAtom);
   const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
-  const activeEnvironmentId = useAtomValue(activeEnvironmentIdAtom);
+  const settingsContextEnvironmentId = useAtomValue(lastViewedChatEnvironmentIdAtom);
   const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
-  const isClarifySettingsReadOnly =
-    activeEnvironmentId !== null && activeEnvironmentId !== primaryEnvironmentId;
-  const clarifySettingsUnavailableReason =
-    primaryServerConfig?.environment.capabilities.promptClarification !== true
-      ? "Prompt clarification requires a newer server"
-      : isClarifySettingsReadOnly
-        ? "Configure this environment from a client where it is primary"
-        : null;
+  const clarifySettingsUnavailableReason = resolveClarifySettingsUnavailableReason({
+    supportsPromptClarification:
+      primaryServerConfig?.environment.capabilities.promptClarification === true,
+    settingsContextEnvironmentId,
+    primaryEnvironmentId,
+  });
   const diagnosticsDescription = formatDiagnosticsDescription({
     localTracingEnabled: observability?.localTracingEnabled ?? false,
     otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
