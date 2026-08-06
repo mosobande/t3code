@@ -450,9 +450,13 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
             <ComposerControl
               className={cn(
                 "shrink-0 whitespace-nowrap",
-                props.clarification.panelOpen
-                  ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/15 hover:text-blue-300"
-                  : "text-muted-foreground/70 hover:text-foreground/80",
+                props.clarification.disabledReason === null
+                  ? props.clarification.panelOpen
+                    ? "bg-fuchsia-500/12 text-fuchsia-700 hover:bg-fuchsia-500/16 hover:text-fuchsia-600 dark:text-fuchsia-300 dark:hover:text-fuchsia-200"
+                    : "text-fuchsia-700 hover:bg-fuchsia-500/10 hover:text-fuchsia-600 dark:text-fuchsia-300 dark:hover:text-fuchsia-200"
+                  : props.clarification.panelOpen
+                    ? "bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground/80"
+                    : "text-muted-foreground/70 hover:text-foreground/80",
               )}
               type="button"
               onClick={props.clarification.onActivate}
@@ -468,7 +472,11 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
         >
           <ComposerControlIcon
             icon={WandSparklesIcon}
-            className={props.clarification.panelOpen ? "text-current opacity-100" : undefined}
+            className={
+              props.clarification.disabledReason === null || props.clarification.panelOpen
+                ? "text-current opacity-100"
+                : undefined
+            }
           />
           <span className="sr-only">Clarify</span>
         </TooltipTrigger>

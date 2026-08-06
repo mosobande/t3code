@@ -2,6 +2,7 @@ import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
 import { memo, type ReactNode } from "react";
 import { EllipsisIcon, ListTodoIcon, WandSparklesIcon } from "lucide-react";
 import { Button } from "../ui/button";
+import { cn } from "~/lib/utils";
 import {
   Menu,
   MenuItem,
@@ -96,7 +97,12 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
           title={props.clarifyDisabledReason ?? undefined}
           onClick={props.onToggleClarify}
         >
-          <WandSparklesIcon className="size-4 shrink-0" />
+          <WandSparklesIcon
+            className={cn(
+              "size-4 shrink-0",
+              props.clarifyDisabledReason === null && "text-fuchsia-700 dark:text-fuchsia-300",
+            )}
+          />
           <span className="flex min-w-0 flex-col">
             <span>Clarify</span>
             {props.clarifyDisabledReason ? (
