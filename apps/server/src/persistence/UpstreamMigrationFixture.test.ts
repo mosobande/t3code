@@ -37,7 +37,7 @@ const initializeDatabase = async (databasePath: string, fixture: string) => {
 
 it.effect("upgrades the pinned upstream-only fixture without losing representative data", () => {
   const fixture = NodeFS.readFileSync(
-    NodePath.join(import.meta.dirname, "fixtures/upstream-f8707481.sql"),
+    NodePath.join(import.meta.dirname, "fixtures/upstream-a483337a.sql"),
     "utf8",
   );
   return Effect.acquireUseRelease(

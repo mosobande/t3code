@@ -48,8 +48,8 @@ const ledgerMatches = (
     })
   );
 };
-
 export function runServicePreflight(input: {
+  /** Older servers always pass this flag when invoking a staged preflight. */
   readonly databasePath: string;
   readonly launcherProtocol: number;
   readonly version?: string;
@@ -77,7 +77,6 @@ export function runServicePreflight(input: {
   } catch {
     return { status: "blocked", version, reason: localUpdateReason(version) };
   }
-
   return { status: "ready", version, launcherProtocol: SERVICE_LAUNCHER_PROTOCOL };
 }
 

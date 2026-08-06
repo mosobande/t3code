@@ -7,8 +7,17 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 
 import * as Electron from "electron";
+import {
+  resolveDesktopIdentity,
+  type DesktopIdentityChannel,
+} from "@t3tools/shared/desktopIdentity";
 
 export const DESKTOP_HOST = "app";
+const DESKTOP_IDENTITY_CHANNELS: readonly DesktopIdentityChannel[] = [
+  "latest",
+  "nightly",
+  "development",
+];
 
 export function getDesktopOrigin(scheme: string): string {
   return `${scheme}://${DESKTOP_HOST}`;
@@ -98,6 +107,29 @@ function withContentSecurityPolicy(response: Response, policy: string): Response
     headers,
   });
 }
+
+/**
+ * Must run synchronously during process bootstrap, before Electron emits `ready`.
+ */
+export function registerDesktopSchemePrivilegesSync(): void {
+  Electron.protocol.registerSchemesAsPrivileged(
+    DESKTOP_IDENTITY_CHANNELS.map((channel) => ({
+      scheme: resolveDesktopIdentity(channel).protocolScheme,
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+      },
+    })),
+  );
+}
+
+const registerDesktopSchemePrivileges = Effect.sync(registerDesktopSchemePrivilegesSync).pipe(
+  Effect.withSpan("desktop.electron.protocol.registerSchemePrivileges"),
+);
+
+export const layerSchemePrivileges = Layer.effectDiscard(registerDesktopSchemePrivileges);
 
 async function proxyRequest(
   request: Request,

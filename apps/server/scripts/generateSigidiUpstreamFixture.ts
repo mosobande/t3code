@@ -12,8 +12,8 @@ import { migrationManifest, runMigrations } from "../src/persistence/Migrations.
 import * as NodeSqliteClient from "../src/persistence/NodeSqliteClient.ts";
 
 const fixtureDirectory = NodePath.resolve(import.meta.dirname, "../src/persistence/fixtures");
-const fixturePath = NodePath.join(fixtureDirectory, "upstream-f8707481.sql");
-const metadataPath = NodePath.join(fixtureDirectory, "upstream-f8707481.json");
+const fixturePath = NodePath.join(fixtureDirectory, "upstream-a483337a.sql");
+const metadataPath = NodePath.join(fixtureDirectory, "upstream-a483337a.json");
 const check = process.argv.includes("--check");
 
 const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;

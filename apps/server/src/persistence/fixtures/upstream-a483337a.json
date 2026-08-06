@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "f8707481bd96324fef8da1d11b9b662fdb4a4cdb",
+  "sourceRevision": "a483337a02d4ac641db0219517816c300a33be6b",
   "upstreamManifest": [
     [1, "OrchestrationEvents"],
     [2, "OrchestrationCommandReceipts"],
@@ -35,13 +35,14 @@
     [32, "AuthPairingProofKeyThumbprint"],
     [33, "ProjectionThreadsSettled"],
     [34, "ProjectionThreadsSnoozed"],
-    [35, "ProjectionThreadTitleRegeneration"]
+    [35, "ProjectionThreadTitleRegeneration"],
+    [36, "ProjectionThreadsPinned"]
   ],
   "sigidiManifest": [],
   "effectEngine": {
-    "version": "4.0.0-beta.102",
-    "patchHash": "71215759e1ac0a7f65d7b75d816986687ae6c3a6cba02d928d184ca71790d488"
+    "version": "4.0.0-beta.103",
+    "patchHash": "a18f963109656ddbeb2a99ca45f942ecf54830986259eb01ce6a970421c9c6a9"
   },
-  "fixtureSha256": "e23dd2fa785a206580741e052a5b664f565ee14c057d39684e16afac66cd00ff",
+  "fixtureSha256": "b7cb7cf346e3a7df362856f6c66215ec5ed887438a9de64a49bf40359987f516",
   "representativeDataCases": ["orchestration event survives SIGIDI migration startup"]
 }

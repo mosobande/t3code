@@ -6,10 +6,10 @@
  * checks and supported upgrade fixtures pass.
  */
 export const sigidiUpstreamCompatibility = {
-  testedUpstreamCommit: "f8707481bd96324fef8da1d11b9b662fdb4a4cdb",
+  testedUpstreamCommit: "a483337a02d4ac641db0219517816c300a33be6b",
   effectEngine: {
-    version: "4.0.0-beta.102",
-    patchHash: "71215759e1ac0a7f65d7b75d816986687ae6c3a6cba02d928d184ca71790d488",
+    version: "4.0.0-beta.103",
+    patchHash: "a18f963109656ddbeb2a99ca45f942ecf54830986259eb01ce6a970421c9c6a9",
   },
   migrations: [
     {
@@ -229,6 +229,12 @@ export const sigidiUpstreamCompatibility = {
       name: "ProjectionThreadTitleRegeneration",
       sourcePath: "apps/server/src/persistence/Migrations/035_ProjectionThreadTitleRegeneration.ts",
       sha256: "cda98a290a3c3d3f503c3942779cf1f97ce71d18cacefe2ca8e71a2c4fda1506",
+    },
+    {
+      id: 36,
+      name: "ProjectionThreadsPinned",
+      sourcePath: "apps/server/src/persistence/Migrations/036_ProjectionThreadsPinned.ts",
+      sha256: "effd5f8f7f8ecd4348b306396ebee9dbb67688994c434c262c4d71aeb0157acb",
     },
   ],
 } as const;

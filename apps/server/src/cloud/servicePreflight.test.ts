@@ -9,6 +9,17 @@ import * as NodeSqlite from "node:sqlite";
 import { migrationManifest } from "../persistence/Migrations.ts";
 import { sigidiMigrationManifest } from "../persistence/SigidiMigrations.ts";
 import { runServicePreflight } from "./servicePreflight.ts";
+import { SERVICE_LAUNCHER_PROTOCOL } from "./serviceProtocol.ts";
+
+it("requires the database-snapshot launcher protocol before reading the database", () => {
+  expect(
+    runServicePreflight({
+      databasePath: "/missing/state.sqlite",
+      launcherProtocol: SERVICE_LAUNCHER_PROTOCOL - 1,
+      version: "1.2.3",
+    }),
+  ).toMatchObject({ status: "blocked", version: "1.2.3" });
+});
 
 it.layer(NodeServices.layer)("service update preflight", (it) => {
   it.effect("requires exact upstream and SIGIDI manifests without mutating the database", () =>
@@ -30,18 +41,28 @@ it.layer(NodeServices.layer)("service update preflight", (it) => {
       for (const [id, name] of sigidiMigrationManifest) insertSigidi.run(id, name);
       database.close();
 
-      expect(runServicePreflight({ databasePath, launcherProtocol: 1, version: "1.2.3" })).toEqual({
+      expect(
+        runServicePreflight({
+          databasePath,
+          launcherProtocol: SERVICE_LAUNCHER_PROTOCOL,
+          version: "1.2.3",
+        }),
+      ).toEqual({
         status: "ready",
         version: "1.2.3",
-        launcherProtocol: 1,
+        launcherProtocol: SERVICE_LAUNCHER_PROTOCOL,
       });
 
+      const latestUpstream = migrationManifest.at(-1);
+      if (!latestUpstream) throw new Error("Expected an upstream migration manifest");
       const changed = new NodeSqlite.DatabaseSync(databasePath);
-      changed.exec("DELETE FROM effect_sql_migrations WHERE migration_id = 35");
+      changed
+        .prepare("DELETE FROM effect_sql_migrations WHERE migration_id = ?")
+        .run(latestUpstream[0]);
       changed.close();
       const blocked = runServicePreflight({
         databasePath,
-        launcherProtocol: 1,
+        launcherProtocol: SERVICE_LAUNCHER_PROTOCOL,
         version: "1.2.3",
       });
       expect(blocked.status).toBe("blocked");
@@ -50,20 +71,32 @@ it.layer(NodeServices.layer)("service update preflight", (it) => {
       }
 
       const missingSigidi = new NodeSqlite.DatabaseSync(databasePath);
-      const latestUpstream = migrationManifest.at(-1);
-      if (latestUpstream) {
-        missingSigidi
-          .prepare("INSERT INTO effect_sql_migrations (migration_id, name) VALUES (?, ?)")
-          .run(...latestUpstream);
-      }
-      missingSigidi.exec("DELETE FROM sigidi_sql_migrations WHERE migration_id = 2");
+      missingSigidi
+        .prepare("INSERT INTO effect_sql_migrations (migration_id, name) VALUES (?, ?)")
+        .run(...latestUpstream);
+      const latestSigidi = sigidiMigrationManifest.at(-1);
+      if (!latestSigidi) throw new Error("Expected a SIGIDI migration manifest");
+      missingSigidi
+        .prepare("DELETE FROM sigidi_sql_migrations WHERE migration_id = ?")
+        .run(latestSigidi[0]);
       missingSigidi.close();
-      const sigidiBlocked = runServicePreflight({
-        databasePath,
-        launcherProtocol: 1,
-        version: "1.2.3",
-      });
-      expect(sigidiBlocked.status).toBe("blocked");
+      expect(
+        runServicePreflight({
+          databasePath,
+          launcherProtocol: SERVICE_LAUNCHER_PROTOCOL,
+          version: "1.2.3",
+        }).status,
+      ).toBe("blocked");
     }),
   );
+
+  it("blocks a matching launcher protocol when the database snapshot is missing", () => {
+    expect(
+      runServicePreflight({
+        databasePath: "/missing/state.sqlite",
+        launcherProtocol: SERVICE_LAUNCHER_PROTOCOL,
+        version: "1.2.3",
+      }).status,
+    ).toBe("blocked");
+  });
 });
