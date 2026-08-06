@@ -147,8 +147,7 @@ export const layer = Layer.effect(
               !snapshot.enabled ||
               !snapshot.installed ||
               snapshot.status !== "ready" ||
-              snapshot.availability === "unavailable" ||
-              !snapshot.models.some((model) => model.slug === selection.model)
+              snapshot.availability === "unavailable"
             ) {
               return yield* new PromptClarificationError({ category: "invalid_selection" });
             }

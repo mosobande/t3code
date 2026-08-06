@@ -2,6 +2,7 @@ import type { ModelSelection, ScopedThreadRef, ServerProvider } from "@t3tools/c
 import type { PromptClarificationSnapshot } from "@t3tools/client-runtime/promptClarification";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
+  countInlineTerminalContextPlaceholders,
   ensureInlineTerminalContextPlaceholders,
   stripInlineTerminalContextPlaceholders,
 } from "./lib/terminalContext";
@@ -29,7 +30,7 @@ export function promptClarificationResultText(text: string, terminalContextCount
   );
 }
 
-/** A revision comparison preserves stale-review truth even when text returns to A after A→B. */
+/** A revision comparison rejects stale results even when text returns to A after A→B. */
 export function promptClarificationDraftChanged(
   request: PromptClarificationSnapshot,
   current: PromptClarificationSnapshot,
@@ -39,6 +40,19 @@ export function promptClarificationDraftChanged(
     request.draftKey !== current.draftKey ||
     request.revision !== current.revision ||
     request.text !== current.text
+  );
+}
+
+/** Return the direct replacement only while the captured draft still owns the result. */
+export function promptClarificationReplacementText(input: {
+  readonly request: PromptClarificationSnapshot;
+  readonly current: PromptClarificationSnapshot;
+  readonly resultText: string;
+}): string | null {
+  if (promptClarificationDraftChanged(input.request, input.current)) return null;
+  return promptClarificationResultText(
+    input.resultText,
+    countInlineTerminalContextPlaceholders(input.current.text),
   );
 }
 
@@ -59,9 +73,6 @@ export function promptClarificationSelectionUnavailableReason(input: {
     return "Configured Clarify provider is unavailable";
   }
   if (provider.status !== "ready") return "Configured Clarify provider is stale";
-  if (!provider.models.some((model) => model.slug === input.selection.model)) {
-    return "Configured Clarify model is stale";
-  }
   return null;
 }
 
@@ -86,16 +97,4 @@ export function promptClarificationDisabledReason(input: {
   if (input.phase === "running") return "Wait for the running turn before clarifying";
   if (input.phase === "plan-follow-up") return "Finish the plan follow-up before clarifying";
   return null;
-}
-
-export function activatePromptClarification(input: {
-  readonly disabledReason: string | null;
-  readonly hasActivated: boolean;
-  readonly panelOpen: boolean;
-  readonly togglePanel: () => void;
-  readonly start: () => boolean;
-}): boolean {
-  input.togglePanel();
-  if (input.panelOpen || input.hasActivated || input.disabledReason !== null) return true;
-  return input.start();
 }

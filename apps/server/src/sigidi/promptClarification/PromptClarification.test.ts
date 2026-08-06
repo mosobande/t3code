@@ -93,7 +93,7 @@ const metricSnapshotsFor = (snapshots: ReadonlyArray<Metric.Metric.Snapshot>, id
 
 it.layer(NodeServices.layer)("PromptClarification", (it) => {
   it.effect(
-    "rejects missing, disabled, unavailable, and stale selections before provider invocation",
+    "rejects missing, disabled, unavailable, and stale providers before provider invocation",
     () =>
       Effect.gen(function* () {
         let calls = 0;
@@ -102,7 +102,6 @@ it.layer(NodeServices.layer)("PromptClarification", (it) => {
           [provider({ enabled: false })],
           [provider({ availability: "unavailable" })],
           [provider({ status: "warning" })],
-          [provider({ models: [] })],
         ] as const) {
           const result = yield* rewrite("session-a", input).pipe(
             Effect.result,
@@ -117,6 +116,23 @@ it.layer(NodeServices.layer)("PromptClarification", (it) => {
         }
         expect(calls).toBe(0);
       }),
+  );
+
+  it.effect("lets the adapter use a configured utility model omitted from the catalog", () =>
+    Effect.gen(function* () {
+      const seenSelections: Array<{ instanceId: ProviderInstanceId; model: string }> = [];
+      const result = yield* rewrite("session-a", input).pipe(
+        Effect.provide(
+          layer([provider({ models: [] })], ({ modelSelection }) => {
+            seenSelections.push(modelSelection);
+            return Effect.succeed({ text: "rewritten" });
+          }),
+        ),
+      );
+
+      expect(result.text).toBe("rewritten");
+      expect(seenSelections).toEqual([selection]);
+    }),
   );
 
   it.effect("rejects only same session and draft while allowing a distinct draft", () =>

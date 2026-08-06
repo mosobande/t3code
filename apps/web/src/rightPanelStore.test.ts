@@ -102,7 +102,7 @@ describe("rightPanelStore", () => {
     });
   });
 
-  it("restores only the Clarify panel descriptor from persisted state", () => {
+  it("drops the removed Clarify surface from persisted state", () => {
     expect(
       migratePersistedRightPanelState({
         byThreadKey: {
@@ -123,9 +123,9 @@ describe("rightPanelStore", () => {
     ).toEqual({
       byThreadKey: {
         "env-1:thread-A": {
-          isOpen: true,
-          activeSurfaceId: "clarify",
-          surfaces: [{ id: "clarify", kind: "clarify" }],
+          isOpen: false,
+          activeSurfaceId: null,
+          surfaces: [],
         },
       },
     });
@@ -183,32 +183,6 @@ describe("rightPanelStore", () => {
         { id: "notes", kind: "notes" },
         { id: "plan", kind: "plan" },
       ],
-    });
-  });
-
-  it("keeps Clarify as a thread-scoped singleton surface", () => {
-    useRightPanelStore.getState().open(refA, "clarify");
-    useRightPanelStore.getState().open(refA, "plan");
-    useRightPanelStore.getState().open(refA, "clarify");
-
-    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
-      isOpen: true,
-      activeSurfaceId: "clarify",
-      surfaces: [
-        { id: "clarify", kind: "clarify" },
-        { id: "plan", kind: "plan" },
-      ],
-    });
-  });
-
-  it("keeps a preallocated draft thread's Clarify descriptor through promotion", () => {
-    useRightPanelStore.getState().open(refB, "clarify");
-
-    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refB)).toBe("clarify");
-    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refB)).toEqual({
-      isOpen: true,
-      activeSurfaceId: "clarify",
-      surfaces: [{ id: "clarify", kind: "clarify" }],
     });
   });
 

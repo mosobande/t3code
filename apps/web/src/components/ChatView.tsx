@@ -76,7 +76,6 @@ import {
   parseStandaloneComposerSlashCommand,
 } from "../composer-logic";
 import { promptClarificationSelectionUnavailableReason } from "../promptClarification.logic";
-import type { PromptClarificationPanelState } from "../promptClarificationPanelState";
 import {
   derivePendingApprovals,
   derivePendingUserInputs,
@@ -314,7 +313,6 @@ import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useComposerHandleContext } from "../composerHandleContext";
 import { sanitizeThreadErrorMessage } from "~/rpc/transportError";
 import { RightPanelSheet } from "./RightPanelSheet";
-import { PromptClarificationPanel } from "./promptClarification/PromptClarificationPanel";
 import { previewEnvironment } from "../state/preview";
 import { useAtomCommand } from "../state/use-atom-command";
 import { Button } from "./ui/button";
@@ -1342,8 +1340,6 @@ function ChatViewContent(props: ChatViewProps) {
   const [respondingUserInputRequestIds, setRespondingUserInputRequestIds] = useState<
     ApprovalRequestId[]
   >([]);
-  const [clarificationPanelState, setClarificationPanelState] =
-    useState<PromptClarificationPanelState | null>(null);
   const [pendingUserInputAnswersByRequestId, setPendingUserInputAnswersByRequestId] = useState<
     Record<string, Record<string, PendingUserInputDraftAnswer>>
   >({});
@@ -1620,10 +1616,6 @@ function ChatViewContent(props: ChatViewProps) {
   ]);
 
   const planSidebarOpen = activeRightPanelKind === "plan";
-  const clarificationPanelOpen = activeRightPanelKind === "clarify";
-  const toggleClarificationPanel = useCallback(() => {
-    useRightPanelStore.getState().toggle(rightPanelThreadRef, "clarify");
-  }, [rightPanelThreadRef]);
 
   const existingOpenTerminalThreadKeys = useMemo(() => {
     const existingThreadKeys = new Set<string>([...serverThreadKeys, ...draftThreadKeys]);
@@ -3496,7 +3488,7 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const activateRightPanelSurface = useCallback(
     (surface: RightPanelSurface) => {
-      if (!activeThreadRef && surface.kind !== "clarify") return;
+      if (!activeThreadRef) return;
       if (surface.kind === "plan") {
         clearPlanSidebarDismissal(scopedThreadKey(activeThreadRef));
       } else if (planSidebarOpen) {
@@ -3592,16 +3584,12 @@ function ChatViewContent(props: ChatViewProps) {
   }, [activeThreadRef]);
   const closeRightPanelSurface = useCallback(
     (surface: RightPanelSurface) => {
-      if (surface.kind === "clarify") {
-        useRightPanelStore.getState().closeSurface(rightPanelThreadRef, surface.id);
-        return;
-      }
       if (!activeThreadRef) return;
       cleanupRightPanelSurfaces([surface]);
       useRightPanelStore.getState().closeSurface(activeThreadRef, surface.id);
       syncActivePreviewSurface();
     },
-    [activeThreadRef, cleanupRightPanelSurfaces, rightPanelThreadRef, syncActivePreviewSurface],
+    [activeThreadRef, cleanupRightPanelSurfaces, syncActivePreviewSurface],
   );
   const closeOtherRightPanelSurfaces = useCallback(
     (surface: RightPanelSurface) => {
@@ -6050,11 +6038,7 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const renderedProjectNotesTarget = visibleFloatingProjectNotesTarget ?? activeProjectNotesTarget;
   const rightPanelContent = rightPanelThreadRef ? (
-    activeRightPanelSurface?.kind === "clarify" ? (
-      clarificationPanelState ? (
-        <PromptClarificationPanel state={clarificationPanelState} />
-      ) : null
-    ) : activeRightPanelSurface?.kind === "preview" ? (
+    activeRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
         <PreviewPanel
           mode="embedded"
@@ -6388,9 +6372,6 @@ function ChatViewContent(props: ChatViewProps) {
                             terminalOpen={Boolean(terminalUiState.terminalOpen)}
                             gitCwd={gitCwd}
                             promptClarification={promptClarification}
-                            clarificationPanelOpen={clarificationPanelOpen}
-                            onToggleClarificationPanel={toggleClarificationPanel}
-                            onClarificationPanelStateChange={setClarificationPanelState}
                             promptRef={promptRef}
                             composerImagesRef={composerImagesRef}
                             composerTerminalContextsRef={composerTerminalContextsRef}

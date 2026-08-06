@@ -14,8 +14,8 @@ export interface PromptClarificationControllerOptions {
   readonly rewrite: (
     snapshot: PromptClarificationSnapshot,
   ) => Promise<PromptClarificationRewriteResult>;
-  /** The result is always review-only; callers own explicit draft replacement. */
-  readonly offerReview?: (
+  /** Callers replace the matching composer draft when the rewrite completes. */
+  readonly onResult?: (
     result: PromptClarificationRewriteResult,
     snapshot: PromptClarificationSnapshot,
   ) => void;
@@ -53,7 +53,7 @@ export function createPromptClarificationController(options: PromptClarification
       .then((result) => {
         if (active.get(key) !== token) return;
         active.delete(key);
-        options.offerReview?.(result, snapshot);
+        options.onResult?.(result, snapshot);
       })
       .catch((error: unknown) => {
         if (active.get(key) !== token) return;

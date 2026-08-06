@@ -5,7 +5,7 @@
  * surface descriptors and the active surface, while each feature continues to
  * own its durable resource state. Browser surfaces point at preview tab ids,
  * terminal surfaces point at terminal session ids, file surfaces point at
- * workspace paths, and diff/plan/files/clarify remain singleton surfaces.
+ * workspace paths, and diff/plan/files remain singleton surfaces.
  */
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import type { ScopedThreadRef } from "@t3tools/contracts";
@@ -23,7 +23,6 @@ export const RIGHT_PANEL_KINDS = [
   "terminal",
   "notes",
   "agents",
-  "clarify",
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
@@ -41,7 +40,6 @@ export type RightPanelSurface =
   | { id: "diff"; kind: "diff" }
   | { id: "files"; kind: "files" }
   | { id: "notes"; kind: "notes" }
-  | { id: "clarify"; kind: "clarify" }
   | {
       id: `file:${string}`;
       kind: "file";
@@ -53,7 +51,7 @@ export type RightPanelSurface =
   | { id: "agents"; kind: "agents" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
-const RIGHT_PANEL_STORAGE_VERSION = 9;
+const RIGHT_PANEL_STORAGE_VERSION = 10;
 
 export interface ThreadRightPanelState {
   isOpen: boolean;
@@ -109,8 +107,6 @@ const singletonSurface = (
       return { id: "notes", kind };
     case "agents":
       return { id: "agents", kind };
-    case "clarify":
-      return { id: "clarify", kind };
   }
 };
 
@@ -189,8 +185,8 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 threadState && typeof threadState === "object" ? threadState : null;
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
-                    if (surface.kind === "clarify") {
-                      return surface.id === "clarify" ? [{ id: "clarify", kind: "clarify" }] : [];
+                    if ((surface as { kind?: unknown }).kind === "clarify") {
+                      return [];
                     }
                     if (surface.kind === "file") {
                       const revealLine =
@@ -246,9 +242,11 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 ? (validThreadState?.activeSurfaceId ?? null)
                 : null;
               const isOpen =
-                typeof validThreadState?.isOpen === "boolean"
-                  ? validThreadState.isOpen
-                  : activeSurfaceId !== null;
+                validThreadState?.activeSurfaceId === "clarify" && activeSurfaceId === null
+                  ? false
+                  : typeof validThreadState?.isOpen === "boolean"
+                    ? validThreadState.isOpen
+                    : activeSurfaceId !== null;
               return [threadKey, { isOpen, surfaces, activeSurfaceId }];
             },
           ),

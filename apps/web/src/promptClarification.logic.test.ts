@@ -12,11 +12,11 @@ import {
   type PromptClarificationRewriteResult,
 } from "@t3tools/client-runtime/promptClarification";
 import {
-  activatePromptClarification,
   promptClarificationDisabledReason,
   promptClarificationDraftChanged,
   promptClarificationDraftKey,
   promptClarificationRequestText,
+  promptClarificationReplacementText,
   promptClarificationResultText,
   promptClarificationSelectionUnavailableReason,
 } from "./promptClarification.logic";
@@ -38,60 +38,6 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
 });
 
 describe("prompt clarification availability", () => {
-  it("opens the panel when the rewrite action is unavailable", () => {
-    const events: string[] = [];
-
-    expect(
-      activatePromptClarification({
-        disabledReason: "Configured Clarify model is stale",
-        hasActivated: false,
-        panelOpen: false,
-        togglePanel: () => events.push("toggle"),
-        start: () => {
-          events.push("start");
-          return true;
-        },
-      }),
-    ).toBe(true);
-    expect(events).toEqual(["toggle"]);
-  });
-
-  it("toggles an open panel without starting a rewrite", () => {
-    const events: string[] = [];
-
-    expect(
-      activatePromptClarification({
-        disabledReason: "Wait for the running turn before clarifying",
-        hasActivated: false,
-        panelOpen: true,
-        togglePanel: () => events.push("toggle"),
-        start: () => {
-          events.push("start");
-          return true;
-        },
-      }),
-    ).toBe(true);
-    expect(events).toEqual(["toggle"]);
-  });
-
-  it("opens the panel and starts the first eligible rewrite", () => {
-    const events: string[] = [];
-
-    expect(
-      activatePromptClarification({
-        disabledReason: null,
-        hasActivated: false,
-        panelOpen: false,
-        togglePanel: () => events.push("toggle"),
-        start: () => {
-          events.push("start");
-          return true;
-        },
-      }),
-    ).toBe(true);
-    expect(events).toEqual(["toggle", "start"]);
-  });
-
   it("marks an A to B to A edit as changed by revision", () => {
     expect(
       promptClarificationDraftChanged(
@@ -115,6 +61,30 @@ describe("prompt clarification availability", () => {
     expect(
       [...resultText].filter((character) => character === INLINE_TERMINAL_CONTEXT_PLACEHOLDER),
     ).toHaveLength(2);
+  });
+
+  it("returns replacement text only for the unchanged composer snapshot", () => {
+    const request = {
+      environmentId: "env",
+      draftKey: "draft",
+      text: `Inspect ${INLINE_TERMINAL_CONTEXT_PLACEHOLDER}`,
+      revision: 1,
+    };
+
+    expect(
+      promptClarificationReplacementText({
+        request,
+        current: request,
+        resultText: "Inspect the active terminal",
+      }),
+    ).toBe(`${INLINE_TERMINAL_CONTEXT_PLACEHOLDER}Inspect the active terminal`);
+    expect(
+      promptClarificationReplacementText({
+        request,
+        current: { ...request, revision: 3 },
+        resultText: "Do not overwrite the newer draft",
+      }),
+    ).toBeNull();
   });
 
   it("isolates same-environment server threads and abandons a late result", async () => {
@@ -141,10 +111,10 @@ describe("prompt clarification availability", () => {
       text: "rough",
       revision: 0,
     };
-    const offered: string[] = [];
+    const completed: string[] = [];
     const controller = createPromptClarificationController({
       rewrite: () => (rewriteIndex++ === 0 ? resultA : resultB),
-      offerReview: (rewrite) => offered.push(rewrite.text),
+      onResult: (rewrite) => completed.push(rewrite.text),
     });
 
     expect(controller.start(current)).toBe(true);
@@ -158,7 +128,7 @@ describe("prompt clarification availability", () => {
     });
     await Promise.resolve();
 
-    expect(offered).toEqual([]);
+    expect(completed).toEqual([]);
   });
 
   it.each([
@@ -167,7 +137,7 @@ describe("prompt clarification availability", () => {
     [[provider({ installed: false })], "Configured Clarify provider is unavailable"],
     [[provider({ status: "warning" })], "Configured Clarify provider is stale"],
     [[provider({ availability: "unavailable" })], "Configured Clarify provider is unavailable"],
-    [[provider({ models: [] })], "Configured Clarify model is stale"],
+    [[provider({ models: [] })], null],
   ] as const)("keeps the configured selection exact", (providers, expected) => {
     expect(
       promptClarificationSelectionUnavailableReason({
