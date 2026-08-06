@@ -7,6 +7,7 @@ export function clarifyComposerControlState(input: {
   if (input.isRunning) {
     return {
       disabled: true,
+      editorReadOnly: true,
       ariaBusy: true,
       ariaLabel: "Clarifying draft",
       statusLabel: "Clarifying…",
@@ -15,6 +16,7 @@ export function clarifyComposerControlState(input: {
   }
   return {
     disabled: input.disabledReason !== null,
+    editorReadOnly: false,
     ariaBusy: false,
     ariaLabel: input.disabledReason ?? "Clarify draft",
     statusLabel: "Clarify",

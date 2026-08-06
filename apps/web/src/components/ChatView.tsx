@@ -75,7 +75,7 @@ import {
   collapseExpandedComposerCursor,
   parseStandaloneComposerSlashCommand,
 } from "../composer-logic";
-import { promptClarificationSelectionUnavailableReason } from "../promptClarification.logic";
+import { usePromptClarificationEnvironment } from "../sigidi/promptClarification/usePromptClarificationEnvironment";
 import {
   derivePendingApprovals,
   derivePendingUserInputs,
@@ -1198,9 +1198,6 @@ function ChatViewContent(props: ChatViewProps) {
   const upsertKeybinding = useAtomCommand(serverEnvironment.upsertKeybinding, {
     reportFailure: false,
   });
-  const promptClarificationRewrite = useAtomCommand(serverEnvironment.promptClarificationRewrite, {
-    reportFailure: false,
-  });
   const openTerminal = useAtomCommand(terminalEnvironment.open, "terminal open");
   const writeTerminal = useAtomCommand(terminalEnvironment.write, "terminal write");
   const closeTerminalMutation = useAtomCommand(terminalEnvironment.close, "terminal close");
@@ -1542,10 +1539,6 @@ function ChatViewContent(props: ChatViewProps) {
     [activeThread],
   );
   const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
-  // A pre-allocated draft route already has a stable thread ref. Use it until
-  // the local draft record materializes, so Clarify does not disappear during
-  // draft-to-server promotion.
-  const rightPanelThreadRef = activeThreadRef ?? routeThreadRef;
   const [timelineAnchor, setTimelineAnchor] = useState<{
     readonly threadKey: string | null;
     readonly messageId: MessageId | null;
@@ -1555,14 +1548,14 @@ function ChatViewContent(props: ChatViewProps) {
   }
   const timelineAnchorMessageId = timelineAnchor.messageId;
   const activeRightPanelKind = useRightPanelStore((state) =>
-    selectActiveRightPanel(state.byThreadKey, rightPanelThreadRef),
+    selectActiveRightPanel(state.byThreadKey, activeThreadRef),
   );
   const diffOpen = activeRightPanelKind === "diff";
   const rightPanelState = useRightPanelStore((state) =>
-    selectThreadRightPanelState(state.byThreadKey, rightPanelThreadRef),
+    selectThreadRightPanelState(state.byThreadKey, activeThreadRef),
   );
   const activeRightPanelSurface = useRightPanelStore((state) =>
-    selectActiveRightPanelSurface(state.byThreadKey, rightPanelThreadRef),
+    selectActiveRightPanelSurface(state.byThreadKey, activeThreadRef),
   );
   const activeFileSurface =
     activeRightPanelSurface?.kind === "file" ? activeRightPanelSurface : null;
@@ -2179,35 +2172,13 @@ function ChatViewContent(props: ChatViewProps) {
     versionMismatchServerLabel,
   ]);
   const providerStatuses = serverConfig?.providers ?? EMPTY_PROVIDERS;
-  const promptClarification = useMemo(
-    () => ({
-      supportsCapability: serverConfig?.environment.capabilities.promptClarification === true,
-      environmentAvailable: !activeEnvironmentUnavailable,
-      selectionUnavailableReason: promptClarificationSelectionUnavailableReason({
-        selection: settings.promptClarificationModelSelection,
-        providers: providerStatuses,
-      }),
-      rewrite: async (input: {
-        readonly environmentId: EnvironmentId;
-        readonly draftKey: string;
-        readonly text: string;
-      }) => {
-        const result = await promptClarificationRewrite({
-          environmentId: input.environmentId,
-          input: { draftKey: input.draftKey, text: input.text },
-        });
-        if (result._tag === "Success") return result.value;
-        throw squashAtomCommandFailure(result);
-      },
-    }),
-    [
-      activeEnvironmentUnavailable,
-      promptClarificationRewrite,
-      providerStatuses,
-      serverConfig,
-      settings.promptClarificationModelSelection,
-    ],
-  );
+  const promptClarification = usePromptClarificationEnvironment({
+    environmentId,
+    supportsCapability: serverConfig?.environment.capabilities.promptClarification === true,
+    environmentAvailable: !activeEnvironmentUnavailable,
+    selection: settings.promptClarificationModelSelection,
+    providers: providerStatuses,
+  });
   const unlockedSelectedProvider = resolveSelectableProvider(
     providerStatuses,
     selectedProviderByThreadId ?? threadProvider,
@@ -3385,9 +3356,11 @@ function ChatViewContent(props: ChatViewProps) {
     }
   }, [activePreviewState.activeTabId, activeThreadRef, createBrowserSurface, previewPanelOpen]);
   const closePreviewPanel = useCallback(() => {
-    setMaximizedRightPanelThreadKey(null);
-    useRightPanelStore.getState().close(rightPanelThreadRef);
-  }, [rightPanelThreadRef]);
+    if (activeThreadRef) {
+      setMaximizedRightPanelThreadKey(null);
+      useRightPanelStore.getState().close(activeThreadRef);
+    }
+  }, [activeThreadRef]);
   const addTerminalSurface = useCallback(() => {
     if (!activeThreadRef || !activeThreadId || !activeProject) return;
     const cwd = gitCwd ?? activeProject.workspaceRoot;
@@ -3494,8 +3467,8 @@ function ChatViewContent(props: ChatViewProps) {
       } else if (planSidebarOpen) {
         dismissPlanSidebarForCurrentTurn();
       }
-      useRightPanelStore.getState().activateSurface(rightPanelThreadRef, surface.id);
-      if (activeThreadRef && surface.kind === "preview" && surface.resourceId) {
+      useRightPanelStore.getState().activateSurface(activeThreadRef, surface.id);
+      if (surface.kind === "preview" && surface.resourceId) {
         setActivePreviewTab(activeThreadRef, surface.resourceId);
       }
       if (surface.kind === "terminal") {
@@ -3505,16 +3478,10 @@ function ChatViewContent(props: ChatViewProps) {
         onDiffPanelOpen?.();
       }
     },
-    [
-      activeThreadRef,
-      diffOpen,
-      dismissPlanSidebarForCurrentTurn,
-      onDiffPanelOpen,
-      planSidebarOpen,
-      rightPanelThreadRef,
-    ],
+    [activeThreadRef, diffOpen, dismissPlanSidebarForCurrentTurn, onDiffPanelOpen, planSidebarOpen],
   );
   const toggleRightPanel = useCallback(() => {
+    if (!activeThreadRef) return;
     if (rightPanelOpen) {
       if (planSidebarOpen) {
         closePlanSidebar();
@@ -3523,8 +3490,8 @@ function ChatViewContent(props: ChatViewProps) {
       }
       return;
     }
-    useRightPanelStore.getState().toggleVisibility(rightPanelThreadRef);
-  }, [closePlanSidebar, closePreviewPanel, planSidebarOpen, rightPanelOpen, rightPanelThreadRef]);
+    useRightPanelStore.getState().toggleVisibility(activeThreadRef);
+  }, [activeThreadRef, closePlanSidebar, closePreviewPanel, planSidebarOpen, rightPanelOpen]);
   const toggleRightPanelMaximized = useCallback(() => {
     if (!canMaximizeRightPanel) return;
     setMaximizedRightPanelThreadKey((threadKey) =>
@@ -3593,38 +3560,41 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const closeOtherRightPanelSurfaces = useCallback(
     (surface: RightPanelSurface) => {
+      if (!activeThreadRef) return;
       const surfaces = rightPanelState.surfaces.filter((entry) => entry.id !== surface.id);
       cleanupRightPanelSurfaces(surfaces);
-      useRightPanelStore.getState().closeOtherSurfaces(rightPanelThreadRef, surface.id);
+      useRightPanelStore.getState().closeOtherSurfaces(activeThreadRef, surface.id);
       syncActivePreviewSurface();
     },
     [
+      activeThreadRef,
       cleanupRightPanelSurfaces,
       rightPanelState.surfaces,
-      rightPanelThreadRef,
       syncActivePreviewSurface,
     ],
   );
   const closeRightPanelSurfacesToRight = useCallback(
     (surface: RightPanelSurface) => {
+      if (!activeThreadRef) return;
       const surfaceIndex = rightPanelState.surfaces.findIndex((entry) => entry.id === surface.id);
       if (surfaceIndex < 0) return;
       const surfaces = rightPanelState.surfaces.slice(surfaceIndex + 1);
       cleanupRightPanelSurfaces(surfaces);
-      useRightPanelStore.getState().closeSurfacesToRight(rightPanelThreadRef, surface.id);
+      useRightPanelStore.getState().closeSurfacesToRight(activeThreadRef, surface.id);
       syncActivePreviewSurface();
     },
     [
+      activeThreadRef,
       cleanupRightPanelSurfaces,
       rightPanelState.surfaces,
-      rightPanelThreadRef,
       syncActivePreviewSurface,
     ],
   );
   const closeAllRightPanelSurfaces = useCallback(() => {
+    if (!activeThreadRef) return;
     cleanupRightPanelSurfaces(rightPanelState.surfaces);
-    useRightPanelStore.getState().closeAllSurfaces(rightPanelThreadRef);
-  }, [cleanupRightPanelSurfaces, rightPanelState.surfaces, rightPanelThreadRef]);
+    useRightPanelStore.getState().closeAllSurfaces(activeThreadRef);
+  }, [activeThreadRef, cleanupRightPanelSurfaces, rightPanelState.surfaces]);
   const copyRightPanelFilePath = useCallback((relativePath: string) => {
     if (typeof window === "undefined" || !navigator.clipboard?.writeText) {
       toastManager.add(
@@ -6037,12 +6007,12 @@ function ChatViewContent(props: ChatViewProps) {
     </div>
   );
   const renderedProjectNotesTarget = visibleFloatingProjectNotesTarget ?? activeProjectNotesTarget;
-  const rightPanelContent = rightPanelThreadRef ? (
+  const rightPanelContent = activeThreadRef ? (
     activeRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
         <PreviewPanel
           mode="embedded"
-          threadRef={rightPanelThreadRef}
+          threadRef={activeThreadRef}
           tabId={activeRightPanelSurface.resourceId}
           configuredUrls={configuredPreviewUrls}
           visible
@@ -6053,7 +6023,7 @@ function ChatViewContent(props: ChatViewProps) {
       </Suspense>
     ) : activeRightPanelSurface?.kind === "terminal" ? (
       <PersistentThreadTerminalPanel
-        threadRef={rightPanelThreadRef}
+        threadRef={activeThreadRef}
         surface={activeRightPanelSurface}
         launchContext={activeTerminalLaunchContext ?? null}
         focusRequestId={terminalFocusRequestId}
@@ -6084,7 +6054,7 @@ function ChatViewContent(props: ChatViewProps) {
         activeProposedPlan={sidebarProposedPlan}
         label={planSidebarLabel}
         environmentId={environmentId}
-        threadRef={rightPanelThreadRef}
+        threadRef={activeThreadRef}
         markdownCwd={gitCwd ?? undefined}
         workspaceRoot={activeWorkspaceRoot}
         timestampFormat={timestampFormat}
@@ -6121,7 +6091,7 @@ function ChatViewContent(props: ChatViewProps) {
           environmentId={activeProject.environmentId}
           cwd={activeWorkspaceRoot}
           projectName={activeProject.title}
-          threadRef={rightPanelThreadRef}
+          threadRef={activeThreadRef}
           composerDraftTarget={composerDraftTarget}
           keybindings={keybindings}
           availableEditors={availableEditors}
@@ -6529,7 +6499,7 @@ function ChatViewContent(props: ChatViewProps) {
         ))}
       </div>
 
-      {!shouldUsePlanSidebarSheet && rightPanelOpen ? (
+      {!shouldUsePlanSidebarSheet && rightPanelOpen && activeThreadRef ? (
         <RightPanelTabs
           mode="inline"
           maximized={rightPanelMaximized}
@@ -6558,7 +6528,7 @@ function ChatViewContent(props: ChatViewProps) {
           {rightPanelContent}
         </RightPanelTabs>
       ) : null}
-      {shouldUsePlanSidebarSheet && rightPanelOpen ? (
+      {shouldUsePlanSidebarSheet && rightPanelOpen && activeThreadRef ? (
         <RightPanelSheet open onClose={planSidebarOpen ? closePlanSidebar : closePreviewPanel}>
           <RightPanelTabs
             mode="sheet"

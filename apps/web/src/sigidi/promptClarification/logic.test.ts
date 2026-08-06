@@ -1,16 +1,16 @@
-import { describe, expect, it } from "vite-plus/test";
-import {
-  EnvironmentId,
-  ProviderDriverKind,
-  ProviderInstanceId,
-  ThreadId,
-  type ServerProvider,
-} from "@t3tools/contracts";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
-  createPromptClarificationController,
+  EnvironmentId,
   type PromptClarificationRewriteResult,
-} from "@t3tools/client-runtime/promptClarification";
+  ProviderDriverKind,
+  ProviderInstanceId,
+  type ServerProvider,
+  ThreadId,
+} from "@t3tools/contracts";
+import { describe, expect, it } from "vite-plus/test";
+
+import { INLINE_TERMINAL_CONTEXT_PLACEHOLDER } from "../../lib/terminalContext";
+import { createPromptClarificationController } from "./controller";
 import {
   promptClarificationDisabledReason,
   promptClarificationDraftChanged,
@@ -19,8 +19,8 @@ import {
   promptClarificationReplacementText,
   promptClarificationResultText,
   promptClarificationSelectionUnavailableReason,
-} from "./promptClarification.logic";
-import { INLINE_TERMINAL_CONTEXT_PLACEHOLDER } from "./lib/terminalContext";
+  promptClarificationSessionDisconnected,
+} from "./logic";
 
 const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
   instanceId: ProviderInstanceId.make("codex"),
@@ -38,6 +38,21 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
 });
 
 describe("prompt clarification availability", () => {
+  it("keeps Clarify active for a new local draft without a provider session", () => {
+    expect(
+      promptClarificationSessionDisconnected({
+        isServerThread: false,
+        phase: "disconnected",
+      }),
+    ).toBe(false);
+    expect(
+      promptClarificationSessionDisconnected({
+        isServerThread: true,
+        phase: "disconnected",
+      }),
+    ).toBe(true);
+  });
+
   it("marks an A to B to A edit as changed by revision", () => {
     expect(
       promptClarificationDraftChanged(

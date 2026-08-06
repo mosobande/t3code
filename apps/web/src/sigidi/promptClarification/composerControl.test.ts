@@ -4,7 +4,7 @@ import {
   CLARIFY_COMPOSER_ICON_CLASS,
   clarifyComposerControlClass,
   clarifyComposerControlState,
-} from "./clarifyComposerControlStyles";
+} from "./composerControl";
 
 describe("clarify composer control styles", () => {
   it("uses the Clarify accent on hover even when rewriting is unavailable", () => {
@@ -26,9 +26,10 @@ describe("clarify composer control styles", () => {
     expect(CLARIFY_COMPOSER_ICON_CLASS).toContain("text-current");
   });
 
-  it("disables and labels the action while the rewrite is running", () => {
+  it("makes the editor read-only and labels the action while rewriting", () => {
     expect(clarifyComposerControlState({ disabledReason: null, isRunning: true })).toEqual({
       disabled: true,
+      editorReadOnly: true,
       ariaBusy: true,
       ariaLabel: "Clarifying draft",
       statusLabel: "Clarifying…",
@@ -39,6 +40,7 @@ describe("clarify composer control styles", () => {
   it("keeps the idle action available and exposes exact unavailable reasons", () => {
     expect(clarifyComposerControlState({ disabledReason: null, isRunning: false })).toMatchObject({
       disabled: false,
+      editorReadOnly: false,
       ariaBusy: false,
       ariaLabel: "Clarify draft",
     });

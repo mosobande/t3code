@@ -1758,6 +1758,7 @@ function ComposerPromptEditorInner({
                 className,
               )}
               data-testid="composer-editor"
+              aria-readonly={disabled}
               aria-placeholder={placeholder}
               placeholder={<span />}
               onPaste={onPaste}

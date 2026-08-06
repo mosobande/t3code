@@ -3,7 +3,7 @@ import { memo, type ReactNode } from "react";
 import { EllipsisIcon, ListTodoIcon, WandSparklesIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import { cn } from "~/lib/utils";
-import { clarifyComposerControlState } from "./clarifyComposerControlStyles";
+import { clarifyComposerControlState } from "../../sigidi/promptClarification/composerControl";
 import {
   Menu,
   MenuItem,

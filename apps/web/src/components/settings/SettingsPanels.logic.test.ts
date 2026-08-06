@@ -15,8 +15,6 @@ import {
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
   projectGroupingModeFromToggle,
-  resolveClarifySettingsUnavailableReason,
-  shouldRestorePromptClarificationSelection,
   resolveBackgroundActivityProfileOption,
 } from "./SettingsPanels.logic";
 
@@ -121,61 +119,6 @@ describe("background activity settings restore", () => {
       },
     });
   });
-});
-
-describe("Clarify Settings environment scope", () => {
-  it("keeps Clarify read-only after navigating from a remote thread", () => {
-    expect(
-      resolveClarifySettingsUnavailableReason({
-        supportsPromptClarification: true,
-        settingsContextEnvironmentId: "remote-environment",
-        primaryEnvironmentId: "primary-environment",
-      }),
-    ).toBe("Configure this environment from a client where it is primary");
-  });
-
-  it.each([
-    [true, "primary-environment", "primary-environment", null, true],
-    [
-      true,
-      "remote-environment",
-      "primary-environment",
-      "Configure this environment from a client where it is primary",
-      false,
-    ],
-    [
-      false,
-      "primary-environment",
-      "primary-environment",
-      "Prompt clarification requires a newer server",
-      false,
-    ],
-    [
-      false,
-      "remote-environment",
-      "primary-environment",
-      "Configure this environment from a client where it is primary",
-      false,
-    ],
-  ])(
-    "applies restore policy only when Clarify is editable",
-    (
-      supportsPromptClarification,
-      settingsContextEnvironmentId,
-      primaryEnvironmentId,
-      reason,
-      expected,
-    ) => {
-      expect(
-        resolveClarifySettingsUnavailableReason({
-          supportsPromptClarification,
-          settingsContextEnvironmentId,
-          primaryEnvironmentId,
-        }),
-      ).toBe(reason);
-      expect(shouldRestorePromptClarificationSelection(reason)).toBe(expected);
-    },
-  );
 });
 
 describe("project grouping toggle", () => {

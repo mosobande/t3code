@@ -37,7 +37,7 @@ import { isElectron } from "../../env";
 import { useOpenInPreferredEditor } from "../../editorPreferences";
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { formatShortcutLabel } from "../../keybindings";
-import { promptClarificationSelectionUnavailableReason } from "../../promptClarification.logic";
+import { promptClarificationSelectionUnavailableReason } from "../../sigidi/promptClarification/logic";
 import { cn } from "../../lib/utils";
 import {
   primaryServerAvailableEditorsAtom,

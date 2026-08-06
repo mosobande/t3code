@@ -147,8 +147,6 @@ import {
   backgroundActivitySharedPolicySettings,
   buildProviderInstanceUpdatePatch,
   formatDiagnosticsDescription,
-  resolveClarifySettingsUnavailableReason,
-  shouldRestorePromptClarificationSelection,
   hasChangedBackgroundActivitySettings,
   isProjectGroupingEnabled,
   projectGroupingModeFromToggle,
@@ -167,6 +165,11 @@ import {
 import { searchableSetting } from "./settingsSearch";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { PromptClarificationSettingsRow } from "../../sigidi/promptClarification/PromptClarificationSettingsRow";
+import {
+  promptClarificationRestoreContribution,
+  resolvePromptClarificationSettingsUnavailableReason,
+} from "../../sigidi/promptClarification/settings";
 
 const THEME_OPTIONS = [
   {
@@ -591,23 +594,19 @@ export function useSettingsRestore(onRestored?: () => void) {
   const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
   const lastViewedChatEnvironmentId = useAtomValue(lastViewedChatEnvironmentIdAtom);
   const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
-  const clarifySettingsUnavailableReason = resolveClarifySettingsUnavailableReason({
-    supportsPromptClarification:
-      primaryServerConfig?.environment.capabilities.promptClarification === true,
+  const clarifySettingsUnavailableReason = resolvePromptClarificationSettingsUnavailableReason({
+    supportsCapability: primaryServerConfig?.environment.capabilities.promptClarification === true,
     settingsContextEnvironmentId: lastViewedChatEnvironmentId,
     primaryEnvironmentId,
   });
-  const shouldRestorePromptClarification = shouldRestorePromptClarificationSelection(
+  const promptClarificationRestore = promptClarificationRestoreContribution(
+    { promptClarificationModelSelection: settings.promptClarificationModelSelection },
     clarifySettingsUnavailableReason,
   );
 
   const isTextGenerationModelDirty = !Equal.equals(
     settings.textGenerationModelSelection ?? null,
     DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
-  );
-  const isPromptClarificationModelDirty = !Equal.equals(
-    settings.promptClarificationModelSelection ?? null,
-    DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection ?? null,
   );
   const isBackgroundActivityDirty = hasChangedBackgroundActivitySettings(settings);
 
@@ -671,14 +670,13 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Delete confirmation"]
         : []),
       ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
-      ...(shouldRestorePromptClarification && isPromptClarificationModelDirty
-        ? ["Clarify model"]
+      ...(promptClarificationRestore.changedLabel !== null
+        ? [promptClarificationRestore.changedLabel]
         : []),
     ],
     [
       isTextGenerationModelDirty,
-      isPromptClarificationModelDirty,
-      shouldRestorePromptClarification,
+      promptClarificationRestore.changedLabel,
       isBackgroundActivityDirty,
       settings.autoOpenPlanSidebar,
       settings.confirmThreadArchive,
@@ -739,12 +737,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
-      ...(shouldRestorePromptClarification
-        ? {
-            promptClarificationModelSelection:
-              DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
-          }
-        : {}),
+      ...promptClarificationRestore.patch,
       fontFamilySans: DEFAULT_UNIFIED_SETTINGS.fontFamilySans,
       fontFamilyComposer: DEFAULT_UNIFIED_SETTINGS.fontFamilyComposer,
       fontFamilyCode: DEFAULT_UNIFIED_SETTINGS.fontFamilyCode,
@@ -755,7 +748,7 @@ export function useSettingsRestore(onRestored?: () => void) {
     changedSettingLabels,
     onRestored,
     setTheme,
-    shouldRestorePromptClarification,
+    promptClarificationRestore.patch,
     updateSettings,
   ]);
 
@@ -1646,16 +1639,7 @@ export function GeneralSettingsPanel() {
     readLastEnabledProjectGroupingMode(),
   );
   const observability = useAtomValue(primaryServerObservabilityAtom);
-  const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
-  const settingsContextEnvironmentId = useAtomValue(lastViewedChatEnvironmentIdAtom);
-  const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
-  const clarifySettingsUnavailableReason = resolveClarifySettingsUnavailableReason({
-    supportsPromptClarification:
-      primaryServerConfig?.environment.capabilities.promptClarification === true,
-    settingsContextEnvironmentId,
-    primaryEnvironmentId,
-  });
   const diagnosticsDescription = formatDiagnosticsDescription({
     localTracingEnabled: observability?.localTracingEnabled ?? false,
     otlpTracesEnabled: observability?.otlpTracesEnabled ?? false,
@@ -1685,23 +1669,6 @@ export function GeneralSettingsPanel() {
   const isTextGenerationModelDirty = !Equal.equals(
     settings.textGenerationModelSelection ?? null,
     DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection ?? null,
-  );
-  const promptClarificationSelection = settings.promptClarificationModelSelection;
-  const promptClarificationInstanceId = promptClarificationSelection.instanceId;
-  const promptClarificationModel = promptClarificationSelection.model;
-  const promptClarificationInstanceEntry = textGenerationModelInstanceEntries.find(
-    (entry) => entry.instanceId === promptClarificationInstanceId,
-  );
-  const promptClarificationOptions = promptClarificationSelection.options;
-  const promptClarificationOptionsByInstance = getCustomModelOptionsByInstance(
-    settings,
-    serverProviders,
-    promptClarificationInstanceId,
-    promptClarificationModel,
-  );
-  const isPromptClarificationDirty = !Equal.equals(
-    settings.promptClarificationModelSelection,
-    DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
   );
   const resolvedBackgroundActivity = resolveServerBackgroundActivitySettings(settings);
   const activeBackgroundActivityProfile = resolvedBackgroundActivity.profile;
@@ -2216,67 +2183,7 @@ export function GeneralSettingsPanel() {
           }
         />
 
-        <SettingsRow
-          {...searchableSetting("prompt-clarification-model")}
-          title="Clarify model"
-          description={
-            clarifySettingsUnavailableReason ??
-            "Independent model for rewriting a draft before you send it."
-          }
-          resetAction={
-            clarifySettingsUnavailableReason === null && isPromptClarificationDirty ? (
-              <SettingResetButton
-                label="Clarify model"
-                onClick={() =>
-                  updateSettings({
-                    promptClarificationModelSelection:
-                      DEFAULT_UNIFIED_SETTINGS.promptClarificationModelSelection,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            clarifySettingsUnavailableReason !== null ? null : (
-              <div className="flex flex-wrap items-center justify-end gap-1.5">
-                <ProviderModelPicker
-                  activeInstanceId={promptClarificationInstanceId}
-                  model={promptClarificationModel}
-                  lockedProvider={null}
-                  instanceEntries={textGenerationModelInstanceEntries}
-                  modelOptionsByInstance={promptClarificationOptionsByInstance}
-                  triggerVariant="outline"
-                  triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
-                  onInstanceModelChange={(instanceId, model) =>
-                    updateSettings({
-                      promptClarificationModelSelection: createModelSelection(instanceId, model),
-                    })
-                  }
-                />
-                <TraitsPicker
-                  provider={promptClarificationInstanceEntry?.driverKind ?? DEFAULT_DRIVER_KIND}
-                  models={promptClarificationInstanceEntry?.models ?? []}
-                  model={promptClarificationModel}
-                  prompt=""
-                  onPromptChange={() => {}}
-                  modelOptions={promptClarificationOptions}
-                  allowPromptInjectedEffort={false}
-                  triggerVariant="outline"
-                  triggerClassName="min-w-0 max-w-none shrink-0 text-foreground/90 hover:text-foreground"
-                  onModelOptionsChange={(nextOptions) =>
-                    updateSettings({
-                      promptClarificationModelSelection: createModelSelection(
-                        promptClarificationInstanceId,
-                        promptClarificationModel,
-                        nextOptions,
-                      ),
-                    })
-                  }
-                />
-              </div>
-            )
-          }
-        />
+        <PromptClarificationSettingsRow />
       </SettingsSection>
 
       <SettingsSection title="About">

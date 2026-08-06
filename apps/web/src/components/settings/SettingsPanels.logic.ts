@@ -20,26 +20,6 @@ export function isProjectGroupingEnabled(mode: SidebarProjectGroupingMode): bool
   return mode !== "separate";
 }
 
-export function resolveClarifySettingsUnavailableReason(input: {
-  readonly supportsPromptClarification: boolean;
-  readonly settingsContextEnvironmentId: string | null;
-  readonly primaryEnvironmentId: string | null;
-}): string | null {
-  if (
-    input.settingsContextEnvironmentId !== null &&
-    input.settingsContextEnvironmentId !== input.primaryEnvironmentId
-  ) {
-    return "Configure this environment from a client where it is primary";
-  }
-  return input.supportsPromptClarification ? null : "Prompt clarification requires a newer server";
-}
-
-export function shouldRestorePromptClarificationSelection(
-  clarifySettingsUnavailableReason: string | null,
-): boolean {
-  return clarifySettingsUnavailableReason === null;
-}
-
 export function projectGroupingModeFromToggle(
   enabled: boolean,
   lastEnabledMode: SidebarProjectGroupingMode = "repository",

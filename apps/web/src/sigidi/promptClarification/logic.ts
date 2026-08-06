@@ -1,11 +1,21 @@
 import type { ModelSelection, ScopedThreadRef, ServerProvider } from "@t3tools/contracts";
-import type { PromptClarificationSnapshot } from "@t3tools/client-runtime/promptClarification";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+
 import {
   countInlineTerminalContextPlaceholders,
   ensureInlineTerminalContextPlaceholders,
   stripInlineTerminalContextPlaceholders,
-} from "./lib/terminalContext";
+} from "../../lib/terminalContext";
+import type { PromptClarificationSnapshot } from "./controller";
+import type { SessionPhase } from "../../types";
+
+/** A local draft has no provider session yet, so its disconnected phase is expected. */
+export function promptClarificationSessionDisconnected(input: {
+  readonly isServerThread: boolean;
+  readonly phase: SessionPhase;
+}): boolean {
+  return input.isServerThread && input.phase === "disconnected";
+}
 
 export function promptClarificationDraftKey(
   scope:
@@ -17,7 +27,7 @@ export function promptClarificationDraftKey(
     : `draft:${scope.draftId}`;
 }
 
-/** Provider input contains only text the user can see, never editor placeholder markers. */
+/** Provider input contains only visible text, never editor placeholder markers. */
 export function promptClarificationRequestText(prompt: string): string {
   return stripInlineTerminalContextPlaceholders(prompt);
 }
@@ -30,7 +40,7 @@ export function promptClarificationResultText(text: string, terminalContextCount
   );
 }
 
-/** A revision comparison rejects stale results even when text returns to A after A→B. */
+/** A revision comparison rejects stale results even when text returns to A after A to B. */
 export function promptClarificationDraftChanged(
   request: PromptClarificationSnapshot,
   current: PromptClarificationSnapshot,
@@ -80,7 +90,6 @@ export function promptClarificationDisabledReason(input: {
   readonly text: string;
   readonly supportsCapability: boolean;
   readonly environmentAvailable: boolean;
-  /** Exact scoped selection fact from the environment caller. */
   readonly selectionUnavailableReason: string | null;
   readonly phase: "idle" | "approval" | "pending-input" | "running" | "plan-follow-up";
 }): string | null {
