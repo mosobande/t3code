@@ -469,7 +469,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
           }
         >
           <ComposerControlIcon icon={WandSparklesIcon} className={CLARIFY_COMPOSER_ICON_CLASS} />
-          <span className="sr-only">Clarify</span>
+          <span className="sr-only sm:not-sr-only">Clarify</span>
         </TooltipTrigger>
         <TooltipPopup side="top">
           {props.clarification.panelOpen
