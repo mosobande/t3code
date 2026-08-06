@@ -102,6 +102,35 @@ describe("rightPanelStore", () => {
     });
   });
 
+  it("restores only the Clarify panel descriptor from persisted state", () => {
+    expect(
+      migratePersistedRightPanelState({
+        byThreadKey: {
+          "env-1:thread-A": {
+            isOpen: true,
+            activeSurfaceId: "clarify",
+            surfaces: [
+              {
+                id: "clarify",
+                kind: "clarify",
+                currentDraft: "Do not persist this draft",
+                result: { text: "Do not persist this result" },
+              },
+            ],
+          },
+        },
+      }),
+    ).toEqual({
+      byThreadKey: {
+        "env-1:thread-A": {
+          isOpen: true,
+          activeSurfaceId: "clarify",
+          surfaces: [{ id: "clarify", kind: "clarify" }],
+        },
+      },
+    });
+  });
+
   it("open sets the active panel for a thread", () => {
     useRightPanelStore.getState().open(refA, "preview");
     expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("preview");
