@@ -10,7 +10,6 @@ const panelState = (
 ): PromptClarificationPanelState => ({
   currentDraft: "Build a focused feature.",
   draftChanged: false,
-  requestSnapshot: null,
   result: null,
   isRunning: false,
   disabledReason: null,
@@ -38,12 +37,6 @@ describe("PromptClarificationPanel", () => {
         state={panelState({
           currentDraft: "Build the thing.",
           draftChanged: true,
-          requestSnapshot: {
-            environmentId: "env",
-            draftKey: "draft",
-            text: "Build it.",
-            revision: 1,
-          },
           result: {
             text: "Build the focused Clarify panel.",
             providerInstanceId: ProviderInstanceId.make("codex-local"),

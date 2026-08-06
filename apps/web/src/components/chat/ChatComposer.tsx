@@ -1549,7 +1549,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           text: prompt,
           revision: clarificationDraftRevision,
         }),
-      requestSnapshot: clarificationReview?.snapshot ?? null,
       result: clarificationReview?.result ?? null,
       isRunning: clarificationPhase === "idle" && isClarificationActive,
       disabledReason: clarificationDisabledReason,
