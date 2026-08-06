@@ -48,6 +48,12 @@ const permissionOptionIds = {
 const sessionId = "mock-session-1";
 
 let currentModeId = process.env.T3_ACP_INITIAL_MODE ?? "ask";
+const requestedAvailableModeIds = new Set(
+  (process.env.T3_ACP_AVAILABLE_MODES ?? "ask,architect,code")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0),
+);
 let currentModelId = "default";
 let parameterizedModelPicker = false;
 let currentReasoning = "medium";
@@ -272,7 +278,7 @@ const availableModes: ReadonlyArray<AcpSchema.SessionMode> = [
     name: "Code",
     description: "Write and modify code with full tool access",
   },
-];
+].filter((mode) => requestedAvailableModeIds.has(mode.id));
 
 function modeState(): AcpSchema.SessionModeState {
   return {

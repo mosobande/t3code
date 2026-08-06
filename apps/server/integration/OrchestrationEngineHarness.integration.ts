@@ -322,6 +322,8 @@ export const makeOrchestrationIntegrationHarness = (
     const textGenerationLayer = Layer.succeed(TextGeneration, {
       generateBranchName: () => Effect.succeed({ branch: "update" }),
       generateThreadTitle: () => Effect.succeed({ title: "New thread" }),
+      generatePromptClarification: () =>
+        Effect.die("generatePromptClarification should not be called in this harness"),
     } as unknown as TextGenerationShape);
     const providerCommandReactorLayer = ProviderCommandReactorLive.pipe(
       Layer.provideMerge(runtimeServicesLayer),

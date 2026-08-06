@@ -18,7 +18,6 @@ import * as Metric from "effect/Metric";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
-import type * as Scope from "effect/Scope";
 
 import * as ProviderRegistry from "../../provider/Services/ProviderRegistry.ts";
 import * as ServerSettings from "../../serverSettings.ts";
@@ -160,9 +159,6 @@ export const layer = Layer.effect(
                 Effect.mapError(() => new PromptClarificationError({ category: "unavailable" })),
               );
             const prompt = buildPromptClarificationPayload(input.text);
-            if (!textGeneration.generatePromptClarification) {
-              return yield* new PromptClarificationError({ category: "unavailable" });
-            }
             const generated = yield* textGeneration
               .generatePromptClarification({ cwd, prompt, modelSelection: selection })
               .pipe(

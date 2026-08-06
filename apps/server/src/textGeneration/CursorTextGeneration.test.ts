@@ -258,7 +258,7 @@ it.layer(CursorTextGenerationTestLayer)("CursorTextGeneration", (it) => {
         Effect.gen(function* () {
           const cwd = NodePath.join(requestLogDir, "isolated-cwd");
           NodeFS.mkdirSync(cwd);
-          const generated = yield* textGeneration.generatePromptClarification!({
+          const generated = yield* textGeneration.generatePromptClarification({
             cwd,
             prompt: "Rewrite this prompt.",
             modelSelection: {

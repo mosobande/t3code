@@ -131,7 +131,7 @@ export class TextGeneration extends Context.Service<
     readonly generateThreadTitle: (
       input: ThreadTitleGenerationInput,
     ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
-    readonly generatePromptClarification?: (
+    readonly generatePromptClarification: (
       input: PromptClarificationGenerationInput,
     ) => Effect.Effect<PromptClarificationGenerationResult, TextGenerationError>;
   }
@@ -190,18 +190,7 @@ export const makeTextGenerationFromRegistry = (
         registry,
         "generatePromptClarification",
         input.modelSelection.instanceId,
-      ).pipe(
-        Effect.flatMap((textGeneration) =>
-          textGeneration.generatePromptClarification
-            ? textGeneration.generatePromptClarification(input)
-            : Effect.fail(
-                new TextGenerationError({
-                  operation: "generatePromptClarification",
-                  detail: "Provider does not support prompt clarification.",
-                }),
-              ),
-        ),
-      ),
+      ).pipe(Effect.flatMap((textGeneration) => textGeneration.generatePromptClarification(input))),
   });
 
 export const make = Effect.gen(function* () {

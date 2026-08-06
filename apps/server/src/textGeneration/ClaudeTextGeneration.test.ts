@@ -352,7 +352,7 @@ it.layer(ClaudeTextGenerationTestLayer)("ClaudeTextGeneration", (it) => {
       },
       (textGeneration) =>
         Effect.gen(function* () {
-          const generated = yield* textGeneration.generatePromptClarification?.({
+          const generated = yield* textGeneration.generatePromptClarification({
             cwd: process.cwd(),
             prompt: "Rewrite this",
             modelSelection: {

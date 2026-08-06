@@ -455,7 +455,7 @@ it.layer(CodexTextGenerationTestLayer)("CodexTextGeneration", (it) => {
           forbidArg: "--image",
         },
         (textGeneration) =>
-          textGeneration.generatePromptClarification!({
+          textGeneration.generatePromptClarification({
             cwd,
             prompt: "Rewrite this prompt.",
             modelSelection: DEFAULT_TEST_MODEL_SELECTION,

@@ -754,7 +754,7 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:prompt-clarification-rewrite",
       tag: WS_METHODS.promptClarificationRewrite,
       concurrency: {
-        mode: "singleFlight",
+        mode: "latest",
         key: ({ environmentId, input }) =>
           promptClarificationRequestKey({ environmentId, draftKey: input.draftKey }),
       },

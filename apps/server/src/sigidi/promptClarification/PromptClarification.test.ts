@@ -63,7 +63,7 @@ const registry = (
 });
 
 const textGeneration = (
-  rewrite: NonNullable<TextGeneration.TextGeneration["Service"]["generatePromptClarification"]>,
+  rewrite: TextGeneration.TextGeneration["Service"]["generatePromptClarification"],
 ) =>
   TextGeneration.TextGeneration.of({
     generateCommitMessage: () => Effect.die("unused"),
@@ -75,7 +75,7 @@ const textGeneration = (
 
 const layer = (
   providers: ReadonlyArray<ServerProvider>,
-  rewrite: NonNullable<TextGeneration.TextGeneration["Service"]["generatePromptClarification"]>,
+  rewrite: TextGeneration.TextGeneration["Service"]["generatePromptClarification"],
 ) =>
   PromptClarification.layer.pipe(
     Layer.provideMerge(ServerSettings.layerTest({ promptClarificationModelSelection: selection })),

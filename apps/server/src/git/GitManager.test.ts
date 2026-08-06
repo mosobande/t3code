@@ -292,6 +292,10 @@ function createTextGeneration(
       Effect.succeed({
         title: "Update workflow",
       }),
+    generatePromptClarification: (input) =>
+      Effect.succeed({
+        text: input.prompt,
+      }),
     ...overrides,
   };
 
@@ -335,6 +339,17 @@ function createTextGeneration(
           (cause) =>
             new TextGenerationError({
               operation: "generateThreadTitle",
+              detail: "fake text generation failed",
+              ...(cause !== undefined ? { cause } : {}),
+            }),
+        ),
+      ),
+    generatePromptClarification: (input) =>
+      implementation.generatePromptClarification(input).pipe(
+        Effect.mapError(
+          (cause) =>
+            new TextGenerationError({
+              operation: "generatePromptClarification",
               detail: "fake text generation failed",
               ...(cause !== undefined ? { cause } : {}),
             }),
