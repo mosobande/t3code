@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 
-import { DEFAULT_TEXT_GENERATION_MODEL } from "./model.ts";
+import {
+  DEFAULT_TEXT_GENERATION_MODEL,
+  DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
+} from "./model.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 import {
   ClientSettingsSchema,
@@ -185,6 +188,12 @@ describe("ServerSettings prompt clarification selection", () => {
     expect(settings.promptClarificationModelSelection).toEqual({
       instanceId: "codex",
       model: DEFAULT_TEXT_GENERATION_MODEL,
+      options: [
+        {
+          id: "reasoningEffort",
+          value: DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
+        },
+      ],
     });
     expect(settings.promptClarificationModelSelection).not.toEqual(
       settings.textGenerationModelSelection,

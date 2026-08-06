@@ -2,6 +2,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
 import {
   COMPOSER_MAX_INPUT_CHARS,
+  DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
   PromptClarificationError,
   ProviderInstanceId,
   TextGenerationError,
@@ -25,6 +26,12 @@ import * as PromptClarification from "./PromptClarification.ts";
 const selection = {
   instanceId: ProviderInstanceId.make("codex"),
   model: "clarify-model",
+  options: [
+    {
+      id: "reasoningEffort",
+      value: DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
+    },
+  ],
 };
 const input = { draftKey: "draft-1", text: "Keep /tmp/example and error E42" };
 

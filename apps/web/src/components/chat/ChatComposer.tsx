@@ -1064,7 +1064,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const [isComposerPrimaryActionsCompact, setIsComposerPrimaryActionsCompact] = useState(false);
   const [isComposerModelPickerOpen, setIsComposerModelPickerOpen] = useState(false);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
-  const [clarificationRequestVersion, setClarificationRequestVersion] = useState(0);
+  const [, setClarificationRequestVersion] = useState(0);
   const [composerMenuAnchor, setComposerMenuAnchor] = useState<HTMLDivElement | null>(null);
   const [isStashMenuOpen, setIsStashMenuOpen] = useState(false);
   const [stashPulse, setStashPulse] = useState<{ key: number; active: boolean }>({
@@ -1497,25 +1497,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     }
     return started;
   }, [clarificationController, clarificationDisabledReason]);
-  const isClarificationActive = useMemo(
-    () =>
-      clarificationPhase === "idle" &&
-      environmentUnavailable === null &&
-      phase !== "disconnected" &&
-      clarificationController.isActive({
-        environmentId: String(environmentId),
-        draftKey: clarificationDraftKey,
-      }),
-    [
-      clarificationController,
-      clarificationDraftKey,
-      clarificationRequestVersion,
-      clarificationPhase,
-      environmentUnavailable,
-      environmentId,
-      phase,
-    ],
-  );
+  const isClarificationActive =
+    clarificationPhase === "idle" &&
+    environmentUnavailable === null &&
+    phase !== "disconnected" &&
+    clarificationController.isActive({
+      environmentId: String(environmentId),
+      draftKey: clarificationDraftKey,
+    });
   const clarificationControl = useMemo<ComposerClarificationControl>(
     () => ({
       disabledReason: clarificationDisabledReason,
