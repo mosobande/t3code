@@ -157,6 +157,32 @@ describe("rightPanelStore", () => {
     });
   });
 
+  it("keeps Clarify as a thread-scoped singleton surface", () => {
+    useRightPanelStore.getState().open(refA, "clarify");
+    useRightPanelStore.getState().open(refA, "plan");
+    useRightPanelStore.getState().open(refA, "clarify");
+
+    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
+      isOpen: true,
+      activeSurfaceId: "clarify",
+      surfaces: [
+        { id: "clarify", kind: "clarify" },
+        { id: "plan", kind: "plan" },
+      ],
+    });
+  });
+
+  it("keeps a preallocated draft thread's Clarify descriptor through promotion", () => {
+    useRightPanelStore.getState().open(refB, "clarify");
+
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refB)).toBe("clarify");
+    expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refB)).toEqual({
+      isOpen: true,
+      activeSurfaceId: "clarify",
+      surfaces: [{ id: "clarify", kind: "clarify" }],
+    });
+  });
+
   it("replaces the standalone explorer with peer file surfaces", () => {
     useRightPanelStore.getState().open(refA, "files");
     useRightPanelStore.getState().openFile(refA, "src/index.ts");

@@ -13,6 +13,7 @@ import {
 } from "@t3tools/client-runtime/promptClarification";
 import {
   promptClarificationDisabledReason,
+  promptClarificationDraftChanged,
   promptClarificationDraftKey,
   promptClarificationRequestText,
   promptClarificationResultText,
@@ -36,6 +37,15 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
 });
 
 describe("prompt clarification availability", () => {
+  it("marks an A to B to A edit as changed by revision", () => {
+    expect(
+      promptClarificationDraftChanged(
+        { environmentId: "env", draftKey: "draft", text: "A", revision: 1 },
+        { environmentId: "env", draftKey: "draft", text: "A", revision: 3 },
+      ),
+    ).toBe(true);
+  });
+
   it("sends visible text and restores every terminal-context placeholder", () => {
     const requestText = promptClarificationRequestText(
       `Inspect ${INLINE_TERMINAL_CONTEXT_PLACEHOLDER} then ${INLINE_TERMINAL_CONTEXT_PLACEHOLDER}`,
@@ -76,12 +86,9 @@ describe("prompt clarification availability", () => {
       text: "rough",
       revision: 0,
     };
-    const applied: string[] = [];
     const offered: string[] = [];
     const controller = createPromptClarificationController({
       rewrite: () => (rewriteIndex++ === 0 ? resultA : resultB),
-      readCurrent: () => current,
-      applyText: (text) => applied.push(text),
       offerReview: (rewrite) => offered.push(rewrite.text),
     });
 
@@ -96,7 +103,6 @@ describe("prompt clarification availability", () => {
     });
     await Promise.resolve();
 
-    expect(applied).toEqual([]);
     expect(offered).toEqual([]);
   });
 

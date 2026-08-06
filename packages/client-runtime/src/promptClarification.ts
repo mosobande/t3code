@@ -14,23 +14,17 @@ export interface PromptClarificationControllerOptions {
   readonly rewrite: (
     snapshot: PromptClarificationSnapshot,
   ) => Promise<PromptClarificationRewriteResult>;
-  readonly readCurrent: () => PromptClarificationSnapshot;
-  /** This deliberately receives text only; callers preserve all non-text draft fields. */
-  readonly applyText: (text: string) => void;
-  readonly onApplied?: (result: PromptClarificationRewriteResult) => void;
-  readonly offerReview?: (result: PromptClarificationRewriteResult) => void;
+  /** The result is always review-only; callers own explicit draft replacement. */
+  readonly offerReview?: (
+    result: PromptClarificationRewriteResult,
+    snapshot: PromptClarificationSnapshot,
+  ) => void;
   readonly onError?: (error: unknown) => void;
 }
 
 export const promptClarificationRequestKey = (
   snapshot: Pick<PromptClarificationSnapshot, "environmentId" | "draftKey">,
 ) => `${snapshot.environmentId}\u0000${snapshot.draftKey}`;
-
-const matches = (left: PromptClarificationSnapshot, right: PromptClarificationSnapshot) =>
-  left.environmentId === right.environmentId &&
-  left.draftKey === right.draftKey &&
-  left.text === right.text &&
-  left.revision === right.revision;
 
 /**
  * Owns only ephemeral request lifetime. A cancellation abandons the response
@@ -59,12 +53,7 @@ export function createPromptClarificationController(options: PromptClarification
       .then((result) => {
         if (active.get(key) !== token) return;
         active.delete(key);
-        if (matches(snapshot, options.readCurrent())) {
-          options.applyText(result.text);
-          options.onApplied?.(result);
-        } else {
-          options.offerReview?.(result);
-        }
+        options.offerReview?.(result, snapshot);
       })
       .catch((error: unknown) => {
         if (active.get(key) !== token) return;

@@ -24,6 +24,7 @@ import {
   type PromptClarificationRewriteResult,
   type PromptClarificationSnapshot,
 } from "@t3tools/client-runtime/promptClarification";
+import type { PromptClarificationPanelState } from "../../promptClarificationPanelState";
 import { serializeComposerFileLink } from "@t3tools/shared/composerTrigger";
 import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import {
@@ -114,57 +115,17 @@ import { cn, randomUUID } from "~/lib/utils";
 import { Separator } from "../ui/separator";
 import {
   promptClarificationDisabledReason,
+  promptClarificationDraftChanged,
   promptClarificationDraftKey,
   promptClarificationRequestText,
   promptClarificationResultText,
 } from "../../promptClarification.logic";
 
-type ComposerClarificationAction = {
+type ComposerClarificationControl = {
   readonly disabledReason: string | null;
-  readonly isActive: boolean;
-  readonly reviewSource: string | null;
-  readonly onStart: () => void;
-  readonly onCancel: () => void;
-  readonly onReview: () => void;
+  readonly panelOpen: boolean;
+  readonly onActivate: () => void;
 };
-
-const ComposerPromptClarificationActions = memo(function ComposerPromptClarificationActions(props: {
-  action: ComposerClarificationAction;
-}) {
-  if (props.action.isActive) {
-    return (
-      <Button type="button" size="sm" variant="outline" onClick={props.action.onCancel}>
-        Cancel clarify
-      </Button>
-    );
-  }
-
-  return (
-    <>
-      {props.action.reviewSource ? (
-        <span className="flex items-center gap-2" aria-live="polite">
-          <Button type="button" size="sm" variant="outline" onClick={props.action.onReview}>
-            Review rewrite
-          </Button>
-          <span className="text-muted-foreground text-xs">
-            Rewrite ready from {props.action.reviewSource}
-          </span>
-        </span>
-      ) : null}
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        disabled={props.action.disabledReason !== null}
-        aria-label={props.action.disabledReason ?? "Clarify draft"}
-        title={props.action.disabledReason ?? "Clarify draft"}
-        onClick={props.action.onStart}
-      >
-        Clarify
-      </Button>
-    </>
-  );
-});
 
 type ComposerCommandMenuPosition = {
   bottom: number;
@@ -181,7 +142,6 @@ function composerCommandMenuPositionsEqual(
     a.bottom === b.bottom && a.left === b.left && a.maxHeight === b.maxHeight && a.width === b.width
   );
 }
-
 function ComposerCommandMenuLayer(props: { anchor: HTMLElement | null; children: ReactNode }) {
   const [position, setPosition] = useState<ComposerCommandMenuPosition | null>(null);
 
@@ -260,6 +220,7 @@ import {
   LockOpenIcon,
   PenLineIcon,
   SparklesIcon,
+  WandSparklesIcon,
   XIcon,
 } from "lucide-react";
 import { proposedPlanTitle } from "../../proposedPlan";
@@ -361,6 +322,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   showPlanToggle: boolean;
   planSidebarLabel: string;
   planSidebarOpen: boolean;
+  clarification: ComposerClarificationControl;
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   onTogglePlanSidebar: () => void;
@@ -479,6 +441,35 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
           </Tooltip>
         </>
       ) : null}
+
+      <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <ComposerControl
+              className={cn(
+                "shrink-0 whitespace-nowrap",
+                props.clarification.panelOpen
+                  ? "bg-blue-500/10 text-blue-400 hover:bg-blue-500/15 hover:text-blue-300"
+                  : "text-muted-foreground/70 hover:text-foreground/80",
+              )}
+              type="button"
+              disabled={props.clarification.disabledReason !== null}
+              onClick={props.clarification.onActivate}
+              aria-label={props.clarification.disabledReason ?? "Clarify draft"}
+            />
+          }
+        >
+          <ComposerControlIcon
+            icon={WandSparklesIcon}
+            className={props.clarification.panelOpen ? "text-current opacity-100" : undefined}
+          />
+          <span className="sr-only">Clarify</span>
+        </TooltipTrigger>
+        <TooltipPopup side="top">
+          {props.clarification.disabledReason ?? "Clarify draft"}
+        </TooltipPopup>
+      </Tooltip>
     </>
   );
 });
@@ -507,7 +498,6 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
   onPreviousPendingQuestion: () => void;
   onInterrupt: () => void;
   onImplementPlanInNewThread: () => void;
-  clarificationAction: ComposerClarificationAction | null;
 }) {
   return (
     <>
@@ -519,9 +509,6 @@ const ComposerFooterPrimaryActions = memo(function ComposerFooterPrimaryActions(
       ) : null}
       {props.isPreparingWorktree ? (
         <span className="text-muted-foreground/70 text-xs">Preparing worktree...</span>
-      ) : null}
-      {props.clarificationAction ? (
-        <ComposerPromptClarificationActions action={props.clarificationAction} />
       ) : null}
       <ComposerPrimaryActions
         compact={props.compact}
@@ -556,7 +543,7 @@ export interface ChatComposerHandle {
   toggleModelPicker: () => void;
   isModelPickerOpen: () => boolean;
   /** Start the composer-owned clarification request when the idle draft permits it. */
-  clarify: (textOverride?: string) => boolean;
+  clarify: () => boolean;
   /** Explain why clarify cannot start for this exact composer snapshot. */
   clarifyDisabledReason: () => string | null;
   readSnapshot: () => {
@@ -682,6 +669,10 @@ export interface ChatComposerProps {
   gitCwd: string | null;
   /** Omitted while entry-point wiring has not supplied the environment-bound command. */
   promptClarification?: ChatComposerPromptClarification;
+  clarificationPanelOpen: boolean;
+  onOpenClarificationPanel: () => void;
+  onToggleClarificationPanel: () => void;
+  onClarificationPanelStateChange: (state: PromptClarificationPanelState | null) => void;
 
   // Refs the parent needs kept in sync
   promptRef: React.RefObject<string>;
@@ -774,6 +765,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     terminalOpen,
     gitCwd,
     promptClarification,
+    clarificationPanelOpen,
+    onOpenClarificationPanel,
+    onToggleClarificationPanel,
+    onClarificationPanelStateChange,
     promptRef,
     composerRef,
     composerImagesRef,
@@ -1077,9 +1072,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const [isComposerPrimaryActionsCompact, setIsComposerPrimaryActionsCompact] = useState(false);
   const [isComposerModelPickerOpen, setIsComposerModelPickerOpen] = useState(false);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
-  const [clarificationReview, setClarificationReview] =
-    useState<PromptClarificationRewriteResult | null>(null);
+  const [clarificationReview, setClarificationReview] = useState<{
+    readonly result: PromptClarificationRewriteResult;
+    readonly snapshot: PromptClarificationSnapshot;
+  } | null>(null);
   const [clarificationRequestVersion, setClarificationRequestVersion] = useState(0);
+  const [clarificationDraftRevision, setClarificationDraftRevision] = useState(0);
   const [composerMenuAnchor, setComposerMenuAnchor] = useState<HTMLDivElement | null>(null);
   const [isStashMenuOpen, setIsStashMenuOpen] = useState(false);
   const [stashPulse, setStashPulse] = useState<{ key: number; active: boolean }>({
@@ -1136,8 +1134,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const clarificationRewriteRef = useRef<ChatComposerPromptClarification["rewrite"] | null>(null);
   const applyClarifiedTextRef = useRef<(text: string) => void>(() => {});
   const clarificationResultsAllowedRef = useRef(true);
+  const clarificationIconActivatedRef = useRef(false);
   const noteClarificationPromptMutation = useCallback((text: string) => {
     clarificationRevisionRef.current += 1;
+    setClarificationDraftRevision(clarificationRevisionRef.current);
     clarificationObservedPromptRef.current = text;
     clarificationSnapshotRef.current = {
       ...clarificationSnapshotRef.current,
@@ -1164,22 +1164,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           text: promptClarificationRequestText(snapshot.text),
         });
       },
-      readCurrent: () =>
-        clarificationResultsAllowedRef.current
-          ? clarificationSnapshotRef.current
-          : { ...clarificationSnapshotRef.current, revision: -1 },
-      applyText: (text) => applyClarifiedTextRef.current(text),
-      offerReview: (result) => {
+      offerReview: (result, snapshot) => {
         if (!clarificationResultsAllowedRef.current) return;
-        setClarificationReview(result);
+        setClarificationReview({ result, snapshot });
         setClarificationRequestVersion((version) => version + 1);
-      },
-      onApplied: (result) => {
-        toastManager.add({
-          type: "success",
-          title: "Draft clarified",
-          description: `Using ${result.providerInstanceId} · ${result.model}`,
-        });
       },
       onError: () => {
         setClarificationRequestVersion((version) => version + 1);
@@ -1509,32 +1497,27 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     applyClarifiedTextRef.current = applyClarifiedText;
   }, [applyClarifiedText]);
 
-  const startClarification = useCallback(
-    (textOverride?: string) => {
-      const disabledReason =
-        textOverride !== undefined && clarificationDisabledReason === "Enter text to clarify"
-          ? null
-          : clarificationDisabledReason;
-      if (disabledReason !== null || !clarificationRewriteRef.current) return false;
-      if (textOverride !== undefined) {
-        applyClarifiedTextRef.current(textOverride);
-      }
-      setClarificationReview(null);
-      const started = clarificationController.start(clarificationSnapshotRef.current);
-      if (started) setClarificationRequestVersion((version) => version + 1);
-      return started;
-    },
-    [clarificationController, clarificationDisabledReason],
-  );
+  const startClarification = useCallback(() => {
+    if (clarificationDisabledReason !== null || !clarificationRewriteRef.current) return false;
+    setClarificationReview(null);
+    const started = clarificationController.start(clarificationSnapshotRef.current);
+    if (started) setClarificationRequestVersion((version) => version + 1);
+    return started;
+  }, [clarificationController, clarificationDisabledReason]);
   const cancelClarification = useCallback(() => {
     clarificationController.cancel(clarificationSnapshotRef.current);
     setClarificationReview(null);
     setClarificationRequestVersion((version) => version + 1);
   }, [clarificationController]);
-  const reviewClarification = useCallback(() => {
+  const replaceClarification = useCallback(() => {
     if (clarificationReview === null) return;
     setClarificationReview(null);
-    applyClarifiedTextRef.current(clarificationReview.text);
+    applyClarifiedTextRef.current(clarificationReview.result.text);
+    toastManager.add({
+      type: "success",
+      title: "Draft clarified",
+      description: `Using ${clarificationReview.result.providerInstanceId} · ${clarificationReview.result.model}`,
+    });
   }, [clarificationReview]);
   const isClarificationActive = useMemo(
     () =>
@@ -1551,25 +1534,75 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       environmentId,
     ],
   );
-  const clarificationAction: ComposerClarificationAction = {
+  const activateClarification = useCallback(() => {
+    if (clarificationDisabledReason !== null) return;
+    if (clarificationIconActivatedRef.current) {
+      onToggleClarificationPanel();
+      return;
+    }
+    onOpenClarificationPanel();
+    if (startClarification()) {
+      clarificationIconActivatedRef.current = true;
+    }
+  }, [
+    clarificationDisabledReason,
+    onOpenClarificationPanel,
+    onToggleClarificationPanel,
+    startClarification,
+  ]);
+  const clarificationControl: ComposerClarificationControl = {
     disabledReason: clarificationDisabledReason,
-    isActive: clarificationPhase === "idle" && isClarificationActive,
-    reviewSource:
-      clarificationPhase === "idle" && clarificationReview !== null
-        ? `${clarificationReview.providerInstanceId} · ${clarificationReview.model}`
-        : null,
-    onStart: () => {
-      void startClarification();
-    },
-    onCancel: cancelClarification,
-    onReview: reviewClarification,
+    panelOpen: clarificationPanelOpen,
+    onActivate: activateClarification,
   };
+
+  const clarificationPanelState = useMemo<PromptClarificationPanelState>(
+    () => ({
+      currentDraft: prompt,
+      draftChanged:
+        clarificationReview !== null &&
+        promptClarificationDraftChanged(clarificationReview.snapshot, {
+          ...clarificationSnapshotRef.current,
+          text: prompt,
+          revision: clarificationDraftRevision,
+        }),
+      requestSnapshot: clarificationReview?.snapshot ?? null,
+      result: clarificationReview?.result ?? null,
+      isRunning: clarificationPhase === "idle" && isClarificationActive,
+      disabledReason: clarificationDisabledReason,
+      onReplace: replaceClarification,
+      onClarifyAgain: startClarification,
+      onCancel: cancelClarification,
+      onDiscard: () => {
+        setClarificationReview(null);
+        onToggleClarificationPanel();
+      },
+    }),
+    [
+      cancelClarification,
+      clarificationDisabledReason,
+      clarificationDraftRevision,
+      clarificationPhase,
+      clarificationReview,
+      isClarificationActive,
+      onToggleClarificationPanel,
+      prompt,
+      replaceClarification,
+      startClarification,
+    ],
+  );
+
+  useEffect(() => {
+    onClarificationPanelStateChange(clarificationPanelOpen ? clarificationPanelState : null);
+    return () => onClarificationPanelStateChange(null);
+  }, [clarificationPanelOpen, clarificationPanelState, onClarificationPanelStateChange]);
 
   useEffect(() => {
     const scope = { environmentId: String(environmentId), draftKey: clarificationDraftKey };
     return () => {
       clarificationController.invalidate(scope);
       setClarificationReview(null);
+      clarificationIconActivatedRef.current = false;
     };
   }, [clarificationController, clarificationDraftKey, environmentId]);
 
@@ -1577,12 +1610,14 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (environmentUnavailable === null && phase !== "disconnected") return;
     clarificationController.invalidate(clarificationSnapshotRef.current);
     setClarificationReview(null);
+    clarificationIconActivatedRef.current = false;
   }, [clarificationController, environmentUnavailable, phase]);
 
   useEffect(() => {
     if (clarificationPhase === "idle") return;
     clarificationController.invalidate(clarificationSnapshotRef.current);
     setClarificationReview(null);
+    clarificationIconActivatedRef.current = false;
   }, [clarificationController, clarificationPhase]);
 
   const addComposerImage = useCallback(
@@ -2158,6 +2193,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       }
       clarificationController.invalidate(clarificationSnapshotRef.current);
       setClarificationReview(null);
+      clarificationIconActivatedRef.current = false;
       onSend(event);
       if (shouldBlurMobileComposerOnSubmit()) {
         blurMobileComposerAfterSend();
@@ -3406,7 +3442,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   data-chat-composer-mobile-pending-actions="true"
                   className="absolute bottom-0 right-0 flex justify-end"
                 >
-                  <ComposerPromptClarificationActions action={clarificationAction} />
                   <ComposerPrimaryActions
                     compact
                     pendingAction={pendingPrimaryAction}
@@ -3436,7 +3471,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
           {/* Bottom toolbar */}
           {isComposerCollapsedMobile ? null : activePendingApproval ? (
             <div className="flex items-center justify-end gap-2 px-3 pb-3 sm:px-4 sm:pb-4">
-              <ComposerPromptClarificationActions action={clarificationAction} />
               <ComposerPendingApprovalActions
                 requestId={activePendingApproval.requestId}
                 isResponding={respondingRequestIds.includes(activePendingApproval.requestId)}
@@ -3497,6 +3531,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {isComposerFooterCompact ? (
                   <CompactComposerControlsMenu
                     activePlan={showPlanSidebarToggle}
+                    clarifyDisabledReason={clarificationControl.disabledReason}
                     interactionMode={interactionMode}
                     planSidebarLabel={planSidebarLabel}
                     planSidebarOpen={planSidebarOpen}
@@ -3504,6 +3539,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     showInteractionModeToggle={composerProviderControls.showInteractionModeToggle}
                     traitsMenuContent={providerTraitsMenuContent}
                     onToggleInteractionMode={toggleInteractionMode}
+                    onToggleClarify={clarificationControl.onActivate}
                     onTogglePlanSidebar={togglePlanSidebar}
                     onRuntimeModeChange={handleRuntimeModeChange}
                   />
@@ -3522,6 +3558,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       showPlanToggle={showPlanSidebarToggle}
                       planSidebarLabel={planSidebarLabel}
                       planSidebarOpen={planSidebarOpen}
+                      clarification={clarificationControl}
                       onToggleInteractionMode={toggleInteractionMode}
                       onRuntimeModeChange={handleRuntimeModeChange}
                       onTogglePlanSidebar={togglePlanSidebar}
@@ -3560,7 +3597,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   onPreviousPendingQuestion={onPreviousActivePendingUserInputQuestion}
                   onInterrupt={handleInterruptPrimaryAction}
                   onImplementPlanInNewThread={handleImplementPlanInNewThreadPrimaryAction}
-                  clarificationAction={clarificationAction}
                 />
               </div>
             </div>

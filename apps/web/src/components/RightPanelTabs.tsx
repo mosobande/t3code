@@ -9,6 +9,7 @@ import {
   NotebookPen,
   Plus,
   TerminalSquare,
+  WandSparkles,
   X,
 } from "lucide-react";
 import {
@@ -242,6 +243,8 @@ function surfaceTitle(
       return "Notes";
     case "agents":
       return "Agents";
+    case "clarify":
+      return "Clarify";
     case "preview": {
       const snapshot = surface.resourceId ? sessions[surface.resourceId] : null;
       if (!snapshot || snapshot.navStatus._tag === "Idle") return "Browser";
@@ -307,6 +310,8 @@ function SurfaceIcon({
       return <NotebookPen className="size-3 shrink-0" />;
     case "agents":
       return <Bot className="size-3 shrink-0" />;
+    case "clarify":
+      return <WandSparkles className="size-3 shrink-0" />;
   }
 }
 

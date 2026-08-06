@@ -73,10 +73,10 @@ import { readLocalApi } from "../localApi";
 import { useDiffPanelStore } from "../diffPanelStore";
 import {
   collapseExpandedComposerCursor,
-  parsePromptClarificationSlashCommand,
   parseStandaloneComposerSlashCommand,
 } from "../composer-logic";
 import { promptClarificationSelectionUnavailableReason } from "../promptClarification.logic";
+import type { PromptClarificationPanelState } from "../promptClarificationPanelState";
 import {
   derivePendingApprovals,
   derivePendingUserInputs,
@@ -314,6 +314,7 @@ import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { useComposerHandleContext } from "../composerHandleContext";
 import { sanitizeThreadErrorMessage } from "~/rpc/transportError";
 import { RightPanelSheet } from "./RightPanelSheet";
+import { PromptClarificationPanel } from "./promptClarification/PromptClarificationPanel";
 import { previewEnvironment } from "../state/preview";
 import { useAtomCommand } from "../state/use-atom-command";
 import { Button } from "./ui/button";
@@ -1341,6 +1342,8 @@ function ChatViewContent(props: ChatViewProps) {
   const [respondingUserInputRequestIds, setRespondingUserInputRequestIds] = useState<
     ApprovalRequestId[]
   >([]);
+  const [clarificationPanelState, setClarificationPanelState] =
+    useState<PromptClarificationPanelState | null>(null);
   const [pendingUserInputAnswersByRequestId, setPendingUserInputAnswersByRequestId] = useState<
     Record<string, Record<string, PendingUserInputDraftAnswer>>
   >({});
@@ -1543,6 +1546,10 @@ function ChatViewContent(props: ChatViewProps) {
     [activeThread],
   );
   const activeThreadKey = activeThreadRef ? scopedThreadKey(activeThreadRef) : null;
+  // A pre-allocated draft route already has a stable thread ref. Use it until
+  // the local draft record materializes, so Clarify does not disappear during
+  // draft-to-server promotion.
+  const rightPanelThreadRef = activeThreadRef ?? routeThreadRef;
   const [timelineAnchor, setTimelineAnchor] = useState<{
     readonly threadKey: string | null;
     readonly messageId: MessageId | null;
@@ -1552,14 +1559,14 @@ function ChatViewContent(props: ChatViewProps) {
   }
   const timelineAnchorMessageId = timelineAnchor.messageId;
   const activeRightPanelKind = useRightPanelStore((state) =>
-    selectActiveRightPanel(state.byThreadKey, activeThreadRef),
+    selectActiveRightPanel(state.byThreadKey, rightPanelThreadRef),
   );
   const diffOpen = activeRightPanelKind === "diff";
   const rightPanelState = useRightPanelStore((state) =>
-    selectThreadRightPanelState(state.byThreadKey, activeThreadRef),
+    selectThreadRightPanelState(state.byThreadKey, rightPanelThreadRef),
   );
   const activeRightPanelSurface = useRightPanelStore((state) =>
-    selectActiveRightPanelSurface(state.byThreadKey, activeThreadRef),
+    selectActiveRightPanelSurface(state.byThreadKey, rightPanelThreadRef),
   );
   const activeFileSurface =
     activeRightPanelSurface?.kind === "file" ? activeRightPanelSurface : null;
@@ -1613,6 +1620,13 @@ function ChatViewContent(props: ChatViewProps) {
   ]);
 
   const planSidebarOpen = activeRightPanelKind === "plan";
+  const clarificationPanelOpen = activeRightPanelKind === "clarify";
+  const openClarificationPanel = useCallback(() => {
+    useRightPanelStore.getState().open(rightPanelThreadRef, "clarify");
+  }, [rightPanelThreadRef]);
+  const toggleClarificationPanel = useCallback(() => {
+    useRightPanelStore.getState().toggle(rightPanelThreadRef, "clarify");
+  }, [rightPanelThreadRef]);
 
   const existingOpenTerminalThreadKeys = useMemo(() => {
     const existingThreadKeys = new Set<string>([...serverThreadKeys, ...draftThreadKeys]);
@@ -3382,11 +3396,9 @@ function ChatViewContent(props: ChatViewProps) {
     }
   }, [activePreviewState.activeTabId, activeThreadRef, createBrowserSurface, previewPanelOpen]);
   const closePreviewPanel = useCallback(() => {
-    if (activeThreadRef) {
-      setMaximizedRightPanelThreadKey(null);
-      useRightPanelStore.getState().close(activeThreadRef);
-    }
-  }, [activeThreadRef]);
+    setMaximizedRightPanelThreadKey(null);
+    useRightPanelStore.getState().close(rightPanelThreadRef);
+  }, [rightPanelThreadRef]);
   const addTerminalSurface = useCallback(() => {
     if (!activeThreadRef || !activeThreadId || !activeProject) return;
     const cwd = gitCwd ?? activeProject.workspaceRoot;
@@ -3487,14 +3499,14 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const activateRightPanelSurface = useCallback(
     (surface: RightPanelSurface) => {
-      if (!activeThreadRef) return;
+      if (!activeThreadRef && surface.kind !== "clarify") return;
       if (surface.kind === "plan") {
         clearPlanSidebarDismissal(scopedThreadKey(activeThreadRef));
       } else if (planSidebarOpen) {
         dismissPlanSidebarForCurrentTurn();
       }
-      useRightPanelStore.getState().activateSurface(activeThreadRef, surface.id);
-      if (surface.kind === "preview" && surface.resourceId) {
+      useRightPanelStore.getState().activateSurface(rightPanelThreadRef, surface.id);
+      if (activeThreadRef && surface.kind === "preview" && surface.resourceId) {
         setActivePreviewTab(activeThreadRef, surface.resourceId);
       }
       if (surface.kind === "terminal") {
@@ -3504,10 +3516,16 @@ function ChatViewContent(props: ChatViewProps) {
         onDiffPanelOpen?.();
       }
     },
-    [activeThreadRef, diffOpen, dismissPlanSidebarForCurrentTurn, onDiffPanelOpen, planSidebarOpen],
+    [
+      activeThreadRef,
+      diffOpen,
+      dismissPlanSidebarForCurrentTurn,
+      onDiffPanelOpen,
+      planSidebarOpen,
+      rightPanelThreadRef,
+    ],
   );
   const toggleRightPanel = useCallback(() => {
-    if (!activeThreadRef) return;
     if (rightPanelOpen) {
       if (planSidebarOpen) {
         closePlanSidebar();
@@ -3516,8 +3534,8 @@ function ChatViewContent(props: ChatViewProps) {
       }
       return;
     }
-    useRightPanelStore.getState().toggleVisibility(activeThreadRef);
-  }, [activeThreadRef, closePlanSidebar, closePreviewPanel, planSidebarOpen, rightPanelOpen]);
+    useRightPanelStore.getState().toggleVisibility(rightPanelThreadRef);
+  }, [closePlanSidebar, closePreviewPanel, planSidebarOpen, rightPanelOpen, rightPanelThreadRef]);
   const toggleRightPanelMaximized = useCallback(() => {
     if (!canMaximizeRightPanel) return;
     setMaximizedRightPanelThreadKey((threadKey) =>
@@ -3577,12 +3595,16 @@ function ChatViewContent(props: ChatViewProps) {
   }, [activeThreadRef]);
   const closeRightPanelSurface = useCallback(
     (surface: RightPanelSurface) => {
+      if (surface.kind === "clarify") {
+        useRightPanelStore.getState().closeSurface(rightPanelThreadRef, surface.id);
+        return;
+      }
       if (!activeThreadRef) return;
       cleanupRightPanelSurfaces([surface]);
       useRightPanelStore.getState().closeSurface(activeThreadRef, surface.id);
       syncActivePreviewSurface();
     },
-    [activeThreadRef, cleanupRightPanelSurfaces, syncActivePreviewSurface],
+    [activeThreadRef, cleanupRightPanelSurfaces, rightPanelThreadRef, syncActivePreviewSurface],
   );
   const closeOtherRightPanelSurfaces = useCallback(
     (surface: RightPanelSurface) => {
@@ -4901,21 +4923,6 @@ function ChatViewContent(props: ChatViewProps) {
         }),
       );
     };
-    const clarificationSlashCommand = parsePromptClarificationSlashCommand(promptRef.current);
-    if (clarificationSlashCommand) {
-      if (clarificationSlashCommand.kind === "missing-arguments") {
-        toastManager.add(
-          stackedThreadToast({
-            type: "warning",
-            title: "Add text after /clarify",
-            description: "For example: /clarify Draft a release note",
-          }),
-        );
-        return;
-      }
-       composerRef.current?.clarify(clarificationSlashCommand.text);
-       return;
-     }
     if (
       !activeThread ||
       isSendBusy ||
@@ -6048,12 +6055,16 @@ function ChatViewContent(props: ChatViewProps) {
     </div>
   );
   const renderedProjectNotesTarget = visibleFloatingProjectNotesTarget ?? activeProjectNotesTarget;
-  const rightPanelContent = activeThreadRef ? (
-    activeRightPanelSurface?.kind === "preview" ? (
+  const rightPanelContent = rightPanelThreadRef ? (
+    activeRightPanelSurface?.kind === "clarify" ? (
+      clarificationPanelState ? (
+        <PromptClarificationPanel state={clarificationPanelState} />
+      ) : null
+    ) : activeRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
         <PreviewPanel
           mode="embedded"
-          threadRef={activeThreadRef}
+          threadRef={rightPanelThreadRef}
           tabId={activeRightPanelSurface.resourceId}
           configuredUrls={configuredPreviewUrls}
           visible
@@ -6064,7 +6075,7 @@ function ChatViewContent(props: ChatViewProps) {
       </Suspense>
     ) : activeRightPanelSurface?.kind === "terminal" ? (
       <PersistentThreadTerminalPanel
-        threadRef={activeThreadRef}
+        threadRef={rightPanelThreadRef}
         surface={activeRightPanelSurface}
         launchContext={activeTerminalLaunchContext ?? null}
         focusRequestId={terminalFocusRequestId}
@@ -6095,7 +6106,7 @@ function ChatViewContent(props: ChatViewProps) {
         activeProposedPlan={sidebarProposedPlan}
         label={planSidebarLabel}
         environmentId={environmentId}
-        threadRef={activeThreadRef}
+        threadRef={rightPanelThreadRef}
         markdownCwd={gitCwd ?? undefined}
         workspaceRoot={activeWorkspaceRoot}
         timestampFormat={timestampFormat}
@@ -6132,7 +6143,7 @@ function ChatViewContent(props: ChatViewProps) {
           environmentId={activeProject.environmentId}
           cwd={activeWorkspaceRoot}
           projectName={activeProject.title}
-          threadRef={activeThreadRef}
+          threadRef={rightPanelThreadRef}
           composerDraftTarget={composerDraftTarget}
           keybindings={keybindings}
           availableEditors={availableEditors}
@@ -6383,6 +6394,10 @@ function ChatViewContent(props: ChatViewProps) {
                             terminalOpen={Boolean(terminalUiState.terminalOpen)}
                             gitCwd={gitCwd}
                             promptClarification={promptClarification}
+                            clarificationPanelOpen={clarificationPanelOpen}
+                            onOpenClarificationPanel={openClarificationPanel}
+                            onToggleClarificationPanel={toggleClarificationPanel}
+                            onClarificationPanelStateChange={setClarificationPanelState}
                             promptRef={promptRef}
                             composerImagesRef={composerImagesRef}
                             composerTerminalContextsRef={composerTerminalContextsRef}
@@ -6540,7 +6555,7 @@ function ChatViewContent(props: ChatViewProps) {
         ))}
       </div>
 
-      {!shouldUsePlanSidebarSheet && rightPanelOpen && activeThreadRef ? (
+      {!shouldUsePlanSidebarSheet && rightPanelOpen ? (
         <RightPanelTabs
           mode="inline"
           maximized={rightPanelMaximized}
@@ -6569,7 +6584,7 @@ function ChatViewContent(props: ChatViewProps) {
           {rightPanelContent}
         </RightPanelTabs>
       ) : null}
-      {shouldUsePlanSidebarSheet && rightPanelOpen && activeThreadRef ? (
+      {shouldUsePlanSidebarSheet && rightPanelOpen ? (
         <RightPanelSheet open onClose={planSidebarOpen ? closePlanSidebar : closePreviewPanel}>
           <RightPanelTabs
             mode="sheet"
