@@ -274,25 +274,6 @@ export function parseStandaloneComposerSlashCommand(
   return "default";
 }
 
-export type PromptClarificationSlashCommand =
-  | { readonly kind: "arguments"; readonly text: string }
-  | { readonly kind: "missing-arguments" };
-
-/**
- * A whole-composer built-in command. Keep it separate from trigger-menu parsing:
- * this runs at submit time and must win over a provider command named clarify.
- */
-export function parsePromptClarificationSlashCommand(
-  text: string,
-): PromptClarificationSlashCommand | null {
-  const match = /^\/clarify(?:\s+([\s\S]*))?\s*$/i.exec(text.trim());
-  if (!match) return null;
-  const argumentsText = match[1]?.trim() ?? "";
-  return argumentsText.length > 0
-    ? { kind: "arguments", text: argumentsText }
-    : { kind: "missing-arguments" };
-}
-
 export function replaceTextRange(
   text: string,
   rangeStart: number,

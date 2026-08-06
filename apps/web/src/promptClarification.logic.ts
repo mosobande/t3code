@@ -1,4 +1,5 @@
 import type { ModelSelection, ScopedThreadRef, ServerProvider } from "@t3tools/contracts";
+import type { PromptClarificationSnapshot } from "@t3tools/client-runtime/promptClarification";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
   ensureInlineTerminalContextPlaceholders,
@@ -25,6 +26,19 @@ export function promptClarificationResultText(text: string, terminalContextCount
   return ensureInlineTerminalContextPlaceholders(
     stripInlineTerminalContextPlaceholders(text),
     terminalContextCount,
+  );
+}
+
+/** A revision comparison preserves stale-review truth even when text returns to A after A→B. */
+export function promptClarificationDraftChanged(
+  request: PromptClarificationSnapshot,
+  current: PromptClarificationSnapshot,
+): boolean {
+  return (
+    request.environmentId !== current.environmentId ||
+    request.draftKey !== current.draftKey ||
+    request.revision !== current.revision ||
+    request.text !== current.text
   );
 }
 

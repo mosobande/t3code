@@ -1,6 +1,6 @@
 import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
 import { memo, type ReactNode } from "react";
-import { EllipsisIcon, ListTodoIcon } from "lucide-react";
+import { EllipsisIcon, ListTodoIcon, WandSparklesIcon } from "lucide-react";
 import { Button } from "../ui/button";
 import {
   Menu,
@@ -14,6 +14,7 @@ import {
 
 export const CompactComposerControlsMenu = memo(function CompactComposerControlsMenu(props: {
   activePlan: boolean;
+  clarifyDisabledReason: string | null;
   interactionMode: ProviderInteractionMode;
   planSidebarLabel: string;
   planSidebarOpen: boolean;
@@ -21,6 +22,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   showInteractionModeToggle: boolean;
   traitsMenuContent?: ReactNode;
   onToggleInteractionMode: () => void;
+  onToggleClarify: () => void;
   onTogglePlanSidebar: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
@@ -85,6 +87,14 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             </MenuItem>
           </>
         ) : null}
+        <MenuItem
+          disabled={props.clarifyDisabledReason !== null}
+          aria-label={props.clarifyDisabledReason ?? "Clarify draft"}
+          onClick={props.onToggleClarify}
+        >
+          <WandSparklesIcon className="size-4 shrink-0" />
+          Clarify
+        </MenuItem>
       </MenuPopup>
     </Menu>
   );

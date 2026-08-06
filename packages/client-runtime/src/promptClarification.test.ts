@@ -31,24 +31,24 @@ describe("prompt clarification controller", () => {
     );
   });
 
-  it("applies text while retaining the effective provider and model", async () => {
+  it("offers the result for explicit review without changing the draft", async () => {
     const result = deferred<PromptClarificationRewriteResult>();
     let current = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
     const applied: string[] = [];
-    const appliedResults: PromptClarificationRewriteResult[] = [];
+    const offered: PromptClarificationRewriteResult[] = [];
     const controller = createPromptClarificationController({
       rewrite: () => result.promise,
       readCurrent: () => current,
       applyText: (text) => applied.push(text),
-      onApplied: (value) => appliedResults.push(value),
+      offerReview: (value) => offered.push(value),
     });
 
     expect(controller.start(current)).toBe(true);
     result.resolve(clarified());
     await Promise.resolve();
 
-    expect(applied).toEqual(["clear"]);
-    expect(appliedResults).toEqual([clarified()]);
+    expect(applied).toEqual([]);
+    expect(offered).toEqual([clarified()]);
   });
 
   it("rejects duplicate work for one environment and draft but permits another draft", () => {
@@ -68,6 +68,16 @@ describe("prompt clarification controller", () => {
     expect(
       controller.start({ environmentId: "env", draftKey: "other", text: "rough", revision: 1 }),
     ).toBe(true);
+  });
+
+  it("permits one fresh rewrite after lifecycle invalidation", () => {
+    const pending = deferred<PromptClarificationRewriteResult>();
+    const controller = createPromptClarificationController({ rewrite: () => pending.promise });
+    const snapshot = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
+
+    expect(controller.start(snapshot)).toBe(true);
+    controller.invalidate(snapshot);
+    expect(controller.start(snapshot)).toBe(true);
   });
 
   it("leaves an edited then restored draft stale because its revision changed", async () => {

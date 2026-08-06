@@ -36,7 +36,7 @@ import {
   LinkIcon,
   MessageSquareIcon,
   NotebookPenIcon,
-  SparklesIcon,
+  WandSparklesIcon,
   SettingsIcon,
   SquarePenIcon,
   TextSearchIcon,
@@ -1366,7 +1366,7 @@ function OpenCommandPaletteDialog(props: {
     searchTerms: ["clarify", "draft", "rewrite", "prompt"],
     title: "Clarify draft",
     description: clarifyDisabledReason ?? "Rewrite the current draft before sending",
-    icon: <SparklesIcon className={ITEM_ICON_CLASS} />,
+    icon: <WandSparklesIcon className={ITEM_ICON_CLASS} />,
     disabled: clarifyDisabledReason !== null,
     run: async () => {
       composerHandleRef?.current?.clarify();
