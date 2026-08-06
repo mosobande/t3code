@@ -16,6 +16,7 @@ import {
 export const CompactComposerControlsMenu = memo(function CompactComposerControlsMenu(props: {
   activePlan: boolean;
   clarifyDisabledReason: string | null;
+  clarifyPanelOpen: boolean;
   interactionMode: ProviderInteractionMode;
   planSidebarLabel: string;
   planSidebarOpen: boolean;
@@ -89,6 +90,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
           </>
         ) : null}
         <MenuItem
+          className="group"
           aria-label={
             props.clarifyDisabledReason
               ? `Toggle Clarify panel: ${props.clarifyDisabledReason}`
@@ -100,7 +102,7 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
           <WandSparklesIcon
             className={cn(
               "size-4 shrink-0",
-              props.clarifyDisabledReason === null && "text-fuchsia-700 dark:text-fuchsia-300",
+              props.clarifyPanelOpen ? "text-clarify" : "group-data-highlighted:text-clarify",
             )}
           />
           <span className="flex min-w-0 flex-col">
