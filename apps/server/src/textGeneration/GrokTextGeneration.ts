@@ -31,8 +31,36 @@ import {
 } from "../provider/acp/GrokAcpSupport.ts";
 
 const GROK_TIMEOUT_MS = 180_000;
+const GROK_SAFE_CLARIFICATION_MODE_ALIASES = ["ask", "plan", "architect"] as const;
 
 const isTextGenerationError = Schema.is(TextGenerationError);
+
+function modeSearchTerms(value: string): ReadonlySet<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
+}
+
+function resolveGrokSafeClarificationMode(
+  modeState:
+    | {
+        readonly availableModes: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+      }
+    | undefined,
+): string | undefined {
+  if (!modeState) return undefined;
+  for (const alias of GROK_SAFE_CLARIFICATION_MODE_ALIASES) {
+    const mode = modeState.availableModes.find(
+      (candidate) =>
+        modeSearchTerms(candidate.id).has(alias) || modeSearchTerms(candidate.name).has(alias),
+    );
+    if (mode) return mode.id;
+  }
+  return undefined;
+}
 
 export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(function* (
   grokSettings: GrokSettings,
@@ -52,7 +80,8 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generatePromptClarification";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -83,6 +112,25 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
 
       const promptResult = yield* Effect.gen(function* () {
         const started = yield* runtime.start();
+        if (operation === "generatePromptClarification") {
+          const safeModeId = resolveGrokSafeClarificationMode(yield* runtime.getModeState);
+          if (!safeModeId) {
+            return yield* new TextGenerationError({
+              operation,
+              detail: "Grok ACP does not advertise a safe mode for prompt clarification.",
+            });
+          }
+          yield* runtime.setMode(safeModeId).pipe(
+            Effect.mapError(
+              (cause) =>
+                new TextGenerationError({
+                  operation,
+                  detail: "Failed to set Grok ACP safe mode for prompt clarification.",
+                  cause,
+                }),
+            ),
+          );
+        }
         yield* applyGrokAcpModelSelection({
           runtime,
           currentModelId: currentGrokModelIdFromSessionSetup(started.sessionSetupResult),
@@ -251,10 +299,25 @@ export const makeGrokTextGeneration = Effect.fn("makeGrokTextGeneration")(functi
       } satisfies TextGeneration.ThreadTitleGenerationResult;
     });
 
+  const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
+    Effect.fn("GrokTextGeneration.generatePromptClarification")(function* (input) {
+      const prompt = input.prompt;
+      const outputSchema = TextGeneration.PromptClarificationOutputSchema;
+      const generated = yield* runGrokJson({
+        operation: "generatePromptClarification",
+        cwd: input.cwd,
+        prompt,
+        outputSchemaJson: outputSchema,
+        modelSelection: input.modelSelection,
+      });
+      return { text: generated.text.trim() };
+    });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generatePromptClarification,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

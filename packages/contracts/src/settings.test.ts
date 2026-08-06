@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vite-plus/test";
 import * as Schema from "effect/Schema";
 
+import {
+  DEFAULT_TEXT_GENERATION_MODEL,
+  DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
+} from "./model.ts";
 import { ProviderInstanceId } from "./providerInstance.ts";
 import {
   ClientSettingsSchema,
@@ -172,6 +176,33 @@ describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
         providerInstances: { "1bad": { driver: "codex" } },
       }),
     ).toThrow();
+  });
+});
+
+describe("ServerSettings prompt clarification selection", () => {
+  it("defaults independently from title generation and accepts a patch", () => {
+    const settings = decodeServerSettings({
+      textGenerationModelSelection: { instanceId: "codex", model: "title-model" },
+    });
+
+    expect(settings.promptClarificationModelSelection).toEqual({
+      instanceId: "codex",
+      model: DEFAULT_TEXT_GENERATION_MODEL,
+      options: [
+        {
+          id: "reasoningEffort",
+          value: DEFAULT_TEXT_GENERATION_REASONING_EFFORT,
+        },
+      ],
+    });
+    expect(settings.promptClarificationModelSelection).not.toEqual(
+      settings.textGenerationModelSelection,
+    );
+    expect(
+      decodeServerSettingsPatch({
+        promptClarificationModelSelection: { instanceId: "claudeAgent", model: "claude-model" },
+      }).promptClarificationModelSelection,
+    ).toEqual({ instanceId: "claudeAgent", model: "claude-model" });
   });
 });
 

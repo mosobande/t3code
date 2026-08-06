@@ -18,6 +18,9 @@ const runtimeMock = {
   state: {
     startCalls: [] as string[],
     promptUrls: [] as string[],
+    clientDirectories: [] as string[],
+    sessionCreateInputs: [] as unknown[],
+    promptInputs: [] as unknown[],
     authHeaders: [] as Array<string | null>,
     closeCalls: [] as string[],
     sessionCreateError: undefined as unknown,
@@ -30,6 +33,9 @@ const runtimeMock = {
   reset() {
     this.state.startCalls.length = 0;
     this.state.promptUrls.length = 0;
+    this.state.clientDirectories.length = 0;
+    this.state.sessionCreateInputs.length = 0;
+    this.state.promptInputs.length = 0;
     this.state.authHeaders.length = 0;
     this.state.closeCalls.length = 0;
     this.state.sessionCreateError = undefined;
@@ -64,17 +70,24 @@ const OpenCodeRuntimeTestDouble: OpenCodeRuntime.OpenCodeRuntimeShape = {
       external: Boolean(serverUrl),
     }),
   runOpenCodeCommand: () => Effect.succeed({ stdout: "", stderr: "", code: 0 }),
-  createOpenCodeSdkClient: ({ baseUrl, serverPassword }) =>
-    ({
+  createOpenCodeSdkClient: ({ baseUrl, directory, serverPassword }) =>
+    (runtimeMock.state.clientDirectories.push(directory),
+    {
       session: {
-        create: async () => {
+        create: async (input: unknown) => {
+          runtimeMock.state.sessionCreateInputs.push(input);
           if (runtimeMock.state.sessionCreateError !== undefined) {
             throw runtimeMock.state.sessionCreateError;
           }
-          return runtimeMock.state.sessionResult ?? { data: { id: `${baseUrl}/session` } };
+          return (
+            runtimeMock.state.sessionResult ?? {
+              data: { id: `${baseUrl}/session` },
+            }
+          );
         },
-        prompt: async () => {
+        prompt: async (input: unknown) => {
           runtimeMock.state.promptUrls.push(baseUrl);
+          runtimeMock.state.promptInputs.push(input);
           runtimeMock.state.authHeaders.push(
             serverPassword ? `Basic ${btoa(`opencode:${serverPassword}`)}` : null,
           );
@@ -248,6 +261,46 @@ it.layer(OpenCodeTextGenerationTestLayer)("OpenCodeTextGeneration", (it) => {
         expect(runtimeMock.state.closeCalls).toEqual(["http://127.0.0.1:4301"]);
       }),
     ).pipe(Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("uses an isolated cwd, deny-all session, and text-only parts for clarification", () =>
+    withOpenCodeTextGeneration(DEFAULT_OPENCODE_SETTINGS, (textGeneration) =>
+      Effect.gen(function* () {
+        const cwd = "/tmp/t3code-clarify-opencode-cwd";
+        runtimeMock.state.promptResult = {
+          data: {
+            parts: [
+              {
+                type: "text",
+                text: '{"text":"Clarify the request."}',
+              },
+            ],
+          },
+        };
+
+        const generated = yield* textGeneration.generatePromptClarification({
+          cwd,
+          prompt: "Rewrite this prompt.",
+          modelSelection: DEFAULT_TEST_MODEL_SELECTION,
+        });
+
+        expect(generated).toEqual({ text: "Clarify the request." });
+        expect(runtimeMock.state.clientDirectories).toEqual([cwd]);
+        expect(runtimeMock.state.sessionCreateInputs).toEqual([
+          {
+            title: "T3 Code generatePromptClarification",
+            permission: [{ permission: "*", pattern: "*", action: "deny" }],
+          },
+        ]);
+        expect(runtimeMock.state.promptInputs).toEqual([
+          {
+            sessionID: "http://127.0.0.1:4301/session",
+            model: { providerID: "openai", modelID: "gpt-5" },
+            parts: [{ type: "text", text: "Rewrite this prompt." }],
+          },
+        ]);
+      }),
+    ),
   );
 
   it.effect("preserves the SDK cause when session creation fails", () =>

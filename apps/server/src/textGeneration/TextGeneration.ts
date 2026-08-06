@@ -1,6 +1,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Schema from "effect/Schema";
 import type { ChatAttachment, ModelSelection, ProviderInstanceId } from "@t3tools/contracts";
 import { TextGenerationError } from "@t3tools/contracts";
 
@@ -73,6 +74,20 @@ export interface ThreadTitleGenerationResult {
   title: string;
 }
 
+export interface PromptClarificationGenerationInput {
+  cwd: string;
+  /** Product-owned policy constructs this structured text-only payload. */
+  prompt: string;
+  modelSelection: ModelSelection;
+}
+
+export interface PromptClarificationGenerationResult {
+  text: string;
+}
+
+/** Generic structured-output shape used by product-owned rewrite policies. */
+export const PromptClarificationOutputSchema = Schema.Struct({ text: Schema.String });
+
 export interface TextGenerationService {
   generateCommitMessage(
     input: CommitMessageGenerationInput,
@@ -80,6 +95,9 @@ export interface TextGenerationService {
   generatePrContent(input: PrContentGenerationInput): Promise<PrContentGenerationResult>;
   generateBranchName(input: BranchNameGenerationInput): Promise<BranchNameGenerationResult>;
   generateThreadTitle(input: ThreadTitleGenerationInput): Promise<ThreadTitleGenerationResult>;
+  generatePromptClarification(
+    input: PromptClarificationGenerationInput,
+  ): Promise<PromptClarificationGenerationResult>;
 }
 
 /**
@@ -113,6 +131,9 @@ export class TextGeneration extends Context.Service<
     readonly generateThreadTitle: (
       input: ThreadTitleGenerationInput,
     ) => Effect.Effect<ThreadTitleGenerationResult, TextGenerationError>;
+    readonly generatePromptClarification: (
+      input: PromptClarificationGenerationInput,
+    ) => Effect.Effect<PromptClarificationGenerationResult, TextGenerationError>;
   }
 >()("t3/textGeneration/TextGeneration") {}
 
@@ -123,7 +144,8 @@ type TextGenerationOp =
   | "generateCommitMessage"
   | "generatePrContent"
   | "generateBranchName"
-  | "generateThreadTitle";
+  | "generateThreadTitle"
+  | "generatePromptClarification";
 
 const resolveInstance = (
   registry: ProviderInstanceRegistry.ProviderInstanceRegistry["Service"],
@@ -163,6 +185,12 @@ export const makeTextGenerationFromRegistry = (
       resolveInstance(registry, "generateThreadTitle", input.modelSelection.instanceId).pipe(
         Effect.flatMap((textGeneration) => textGeneration.generateThreadTitle(input)),
       ),
+    generatePromptClarification: (input) =>
+      resolveInstance(
+        registry,
+        "generatePromptClarification",
+        input.modelSelection.instanceId,
+      ).pipe(Effect.flatMap((textGeneration) => textGeneration.generatePromptClarification(input))),
   });
 
 export const make = Effect.gen(function* () {

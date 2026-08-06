@@ -1,6 +1,5 @@
 import type {
   ApprovalRequestId,
-  EnvironmentId,
   ModelSelection,
   PreviewAnnotationPayload,
   ProviderApprovalDecision,
@@ -13,6 +12,7 @@ import type {
   TurnId,
 } from "@t3tools/contracts";
 import {
+  EnvironmentId,
   ProviderDriverKind,
   ProviderInstanceId,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
@@ -94,6 +94,20 @@ import { ComposerPendingApprovalPanel } from "./ComposerPendingApprovalPanel";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { ComposerPlanFollowUpBanner } from "./ComposerPlanFollowUpBanner";
 import { ComposerControl, ComposerControlIcon, ComposerSelectControl } from "./ComposerControl";
+import {
+  CLARIFY_COMPOSER_ICON_CLASS,
+  clarifyComposerControlClass,
+  clarifyComposerControlState,
+} from "../../sigidi/promptClarification/composerControl";
+import { useComposerPromptClarification } from "../../sigidi/promptClarification/useComposerPromptClarification";
+import type {
+  PromptClarificationComposerControl,
+  PromptClarificationEnvironmentBinding,
+} from "../../sigidi/promptClarification/types";
+import {
+  promptClarificationDraftKey,
+  promptClarificationSessionDisconnected,
+} from "../../sigidi/promptClarification/logic";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
 import { searchSlashCommandItems } from "./composerSlashCommandSearch";
 import {
@@ -107,7 +121,6 @@ import { buildExpandedImagePreview, type ExpandedImagePreview } from "./Expanded
 import { basenameOfPath } from "../../pierre-icons";
 import { cn, randomUUID } from "~/lib/utils";
 import { Separator } from "../ui/separator";
-
 type ComposerCommandMenuPosition = {
   bottom: number;
   left: number;
@@ -123,7 +136,6 @@ function composerCommandMenuPositionsEqual(
     a.bottom === b.bottom && a.left === b.left && a.maxHeight === b.maxHeight && a.width === b.width
   );
 }
-
 function ComposerCommandMenuLayer(props: { anchor: HTMLElement | null; children: ReactNode }) {
   const [position, setPosition] = useState<ComposerCommandMenuPosition | null>(null);
 
@@ -190,8 +202,8 @@ function ComposerCommandMenuLayer(props: { anchor: HTMLElement | null; children:
 }
 import { Button } from "../ui/button";
 import { Select, SelectItem, SelectPopup, SelectValue } from "../ui/select";
-import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { toastManager } from "../ui/toast";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import {
   BotIcon,
   CircleAlertIcon,
@@ -202,6 +214,7 @@ import {
   LockOpenIcon,
   PenLineIcon,
   SparklesIcon,
+  WandSparklesIcon,
   XIcon,
 } from "lucide-react";
 import { proposedPlanTitle } from "../../proposedPlan";
@@ -303,6 +316,7 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   showPlanToggle: boolean;
   planSidebarLabel: string;
   planSidebarOpen: boolean;
+  clarification: PromptClarificationComposerControl;
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
   onTogglePlanSidebar: () => void;
@@ -316,6 +330,10 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
   const planSidebarTooltip = props.planSidebarOpen
     ? `Hide ${props.planSidebarLabel.toLowerCase()} sidebar`
     : `Show ${props.planSidebarLabel.toLowerCase()} sidebar`;
+  const clarificationState = clarifyComposerControlState({
+    disabledReason: props.clarification.disabledReason,
+    isRunning: props.clarification.isRunning,
+  });
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <>
@@ -421,6 +439,29 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
           </Tooltip>
         </>
       ) : null}
+
+      <Separator orientation="vertical" className="mx-0.5 hidden h-4 sm:block" />
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <ComposerControl
+              className={cn(
+                "shrink-0 whitespace-nowrap",
+                clarifyComposerControlClass(props.clarification.isRunning),
+              )}
+              type="button"
+              disabled={clarificationState.disabled}
+              onClick={props.clarification.onActivate}
+              aria-busy={clarificationState.ariaBusy}
+              aria-label={clarificationState.ariaLabel}
+            />
+          }
+        >
+          <ComposerControlIcon icon={WandSparklesIcon} className={CLARIFY_COMPOSER_ICON_CLASS} />
+          <span className="sr-only sm:not-sr-only">Clarify</span>
+        </TooltipTrigger>
+        <TooltipPopup side="top">{clarificationState.tooltip}</TooltipPopup>
+      </Tooltip>
     </>
   );
 });
@@ -493,6 +534,10 @@ export interface ChatComposerHandle {
   openModelPicker: () => void;
   toggleModelPicker: () => void;
   isModelPickerOpen: () => boolean;
+  /** Rewrite the current composer draft with the configured Clarify model. */
+  clarify: () => boolean;
+  /** Explain why clarify cannot start for this exact composer snapshot. */
+  clarifyDisabledReason: () => string | null;
   readSnapshot: () => {
     value: string;
     cursor: number;
@@ -600,6 +645,7 @@ export interface ChatComposerProps {
   keybindings: ResolvedKeybindingsConfig;
   terminalOpen: boolean;
   gitCwd: string | null;
+  promptClarification: PromptClarificationEnvironmentBinding;
 
   // Refs the parent needs kept in sync
   promptRef: React.RefObject<string>;
@@ -654,7 +700,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     activeThreadId,
     activeThreadEnvironmentId: _activeThreadEnvironmentId,
     activeThread,
-    isServerThread: _isServerThread,
+    isServerThread,
     isLocalDraftThread: _isLocalDraftThread,
     forceExpandedOnMobile,
     projectSelectionRequired,
@@ -691,6 +737,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     keybindings,
     terminalOpen,
     gitCwd,
+    promptClarification,
     promptRef,
     composerRef,
     composerImagesRef,
@@ -1003,6 +1050,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const isMobileViewport = useMediaQuery("max-sm");
   const isComposerCollapsedMobile =
     isMobileViewport && !forceExpandedOnMobile && !isComposerFocused;
+  const clarificationDraftKey =
+    routeKind === "server"
+      ? promptClarificationDraftKey({ routeKind, threadRef: routeThreadRef })
+      : promptClarificationDraftKey({ routeKind, draftId: String(composerDraftTarget) });
 
   // ------------------------------------------------------------------
   // Refs
@@ -1034,6 +1085,15 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
    * next draft.
    */
   const pendingImageCompressionsRef = useRef<Map<ThreadId, number>>(new Map());
+  const clarificationPromptMutationRef = useRef<(text: string) => void>(() => {});
+  const writeComposerDraftText = useCallback(
+    (text: string) => {
+      promptRef.current = text;
+      clarificationPromptMutationRef.current(text);
+      setComposerDraftPrompt(composerDraftTarget, text);
+    },
+    [composerDraftTarget, promptRef, setComposerDraftPrompt],
+  );
 
   // ------------------------------------------------------------------
   // Derived: composer send state
@@ -1218,20 +1278,25 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   // ------------------------------------------------------------------
   // Provider traits UI
   // ------------------------------------------------------------------
+  const setPrompt = useCallback(
+    (nextPrompt: string) => {
+      writeComposerDraftText(nextPrompt);
+    },
+    [writeComposerDraftText],
+  );
   const setPromptFromTraits = useCallback(
     (nextPrompt: string) => {
       if (nextPrompt === promptRef.current) {
         scheduleComposerFocus();
         return;
       }
-      promptRef.current = nextPrompt;
-      setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+      setPrompt(nextPrompt);
       const nextCursor = collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
       setComposerCursor(nextCursor);
       setComposerTrigger(detectComposerTrigger(nextPrompt, nextPrompt.length));
       scheduleComposerFocus();
     },
-    [composerDraftTarget, promptRef, scheduleComposerFocus, setComposerDraftPrompt],
+    [promptRef, scheduleComposerFocus, setPrompt],
   );
 
   const providerTraitsMenuContent = renderProviderTraitsMenuContent({
@@ -1282,15 +1347,49 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   const showMobilePendingAnswerActions =
     isMobileViewport && !isComposerCollapsedMobile && pendingPrimaryAction !== null;
 
-  // ------------------------------------------------------------------
-  // Prompt helpers
-  // ------------------------------------------------------------------
-  const setPrompt = useCallback(
-    (nextPrompt: string) => {
-      setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+  const clarificationPhase = isComposerApprovalState
+    ? "approval"
+    : pendingUserInputs.length > 0
+      ? "pending-input"
+      : phase === "running"
+        ? "running"
+        : showPlanFollowUpPrompt
+          ? "plan-follow-up"
+          : "idle";
+  const applyClarifiedText = useCallback(
+    (text: string) => {
+      writeComposerDraftText(text);
+      const nextCursor = collapseExpandedComposerCursor(text, text.length);
+      setComposerHighlightedItemId(null);
+      setComposerCursor(nextCursor);
+      setComposerTrigger(detectComposerTrigger(text, text.length));
+      window.requestAnimationFrame(() => {
+        composerEditorRef.current?.focusAt(nextCursor);
+      });
     },
-    [composerDraftTarget, setComposerDraftPrompt],
+    [writeComposerDraftText],
   );
+  const clarification = useComposerPromptClarification({
+    environmentId,
+    draftKey: clarificationDraftKey,
+    prompt,
+    phase: clarificationPhase,
+    environmentUnavailable: environmentUnavailable !== null,
+    disconnected: promptClarificationSessionDisconnected({ isServerThread, phase }),
+    binding: promptClarification,
+    applyText: applyClarifiedText,
+  });
+  useLayoutEffect(() => {
+    clarificationPromptMutationRef.current = clarification.notePromptMutation;
+  }, [clarification.notePromptMutation]);
+  const clarificationDisabledReason = clarification.disabledReason;
+  const startClarification = clarification.start;
+  const invalidateClarification = clarification.invalidate;
+  const clarificationControl: PromptClarificationComposerControl = clarification;
+  const clarificationControlState = clarifyComposerControlState({
+    disabledReason: clarificationDisabledReason,
+    isRunning: clarification.isRunning,
+  });
 
   const addComposerImage = useCallback(
     (image: ComposerImageAttachment) => {
@@ -1320,7 +1419,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       );
       if (contextIndex < 0) return;
       const removal = removeInlineTerminalContextPlaceholder(promptRef.current, contextIndex);
-      promptRef.current = removal.prompt;
       setPrompt(removal.prompt);
       removeComposerDraftTerminalContext(composerDraftTarget, contextId);
       const nextCursor = collapseExpandedComposerCursor(removal.prompt, removal.cursor);
@@ -1414,6 +1512,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     }
 
     promptRef.current = nextCustomAnswer;
+    clarificationPromptMutationRef.current(nextCustomAnswer);
     const nextCursor = collapseExpandedComposerCursor(nextCustomAnswer, nextCustomAnswer.length);
     setComposerCursor(nextCursor);
     setComposerTrigger(
@@ -1580,7 +1679,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         );
         return;
       }
-      promptRef.current = nextPrompt;
       setPrompt(nextPrompt);
       if (!terminalContextIdListsEqual(composerTerminalContexts, terminalContextIds)) {
         setComposerDraftTerminalContexts(
@@ -1597,7 +1695,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       activePendingProgress?.activeQuestion,
       pendingUserInputs.length,
       onChangeActivePendingUserInputCustomAnswer,
-      promptRef,
       setPrompt,
       composerDraftTarget,
       composerTerminalContexts,
@@ -1627,9 +1724,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       const next = replaceTextRange(promptRef.current, rangeStart, rangeEnd, replacement);
       const nextCursor = collapseExpandedComposerCursor(next.text, next.cursor);
       const nextExpandedCursor = expandCollapsedComposerCursor(next.text, nextCursor);
-      promptRef.current = next.text;
       const activePendingQuestion = activePendingProgress?.activeQuestion;
       if (activePendingQuestion && activePendingUserInput) {
+        promptRef.current = next.text;
+        clarificationPromptMutationRef.current(next.text);
         onChangeActivePendingUserInputCustomAnswer(
           activePendingQuestion.id,
           next.text,
@@ -1862,6 +1960,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         });
         return;
       }
+      invalidateClarification();
       onSend(event);
       if (shouldBlurMobileComposerOnSubmit()) {
         blurMobileComposerAfterSend();
@@ -1874,6 +1973,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       noProviderAvailable,
       onSend,
       shouldBlurMobileComposerOnSubmit,
+      invalidateClarification,
     ],
   );
   const expandMobileComposer = useCallback(() => {
@@ -1997,8 +2097,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
             : entry.prompt;
       const promptChanged = nextPrompt !== currentPrompt;
       if (promptChanged) {
-        promptRef.current = nextPrompt;
-        setComposerDraftPrompt(composerDraftTarget, nextPrompt);
+        writeComposerDraftText(nextPrompt);
         setComposerCursor(collapseExpandedComposerCursor(nextPrompt, nextPrompt.length));
         setComposerTrigger(null);
       }
@@ -2080,8 +2179,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerDraftTarget,
       composerImagesRef,
       promptRef,
-      setComposerDraftPrompt,
       takeStashEntry,
+      writeComposerDraftText,
     ],
   );
 
@@ -2169,6 +2268,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       // Only the prompt and images are cleared — terminal/element contexts,
       // preview annotations, and review comments are not stashable, so
       // destroying them here would be unrecoverable.
+      clarificationPromptMutationRef.current("");
       promptRef.current = "";
       clearComposerDraftPromptAndImages(stashTarget);
       setComposerCursor(0);
@@ -2452,28 +2552,35 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     focusComposer();
   };
 
-  const insertComposerTextAtEnd = (
-    text: string,
-    options?: { ensureLeadingBoundary?: boolean },
-  ): boolean => {
-    if (
-      text.length === 0 ||
-      isConnecting ||
-      isComposerApprovalState ||
-      pendingUserInputs.length > 0 ||
-      projectSelectionRequired
-    ) {
-      return false;
-    }
-    const prompt = promptRef.current;
-    const needsLeadingSpace =
-      (options?.ensureLeadingBoundary ?? false) && prompt.length > 0 && !/\s$/.test(prompt);
-    return applyPromptReplacement(
-      prompt.length,
-      prompt.length,
-      needsLeadingSpace ? ` ${text}` : text,
-    );
-  };
+  const insertComposerTextAtEnd = useCallback(
+    (text: string, options?: { ensureLeadingBoundary?: boolean }): boolean => {
+      if (
+        text.length === 0 ||
+        isConnecting ||
+        isComposerApprovalState ||
+        pendingUserInputs.length > 0 ||
+        projectSelectionRequired
+      ) {
+        return false;
+      }
+      const prompt = promptRef.current;
+      const needsLeadingSpace =
+        (options?.ensureLeadingBoundary ?? false) && prompt.length > 0 && !/\s$/.test(prompt);
+      return applyPromptReplacement(
+        prompt.length,
+        prompt.length,
+        needsLeadingSpace ? ` ${text}` : text,
+      );
+    },
+    [
+      applyPromptReplacement,
+      isComposerApprovalState,
+      isConnecting,
+      pendingUserInputs.length,
+      projectSelectionRequired,
+      promptRef,
+    ],
+  );
 
   // File-tree drags land as mentions. Handled in the capture phase so the
   // editor never sees the drop; the load-bearing rules (native stop, "move"
@@ -2582,6 +2689,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         setIsComposerModelPickerOpen((open) => !open);
       },
       isModelPickerOpen: () => isComposerModelPickerOpen,
+      clarify: startClarification,
+      clarifyDisabledReason: () => clarificationDisabledReason,
       readSnapshot: () => {
         return readComposerSnapshot();
       },
@@ -2632,6 +2741,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         );
         if (!inserted) return;
         promptRef.current = insertion.prompt;
+        clarificationPromptMutationRef.current(insertion.prompt);
         setComposerCursor(nextCollapsedCursor);
         setComposerTrigger(detectComposerTrigger(insertion.prompt, insertion.cursor));
         window.requestAnimationFrame(() => {
@@ -2666,12 +2776,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerElementContextsRef,
       composerPreviewAnnotations,
       composerReviewComments,
-      isConnecting,
-      isComposerApprovalState,
-      pendingUserInputs.length,
-      projectSelectionRequired,
-      applyPromptReplacement,
+      insertComposerTextAtEnd,
       isComposerModelPickerOpen,
+      clarificationDisabledReason,
       readComposerSnapshot,
       selectedModel,
       selectedModelOptionsForDispatch,
@@ -2680,6 +2787,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       selectedPromptEffort,
       selectedProvider,
       selectedProviderModels,
+      startClarification,
     ],
   );
 
@@ -3092,7 +3200,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               ? "Ask for follow-up changes or attach images"
                               : "Ask anything, @tag files/folders, $use skills, or / for commands"
                 }
-                disabled={isConnecting || isComposerApprovalState || projectSelectionRequired}
+                disabled={
+                  isConnecting ||
+                  isComposerApprovalState ||
+                  projectSelectionRequired ||
+                  clarificationControlState.editorReadOnly
+                }
               />
               {showMobilePendingAnswerActions ? (
                 <div
@@ -3188,6 +3301,8 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                 {isComposerFooterCompact ? (
                   <CompactComposerControlsMenu
                     activePlan={showPlanSidebarToggle}
+                    clarifyDisabledReason={clarificationControl.disabledReason}
+                    clarifyRunning={clarificationControl.isRunning}
                     interactionMode={interactionMode}
                     planSidebarLabel={planSidebarLabel}
                     planSidebarOpen={planSidebarOpen}
@@ -3195,6 +3310,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     showInteractionModeToggle={composerProviderControls.showInteractionModeToggle}
                     traitsMenuContent={providerTraitsMenuContent}
                     onToggleInteractionMode={toggleInteractionMode}
+                    onClarify={clarificationControl.onActivate}
                     onTogglePlanSidebar={togglePlanSidebar}
                     onRuntimeModeChange={handleRuntimeModeChange}
                   />
@@ -3213,6 +3329,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                       showPlanToggle={showPlanSidebarToggle}
                       planSidebarLabel={planSidebarLabel}
                       planSidebarOpen={planSidebarOpen}
+                      clarification={clarificationControl}
                       onToggleInteractionMode={toggleInteractionMode}
                       onRuntimeModeChange={handleRuntimeModeChange}
                       onTogglePlanSidebar={togglePlanSidebar}

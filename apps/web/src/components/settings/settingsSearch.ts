@@ -147,6 +147,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
   },
   {
+    id: "prompt-clarification-model",
+    title: "Clarify model",
+    to: "/settings/general",
+  },
+  {
     id: "diagnostics",
     title: "Diagnostics",
     to: "/settings/general",

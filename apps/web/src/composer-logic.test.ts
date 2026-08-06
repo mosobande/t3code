@@ -371,4 +371,9 @@ describe("parseStandaloneComposerSlashCommand", () => {
   it("ignores slash commands with extra message text", () => {
     expect(parseStandaloneComposerSlashCommand("/plan explain this")).toBeNull();
   });
+
+  it("leaves /clarify as ordinary composer text", () => {
+    expect(parseStandaloneComposerSlashCommand("/clarify")).toBeNull();
+    expect(parseStandaloneComposerSlashCommand("/clarify Rewrite this")).toBeNull();
+  });
 });

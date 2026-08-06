@@ -4,6 +4,7 @@ import type { ResolvedKeybindingsConfig } from "@t3tools/contracts";
 import {
   buildKeybindingRows,
   buildKeybindingCommandOptions,
+  keybindingCommandDisabledReason,
   buildWhenVariableOptions,
   commandLabel,
   keybindingConflictLabels,
@@ -15,6 +16,21 @@ import {
 } from "./KeybindingsSettings.logic";
 
 describe("KeybindingsSettings.logic", () => {
+  it("blocks Clarify bindings on an older server", () => {
+    expect(
+      keybindingCommandDisabledReason(
+        "composer.clarify",
+        "Prompt clarification requires a newer server",
+      ),
+    ).toBe("Prompt clarification requires a newer server");
+  });
+
+  it("keeps the configured Clarify selection reason exact", () => {
+    expect(
+      keybindingCommandDisabledReason("composer.clarify", "Configured Clarify provider is stale"),
+    ).toBe("Configured Clarify provider is stale");
+  });
+
   it("builds searchable rows with readable key and when values", () => {
     const rows = buildKeybindingRows(
       [
@@ -124,6 +140,10 @@ describe("KeybindingsSettings.logic", () => {
     expect(commandLabel("commandPalette.toggle")).toBe("Command Palette: Toggle");
     expect(commandLabel("projectNotes.toggle")).toBe("Project Notes: Toggle");
     expect(commandLabel("script.setup-db.run")).toBe("Run Script: Setup Db");
+  });
+
+  it("keeps the unbound Clarify command discoverable in Settings", () => {
+    expect(buildKeybindingCommandOptions([])).toContain("composer.clarify");
   });
 
   it("builds known when variable options from defaults without frontend labels", () => {

@@ -47,7 +47,13 @@ const permissionOptionIds = {
 };
 const sessionId = "mock-session-1";
 
-let currentModeId = "ask";
+let currentModeId = process.env.T3_ACP_INITIAL_MODE ?? "ask";
+const requestedAvailableModeIds = new Set(
+  (process.env.T3_ACP_AVAILABLE_MODES ?? "ask,architect,code")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0),
+);
 let currentModelId = "default";
 let parameterizedModelPicker = false;
 let currentReasoning = "medium";
@@ -218,7 +224,10 @@ function configOptions(): ReadonlyArray<AcpSchema.SessionConfigOption> {
         { value: "default", name: "Auto" },
         { value: "composer-2", name: "Composer 2" },
         { value: "composer-2[fast=true]", name: "Composer 2 Fast" },
-        { value: "gpt-5.3-codex[reasoning=medium,fast=false]", name: "Codex 5.3" },
+        {
+          value: "gpt-5.3-codex[reasoning=medium,fast=false]",
+          name: "Codex 5.3",
+        },
       ],
     },
   ];
@@ -269,7 +278,7 @@ const availableModes: ReadonlyArray<AcpSchema.SessionMode> = [
     name: "Code",
     description: "Write and modify code with full tool access",
   },
-];
+].filter((mode) => requestedAvailableModeIds.has(mode.id));
 
 function modeState(): AcpSchema.SessionModeState {
   return {
@@ -674,13 +683,21 @@ const program = Effect.gen(function* () {
             ],
           },
           options: [
-            { optionId: permissionOptionIds.allowOnce, name: "Allow once", kind: "allow_once" },
+            {
+              optionId: permissionOptionIds.allowOnce,
+              name: "Allow once",
+              kind: "allow_once",
+            },
             {
               optionId: permissionOptionIds.allowAlways,
               name: "Allow always",
               kind: "allow_always",
             },
-            { optionId: permissionOptionIds.rejectOnce, name: "Reject", kind: "reject_once" },
+            {
+              optionId: permissionOptionIds.rejectOnce,
+              name: "Reject",
+              kind: "reject_once",
+            },
           ],
         });
 
@@ -784,7 +801,10 @@ const program = Effect.gen(function* () {
                 question: "Which scope should Grok use?",
                 multiSelect: null,
                 options: [
-                  { label: "Workspace", description: "Use the current workspace" },
+                  {
+                    label: "Workspace",
+                    description: "Use the current workspace",
+                  },
                   { label: "Session", description: "Only use this session" },
                 ],
               },
@@ -869,7 +889,10 @@ const program = Effect.gen(function* () {
         sessionId: requestedSessionId,
         update: {
           sessionUpdate: "agent_message_chunk",
-          content: { type: "text", text: promptResponseText ?? "hello from mock" },
+          content: {
+            type: "text",
+            text: promptResponseText ?? "hello from mock",
+          },
         },
       });
 

@@ -69,14 +69,21 @@ function withFakeAcpGrok<A, E, R>(
   }).pipe(Effect.scoped);
 }
 
-function readJsonRpcRequests(
-  filePath: string,
-): ReadonlyArray<{ readonly method?: string; readonly params?: Record<string, unknown> }> {
+function readJsonRpcRequests(filePath: string): ReadonlyArray<{
+  readonly method?: string;
+  readonly params?: Record<string, unknown>;
+}> {
   return NodeFS.readFileSync(filePath, "utf8")
     .trim()
     .split("\n")
     .filter((line) => line.length > 0)
-    .map((line) => JSON.parse(line) as { method?: string; params?: Record<string, unknown> });
+    .map(
+      (line) =>
+        JSON.parse(line) as {
+          method?: string;
+          params?: Record<string, unknown>;
+        },
+    );
 }
 
 it.layer(GrokTextGenerationTestLayer)("GrokTextGeneration", (it) => {
@@ -144,6 +151,178 @@ it.layer(GrokTextGenerationTestLayer)("GrokTextGeneration", (it) => {
         }),
     ),
   );
+
+  it.effect("uses the safe ACP capability set and text-only input for clarification", () => {
+    const requestLogDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeOS.tmpdir(), "t3code-grok-clarify-log-"),
+    );
+    const requestLogPath = NodePath.join(requestLogDir, "requests.ndjson");
+
+    return withFakeAcpGrok(
+      {
+        T3_ACP_INITIAL_MODE: "code",
+        T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+        T3_ACP_PROMPT_RESPONSE_TEXT: JSON.stringify({
+          text: "Clarify the expected result.",
+        }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generated = yield* textGeneration.generatePromptClarification({
+            cwd: requestLogDir,
+            prompt: "Rewrite this prompt.",
+            modelSelection: createModelSelection(ProviderInstanceId.make("grok"), "grok-mock-alt"),
+          });
+          expect(generated).toEqual({ text: "Clarify the expected result." });
+
+          const requests = readJsonRpcRequests(requestLogPath);
+          expect(
+            requests.find((request) => request.method === "initialize")?.params?.clientCapabilities,
+          ).toMatchObject({
+            fs: { readTextFile: false, writeTextFile: false },
+            terminal: false,
+          });
+          expect(
+            requests.some(
+              (request) =>
+                request.method === "session/set_model" &&
+                request.params?.modelId === "grok-mock-alt",
+            ),
+          ).toBe(true);
+          const safeModeRequestIndex = requests.findIndex(
+            (request) =>
+              request.method === "session/set_config_option" &&
+              request.params?.configId === "mode" &&
+              request.params?.value === "ask",
+          );
+          const promptRequestIndex = requests.findIndex(
+            (request) => request.method === "session/prompt",
+          );
+          expect(safeModeRequestIndex).toBeGreaterThanOrEqual(0);
+          expect(promptRequestIndex).toBeGreaterThan(safeModeRequestIndex);
+          expect(
+            requests.find((request) => request.method === "session/prompt")?.params?.prompt,
+          ).toEqual([{ type: "text", text: "Rewrite this prompt." }]);
+
+          NodeFS.rmSync(requestLogDir, { recursive: true, force: true });
+        }),
+    );
+  });
+
+  it.effect("uses an advertised architecture mode when ask mode is unavailable", () => {
+    const requestLogDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeOS.tmpdir(), "t3code-grok-clarify-architect-log-"),
+    );
+    const requestLogPath = NodePath.join(requestLogDir, "requests.ndjson");
+
+    return withFakeAcpGrok(
+      {
+        T3_ACP_AVAILABLE_MODES: "architect,code",
+        T3_ACP_INITIAL_MODE: "code",
+        T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+        T3_ACP_PROMPT_RESPONSE_TEXT: JSON.stringify({ text: "Clarify the boundaries." }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generated = yield* textGeneration.generatePromptClarification({
+            cwd: requestLogDir,
+            prompt: "Rewrite these boundaries.",
+            modelSelection: createModelSelection(ProviderInstanceId.make("grok"), "grok-build"),
+          });
+          expect(generated).toEqual({ text: "Clarify the boundaries." });
+
+          const requests = readJsonRpcRequests(requestLogPath);
+          expect(
+            requests.some(
+              (request) =>
+                request.method === "session/set_config_option" &&
+                request.params?.configId === "mode" &&
+                request.params?.value === "architect",
+            ),
+          ).toBe(true);
+          expect(
+            requests.some(
+              (request) =>
+                request.method === "session/set_config_option" &&
+                request.params?.configId === "mode" &&
+                request.params?.value === "ask",
+            ),
+          ).toBe(false);
+
+          NodeFS.rmSync(requestLogDir, { recursive: true, force: true });
+        }),
+    );
+  });
+
+  it.effect("fails closed when Grok advertises no safe clarification mode", () => {
+    const requestLogDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeOS.tmpdir(), "t3code-grok-clarify-unsafe-log-"),
+    );
+    const requestLogPath = NodePath.join(requestLogDir, "requests.ndjson");
+
+    return withFakeAcpGrok(
+      {
+        T3_ACP_AVAILABLE_MODES: "code",
+        T3_ACP_INITIAL_MODE: "code",
+        T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+        T3_ACP_PROMPT_RESPONSE_TEXT: JSON.stringify({ text: "must not be returned" }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(
+            textGeneration.generatePromptClarification({
+              cwd: requestLogDir,
+              prompt: "Do not run tools.",
+              modelSelection: createModelSelection(ProviderInstanceId.make("grok"), "grok-build"),
+            }),
+          );
+          expect(error).toMatchObject({
+            _tag: "TextGenerationError",
+            operation: "generatePromptClarification",
+          });
+          expect(readJsonRpcRequests(requestLogPath)).not.toContainEqual(
+            expect.objectContaining({ method: "session/prompt" }),
+          );
+
+          NodeFS.rmSync(requestLogDir, { recursive: true, force: true });
+        }),
+    );
+  });
+
+  it.effect("fails closed when Grok cannot enter its advertised safe mode", () => {
+    const requestLogDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeOS.tmpdir(), "t3code-grok-clarify-mode-failure-log-"),
+    );
+    const requestLogPath = NodePath.join(requestLogDir, "requests.ndjson");
+
+    return withFakeAcpGrok(
+      {
+        T3_ACP_FAIL_SET_CONFIG_OPTION: "1",
+        T3_ACP_INITIAL_MODE: "code",
+        T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+        T3_ACP_PROMPT_RESPONSE_TEXT: JSON.stringify({ text: "must not be returned" }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const error = yield* Effect.flip(
+            textGeneration.generatePromptClarification({
+              cwd: requestLogDir,
+              prompt: "Do not run tools.",
+              modelSelection: createModelSelection(ProviderInstanceId.make("grok"), "grok-build"),
+            }),
+          );
+          expect(error).toMatchObject({
+            _tag: "TextGenerationError",
+            operation: "generatePromptClarification",
+          });
+          expect(readJsonRpcRequests(requestLogPath)).not.toContainEqual(
+            expect.objectContaining({ method: "session/prompt" }),
+          );
+
+          NodeFS.rmSync(requestLogDir, { recursive: true, force: true });
+        }),
+    );
+  });
 
   it.effect("surfaces ACP request failures as text generation errors", () =>
     withFakeAcpGrok(

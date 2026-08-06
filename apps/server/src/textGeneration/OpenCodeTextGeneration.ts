@@ -39,6 +39,7 @@ const OpenCodeTextGenerationOperation = Schema.Literals([
   "generatePrContent",
   "generateBranchName",
   "generateThreadTitle",
+  "generatePromptClarification",
 ]);
 
 type OpenCodeTextGenerationOperation = typeof OpenCodeTextGenerationOperation.Type;
@@ -253,7 +254,8 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generatePromptClarification";
   }) =>
     sharedServerMutex.withPermit(
       Effect.gen(function* () {
@@ -615,10 +617,23 @@ export const makeOpenCodeTextGeneration = Effect.fn("makeOpenCodeTextGeneration"
       };
     });
 
+  const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
+    Effect.fn("OpenCodeTextGeneration.generatePromptClarification")(function* (input) {
+      const generated = yield* runOpenCodeJson({
+        operation: "generatePromptClarification",
+        cwd: input.cwd,
+        prompt: input.prompt,
+        outputSchemaJson: TextGeneration.PromptClarificationOutputSchema,
+        modelSelection: input.modelSelection,
+      });
+      return { text: generated.text.trim() };
+    });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generatePromptClarification,
   } satisfies TextGeneration.TextGeneration["Service"];
 });

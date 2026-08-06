@@ -1,5 +1,6 @@
 import {
   EnvironmentId,
+  ProviderInstanceId,
   type ServerConfig,
   type ServerConfigStreamEvent,
   type ServerLifecycleWelcomePayload,
@@ -11,12 +12,14 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
+import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import * as Stream from "effect/Stream";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as TestClock from "effect/testing/TestClock";
+import { Atom, AtomRegistry } from "effect/unstable/reactivity";
 import { RpcClientError } from "effect/unstable/rpc";
 import * as Socket from "effect/unstable/socket/Socket";
 
@@ -26,11 +29,13 @@ import {
   type PreparedConnection,
 } from "../connection/model.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
+import * as EnvironmentRegistry from "../connection/registry.ts";
 import * as Persistence from "../platform/persistence.ts";
 import type { WsRpcProtocolClient } from "../rpc/protocol.ts";
 import type { RpcSession } from "../rpc/session.ts";
 import {
   applyServerConfigProjection,
+  createServerEnvironmentAtoms,
   makeEnvironmentServerConfigState,
   isLegacyUpdateHandoffLoss,
   matchesServerUpdateReadyEvent,
@@ -127,6 +132,97 @@ describe("update restart reconnect nudges", () => {
 });
 
 describe("server state projection", () => {
+  it.effect("runs the latest clarification after an active rewrite settles", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const firstStarted = Promise.withResolvers<void>();
+        const releaseFirst = Promise.withResolvers<void>();
+        const executedTexts: string[] = [];
+        const client = {
+          [WS_METHODS.promptClarificationRewrite]: (input: {
+            readonly draftKey: string;
+            readonly text: string;
+          }) =>
+            Effect.promise(async () => {
+              executedTexts.push(input.text);
+              if (input.text === "draft A") {
+                firstStarted.resolve();
+                await releaseFirst.promise;
+              }
+              return {
+                text: `clarified ${input.text}`,
+                providerInstanceId: ProviderInstanceId.make("codex"),
+                model: "gpt-test",
+              };
+            }),
+        } as unknown as WsRpcProtocolClient;
+        const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
+          target: TARGET,
+          state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
+          session: yield* SubscriptionRef.make(Option.some(session(client))),
+          prepared: yield* SubscriptionRef.make(Option.none<PreparedConnection>()),
+          connect: Effect.void,
+          disconnect: Effect.void,
+          retryNow: Effect.void,
+        } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
+        const run: EnvironmentRegistry.EnvironmentRegistry["Service"]["run"] = (
+          _environmentId,
+          effect,
+        ) => Effect.provideService(effect, EnvironmentSupervisor.EnvironmentSupervisor, supervisor);
+        const environmentRegistry = EnvironmentRegistry.EnvironmentRegistry.of({
+          run,
+        } as unknown as EnvironmentRegistry.EnvironmentRegistry["Service"]);
+        const cache = Persistence.EnvironmentCacheStore.of({
+          loadShell: () => Effect.succeed(Option.none()),
+          saveShell: () => Effect.void,
+          loadThread: () => Effect.succeed(Option.none()),
+          saveThread: () => Effect.void,
+          removeThread: () => Effect.void,
+          loadServerConfig: () => Effect.succeed(Option.none()),
+          saveServerConfig: () => Effect.void,
+          loadVcsRefs: () => Effect.succeed(Option.none()),
+          saveVcsRefs: () => Effect.void,
+          removeVcsRefs: () => Effect.void,
+          clearVcsRefs: () => Effect.void,
+          clear: () => Effect.void,
+        });
+        const runtime = Atom.runtime(
+          Layer.merge(
+            Layer.succeed(EnvironmentRegistry.EnvironmentRegistry, environmentRegistry),
+            Layer.succeed(Persistence.EnvironmentCacheStore, cache),
+          ),
+        );
+        const atoms = createServerEnvironmentAtoms(runtime, {
+          initialConfigValueAtom: () => Atom.make<ServerConfig | null>(null),
+        });
+        const registry = yield* Effect.acquireRelease(Effect.sync(AtomRegistry.make), (value) =>
+          Effect.sync(() => value.dispose()),
+        );
+
+        const first = atoms.promptClarificationRewrite.run(registry, {
+          environmentId: TARGET.environmentId,
+          input: { draftKey: "draft:1", text: "draft A" },
+        });
+        yield* Effect.promise(() => firstStarted.promise);
+        const latest = atoms.promptClarificationRewrite.run(registry, {
+          environmentId: TARGET.environmentId,
+          input: { draftKey: "draft:1", text: "draft B" },
+        });
+        releaseFirst.resolve();
+
+        expect(yield* Effect.promise(() => first)).toMatchObject({
+          _tag: "Success",
+          value: { text: "clarified draft A" },
+        });
+        expect(yield* Effect.promise(() => latest)).toMatchObject({
+          _tag: "Success",
+          value: { text: "clarified draft B" },
+        });
+        expect(executedTexts).toEqual(["draft A", "draft B"]);
+      }),
+    ),
+  );
+
   it("only treats a legacy transport interruption as an unacknowledged handoff", () => {
     expect(isLegacyUpdateHandoffLoss(Cause.interrupt(1))).toBe(true);
     expect(

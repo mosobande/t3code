@@ -75,6 +75,7 @@ import {
   collapseExpandedComposerCursor,
   parseStandaloneComposerSlashCommand,
 } from "../composer-logic";
+import { usePromptClarificationEnvironment } from "../sigidi/promptClarification/usePromptClarificationEnvironment";
 import {
   derivePendingApprovals,
   derivePendingUserInputs,
@@ -2171,6 +2172,13 @@ function ChatViewContent(props: ChatViewProps) {
     versionMismatchServerLabel,
   ]);
   const providerStatuses = serverConfig?.providers ?? EMPTY_PROVIDERS;
+  const promptClarification = usePromptClarificationEnvironment({
+    environmentId,
+    supportsCapability: serverConfig?.environment.capabilities.promptClarification === true,
+    environmentAvailable: !activeEnvironmentUnavailable,
+    selection: settings.promptClarificationModelSelection,
+    providers: providerStatuses,
+  });
   const unlockedSelectedProvider = resolveSelectableProvider(
     providerStatuses,
     selectedProviderByThreadId ?? threadProvider,
@@ -4752,6 +4760,13 @@ function ChatViewContent(props: ChatViewProps) {
         return;
       }
 
+      if (command === "composer.clarify") {
+        event.preventDefault();
+        event.stopPropagation();
+        composerRef.current?.clarify();
+        return;
+      }
+
       const scriptId = projectScriptIdFromCommand(command);
       if (!scriptId || !activeProject) return;
       const script = activeProject.scripts.find((entry) => entry.id === scriptId);
@@ -6326,6 +6341,7 @@ function ChatViewContent(props: ChatViewProps) {
                             keybindings={keybindings}
                             terminalOpen={Boolean(terminalUiState.terminalOpen)}
                             gitCwd={gitCwd}
+                            promptClarification={promptClarification}
                             promptRef={promptRef}
                             composerImagesRef={composerImagesRef}
                             composerTerminalContextsRef={composerTerminalContextsRef}

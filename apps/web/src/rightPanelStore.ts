@@ -51,7 +51,7 @@ export type RightPanelSurface =
   | { id: "agents"; kind: "agents" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
-const RIGHT_PANEL_STORAGE_VERSION = 8;
+const RIGHT_PANEL_STORAGE_VERSION = 10;
 
 export interface ThreadRightPanelState {
   isOpen: boolean;
@@ -185,6 +185,9 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 threadState && typeof threadState === "object" ? threadState : null;
               const surfaces = Array.isArray(validThreadState?.surfaces)
                 ? validThreadState.surfaces.flatMap<RightPanelSurface>((surface) => {
+                    if ((surface as { kind?: unknown }).kind === "clarify") {
+                      return [];
+                    }
                     if (surface.kind === "file") {
                       const revealLine =
                         typeof surface.revealLine === "number" &&
@@ -239,9 +242,11 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                 ? (validThreadState?.activeSurfaceId ?? null)
                 : null;
               const isOpen =
-                typeof validThreadState?.isOpen === "boolean"
-                  ? validThreadState.isOpen
-                  : activeSurfaceId !== null;
+                validThreadState?.activeSurfaceId === "clarify" && activeSurfaceId === null
+                  ? false
+                  : typeof validThreadState?.isOpen === "boolean"
+                    ? validThreadState.isOpen
+                    : activeSurfaceId !== null;
               return [threadKey, { isOpen, surfaces, activeSurfaceId }];
             },
           ),

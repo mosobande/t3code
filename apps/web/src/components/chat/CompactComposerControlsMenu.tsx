@@ -1,7 +1,9 @@
 import { ProviderInteractionMode, RuntimeMode } from "@t3tools/contracts";
 import { memo, type ReactNode } from "react";
-import { EllipsisIcon, ListTodoIcon } from "lucide-react";
+import { EllipsisIcon, ListTodoIcon, WandSparklesIcon } from "lucide-react";
 import { Button } from "../ui/button";
+import { cn } from "~/lib/utils";
+import { clarifyComposerControlState } from "../../sigidi/promptClarification/composerControl";
 import {
   Menu,
   MenuItem,
@@ -14,6 +16,8 @@ import {
 
 export const CompactComposerControlsMenu = memo(function CompactComposerControlsMenu(props: {
   activePlan: boolean;
+  clarifyDisabledReason: string | null;
+  clarifyRunning: boolean;
   interactionMode: ProviderInteractionMode;
   planSidebarLabel: string;
   planSidebarOpen: boolean;
@@ -21,9 +25,14 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
   showInteractionModeToggle: boolean;
   traitsMenuContent?: ReactNode;
   onToggleInteractionMode: () => void;
+  onClarify: () => void;
   onTogglePlanSidebar: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const clarificationState = clarifyComposerControlState({
+    disabledReason: props.clarifyDisabledReason,
+    isRunning: props.clarifyRunning,
+  });
   return (
     <Menu>
       <MenuTrigger
@@ -85,6 +94,31 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
             </MenuItem>
           </>
         ) : null}
+        <MenuItem
+          className="group"
+          disabled={clarificationState.disabled}
+          aria-busy={clarificationState.ariaBusy}
+          aria-label={clarificationState.ariaLabel}
+          title={props.clarifyDisabledReason ?? undefined}
+          onClick={props.onClarify}
+        >
+          <WandSparklesIcon
+            className={cn(
+              "size-4 shrink-0",
+              props.clarifyRunning
+                ? "motion-safe:animate-pulse text-clarify"
+                : "group-data-highlighted:text-clarify",
+            )}
+          />
+          <span className="flex min-w-0 flex-col">
+            <span>{clarificationState.statusLabel}</span>
+            {props.clarifyDisabledReason ? (
+              <span className="max-w-64 whitespace-normal text-muted-foreground text-xs">
+                {props.clarifyDisabledReason}
+              </span>
+            ) : null}
+          </span>
+        </MenuItem>
       </MenuPopup>
     </Menu>
   );

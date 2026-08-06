@@ -90,11 +90,13 @@ import { ensureLocalApi, readLocalApi } from "../../localApi";
 import { isMacPlatform } from "../../lib/utils";
 import {
   primaryServerObservabilityAtom,
+  primaryServerConfigAtom,
   primaryServerProvidersAtom,
   serverEnvironment,
 } from "../../state/server";
 import { usePrimaryEnvironment } from "../../state/environments";
-import { useProjects } from "../../state/entities";
+import { lastViewedChatEnvironmentIdAtom, useProjects } from "../../state/entities";
+import { primaryEnvironmentIdAtom } from "../../state/primaryEnvironment";
 import { useArchivedThreadSnapshots } from "../../lib/archivedThreadsState";
 import { formatRelativeTimeLabel, getRelativeTimeState } from "../../timestampFormat";
 import { Button } from "../ui/button";
@@ -163,6 +165,11 @@ import {
 import { searchableSetting } from "./settingsSearch";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { PromptClarificationSettingsRow } from "../../sigidi/promptClarification/PromptClarificationSettingsRow";
+import {
+  promptClarificationRestoreContribution,
+  resolvePromptClarificationSettingsUnavailableReason,
+} from "../../sigidi/promptClarification/settings";
 
 const THEME_OPTIONS = [
   {
@@ -584,6 +591,18 @@ export function useSettingsRestore(onRestored?: () => void) {
   const { theme, setTheme } = useTheme();
   const settings = usePrimarySettings();
   const updateSettings = useUpdatePrimarySettings();
+  const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
+  const lastViewedChatEnvironmentId = useAtomValue(lastViewedChatEnvironmentIdAtom);
+  const primaryEnvironmentId = useAtomValue(primaryEnvironmentIdAtom);
+  const clarifySettingsUnavailableReason = resolvePromptClarificationSettingsUnavailableReason({
+    supportsCapability: primaryServerConfig?.environment.capabilities.promptClarification === true,
+    settingsContextEnvironmentId: lastViewedChatEnvironmentId,
+    primaryEnvironmentId,
+  });
+  const promptClarificationRestore = promptClarificationRestoreContribution(
+    { promptClarificationModelSelection: settings.promptClarificationModelSelection },
+    clarifySettingsUnavailableReason,
+  );
 
   const isTextGenerationModelDirty = !Equal.equals(
     settings.textGenerationModelSelection ?? null,
@@ -651,9 +670,13 @@ export function useSettingsRestore(onRestored?: () => void) {
         ? ["Delete confirmation"]
         : []),
       ...(isTextGenerationModelDirty ? ["Text generation model"] : []),
+      ...(promptClarificationRestore.changedLabel !== null
+        ? [promptClarificationRestore.changedLabel]
+        : []),
     ],
     [
       isTextGenerationModelDirty,
+      promptClarificationRestore.changedLabel,
       isBackgroundActivityDirty,
       settings.autoOpenPlanSidebar,
       settings.confirmThreadArchive,
@@ -714,13 +737,20 @@ export function useSettingsRestore(onRestored?: () => void) {
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       textGenerationModelSelection: DEFAULT_UNIFIED_SETTINGS.textGenerationModelSelection,
+      ...promptClarificationRestore.patch,
       fontFamilySans: DEFAULT_UNIFIED_SETTINGS.fontFamilySans,
       fontFamilyComposer: DEFAULT_UNIFIED_SETTINGS.fontFamilyComposer,
       fontFamilyCode: DEFAULT_UNIFIED_SETTINGS.fontFamilyCode,
       fontFamilyTerminal: DEFAULT_UNIFIED_SETTINGS.fontFamilyTerminal,
     });
     onRestored?.();
-  }, [changedSettingLabels, onRestored, setTheme, updateSettings]);
+  }, [
+    changedSettingLabels,
+    onRestored,
+    setTheme,
+    promptClarificationRestore.patch,
+    updateSettings,
+  ]);
 
   return {
     changedSettingLabels,
@@ -2152,6 +2182,8 @@ export function GeneralSettingsPanel() {
             </div>
           }
         />
+
+        <PromptClarificationSettingsRow />
       </SettingsSection>
 
       <SettingsSection title="About">

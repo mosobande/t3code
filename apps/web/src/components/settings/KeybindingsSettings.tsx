@@ -35,10 +35,13 @@ import {
 
 import { isElectron } from "../../env";
 import { useOpenInPreferredEditor } from "../../editorPreferences";
+import { usePrimarySettings } from "../../hooks/useSettings";
 import { formatShortcutLabel } from "../../keybindings";
+import { promptClarificationSelectionUnavailableReason } from "../../sigidi/promptClarification/logic";
 import { cn } from "../../lib/utils";
 import {
   primaryServerAvailableEditorsAtom,
+  primaryServerConfigAtom,
   primaryServerKeybindingsAtom,
   primaryServerKeybindingsConfigPathAtom,
   serverEnvironment,
@@ -61,6 +64,7 @@ import {
   DEFAULT_WHEN_VARIABLE,
   isKnownWhenVariable,
   keybindingConflictLabels,
+  keybindingCommandDisabledReason,
   keybindingFromKeyboardEvent,
   parseWhenExpressionDraft,
   type KeybindingCommandOption,
@@ -937,6 +941,7 @@ function NewKeybindingTableRow({
   commandOptions,
   allRows,
   variables,
+  promptClarificationUnavailableReason,
   isSaving,
   onSave,
   onCancel,
@@ -944,6 +949,7 @@ function NewKeybindingTableRow({
   commandOptions: ReadonlyArray<KeybindingCommandOption>;
   allRows: ReadonlyArray<KeybindingRow>;
   variables: ReadonlyArray<WhenVariableOption>;
+  promptClarificationUnavailableReason: string | null;
   isSaving: boolean;
   onSave: (input: ServerUpsertKeybindingInput) => void;
   onCancel: () => void;
@@ -1003,11 +1009,33 @@ function NewKeybindingTableRow({
             matchTriggerWidth={false}
             className="max-h-72 w-fit min-w-56"
           >
-            {commandOptions.map((command) => (
-              <SelectItem key={command} value={command} className="min-h-7 w-full py-1 text-[12px]">
-                <span className="truncate">{commandLabel(command)}</span>
-              </SelectItem>
-            ))}
+            {commandOptions.map((command) => {
+              const disabledReason = keybindingCommandDisabledReason(
+                command,
+                promptClarificationUnavailableReason,
+              );
+              return (
+                <SelectItem
+                  key={command}
+                  value={command}
+                  disabled={disabledReason !== null}
+                  aria-label={
+                    disabledReason
+                      ? `${commandLabel(command)} unavailable: ${disabledReason}`
+                      : commandLabel(command)
+                  }
+                  title={disabledReason ?? undefined}
+                  className="min-h-7 w-full py-1 text-[12px]"
+                >
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{commandLabel(command)}</span>
+                    {disabledReason ? (
+                      <span className="text-muted-foreground text-[11px]">{disabledReason}</span>
+                    ) : null}
+                  </span>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -1084,6 +1112,23 @@ function NewKeybindingTableRow({
 
 export function KeybindingsSettingsPanel() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const primaryServerConfig = useAtomValue(primaryServerConfigAtom);
+  const supportsPromptClarification =
+    primaryServerConfig?.environment.capabilities.promptClarification === true;
+  const promptClarificationModelSelection = usePrimarySettings(
+    (settings) => settings.promptClarificationModelSelection,
+  );
+  const promptClarificationUnavailableReason = useMemo(() => {
+    if (!supportsPromptClarification) return "Prompt clarification requires a newer server";
+    return promptClarificationSelectionUnavailableReason({
+      selection: promptClarificationModelSelection,
+      providers: primaryServerConfig?.providers ?? [],
+    });
+  }, [
+    primaryServerConfig?.providers,
+    promptClarificationModelSelection,
+    supportsPromptClarification,
+  ]);
   const keybindingsConfigPath = useAtomValue(primaryServerKeybindingsConfigPathAtom);
   const availableEditors = useAtomValue(primaryServerAvailableEditorsAtom);
   const primaryEnvironment = usePrimaryEnvironment();
@@ -1151,6 +1196,18 @@ export function KeybindingsSettingsPanel() {
   const saveKeybinding = useCallback(
     (input: ServerUpsertKeybindingInput) => {
       if (!primaryEnvironment) return;
+      const disabledReason = keybindingCommandDisabledReason(
+        input.command,
+        promptClarificationUnavailableReason,
+      );
+      if (disabledReason) {
+        toastManager.add({
+          title: "Unable to save keybinding",
+          description: disabledReason,
+          type: "warning",
+        });
+        return;
+      }
       setSavingCommand(input.command);
       const payload: ServerUpsertKeybindingInput = {
         command: input.command,
@@ -1178,7 +1235,7 @@ export function KeybindingsSettingsPanel() {
         }
       })();
     },
-    [primaryEnvironment, upsertKeybinding],
+    [primaryEnvironment, promptClarificationUnavailableReason, upsertKeybinding],
   );
 
   const removeKeybinding = useCallback(
@@ -1308,6 +1365,7 @@ export function KeybindingsSettingsPanel() {
                 commandOptions={commandOptions}
                 allRows={rows}
                 variables={whenVariables}
+                promptClarificationUnavailableReason={promptClarificationUnavailableReason}
                 isSaving={savingCommand !== null}
                 onSave={saveKeybinding}
                 onCancel={() => setIsAddingBinding(false)}

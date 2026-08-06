@@ -68,6 +68,16 @@ export const activeEnvironmentIdAtom = Atom.make<EnvironmentId | null>(null).pip
   Atom.withLabel("web-active-environment-id"),
 );
 
+/** Last environment shown by a chat route; never used for connection/bootstrap state. */
+export const lastViewedChatEnvironmentIdAtom = Atom.make<EnvironmentId | null>(null).pipe(
+  Atom.keepAlive,
+  Atom.withLabel("web-last-viewed-chat-environment-id"),
+);
+
+export function setLastViewedChatEnvironmentId(environmentId: EnvironmentId | null): void {
+  appAtomRegistry.set(lastViewedChatEnvironmentIdAtom, environmentId);
+}
+
 export function useActiveEnvironmentId(): EnvironmentId | null {
   return useAtomValue(activeEnvironmentIdAtom);
 }

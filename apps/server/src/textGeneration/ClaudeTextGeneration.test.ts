@@ -342,4 +342,26 @@ it.layer(ClaudeTextGenerationTestLayer)("ClaudeTextGeneration", (it) => {
         }),
     ),
   );
+
+  it.effect("disables Claude tools only for prompt clarification", () =>
+    withFakeClaudeEnv(
+      {
+        output: JSON.stringify({ structured_output: { text: "Clarified prompt" } }),
+        argsMustContain: "--tools ",
+        argsMustNotContain: "--dangerously-skip-permissions",
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const generated = yield* textGeneration.generatePromptClarification({
+            cwd: process.cwd(),
+            prompt: "Rewrite this",
+            modelSelection: {
+              instanceId: ProviderInstanceId.make("claudeAgent"),
+              model: "claude-sonnet-4-6",
+            },
+          })!;
+          expect(generated.text).toBe("Clarified prompt");
+        }),
+    ),
+  );
 });

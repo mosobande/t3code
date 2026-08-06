@@ -130,7 +130,11 @@ it.layer(CursorTextGenerationTestLayer)("CursorTextGeneration", (it) => {
             .split("\n")
             .filter((line) => line.length > 0)
             .map(
-              (line) => JSON.parse(line) as { method?: string; params?: Record<string, unknown> },
+              (line) =>
+                JSON.parse(line) as {
+                  method?: string;
+                  params?: Record<string, unknown>;
+                },
             );
 
           expect(
@@ -235,6 +239,62 @@ it.layer(CursorTextGenerationTestLayer)("CursorTextGeneration", (it) => {
         }),
     ),
   );
+
+  it.effect("uses Cursor ask mode and a text-only prompt for clarification", () => {
+    const requestLogDir = NodeFS.mkdtempSync(
+      NodePath.join(NodeOS.tmpdir(), "t3code-cursor-clarify-log-"),
+    );
+    const requestLogPath = NodePath.join(requestLogDir, "requests.ndjson");
+
+    return withFakeAcpAgent(
+      {
+        T3_ACP_INITIAL_MODE: "code",
+        T3_ACP_REQUEST_LOG_PATH: requestLogPath,
+        T3_ACP_PROMPT_RESPONSE_TEXT: JSON.stringify({
+          text: "Clarify the constraints.",
+        }),
+      },
+      (textGeneration) =>
+        Effect.gen(function* () {
+          const cwd = NodePath.join(requestLogDir, "isolated-cwd");
+          NodeFS.mkdirSync(cwd);
+          const generated = yield* textGeneration.generatePromptClarification({
+            cwd,
+            prompt: "Rewrite this prompt.",
+            modelSelection: {
+              instanceId: ProviderInstanceId.make("cursor"),
+              model: "composer-2",
+            },
+          });
+          expect(generated).toEqual({ text: "Clarify the constraints." });
+
+          const requests = NodeFS.readFileSync(requestLogPath, "utf8")
+            .trim()
+            .split("\n")
+            .filter((line) => line.length > 0)
+            .map(
+              (line) =>
+                JSON.parse(line) as {
+                  method?: string;
+                  params?: Record<string, unknown>;
+                },
+            );
+          expect(
+            requests.some(
+              (request) =>
+                request.method === "session/set_config_option" &&
+                request.params?.configId === "mode" &&
+                request.params?.value === "ask",
+            ),
+          ).toBe(true);
+          expect(
+            requests.find((request) => request.method === "session/prompt")?.params?.prompt,
+          ).toEqual([{ type: "text", text: "Rewrite this prompt." }]);
+
+          NodeFS.rmSync(requestLogDir, { recursive: true, force: true });
+        }),
+    );
+  });
 
   it.effect("closes the ACP child process after text generation completes", () => {
     const exitLogDir = NodeFS.mkdtempSync(

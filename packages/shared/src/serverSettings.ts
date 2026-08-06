@@ -97,8 +97,11 @@ export function parsePersistedServerObservabilitySettings(
   return { otlpTracesUrl: undefined, otlpMetricsUrl: undefined };
 }
 
-function shouldReplaceTextGenerationModelSelection(
-  patch: ServerSettingsPatch["textGenerationModelSelection"] | undefined,
+function shouldReplaceModelSelection(
+  patch:
+    | ServerSettingsPatch["textGenerationModelSelection"]
+    | ServerSettingsPatch["promptClarificationModelSelection"]
+    | undefined,
 ): boolean {
   return Boolean(patch && (patch.instanceId !== undefined || patch.model !== undefined));
 }
@@ -126,6 +129,7 @@ export function applyServerSettingsPatch(
   patch: ServerSettingsPatch,
 ): ServerSettings {
   const selectionPatch = patch.textGenerationModelSelection;
+  const promptClarificationSelectionPatch = patch.promptClarificationModelSelection;
   const {
     automaticGitFetchInterval,
     providerHealthRefreshInterval,
@@ -206,21 +210,45 @@ export function applyServerSettingsPatch(
     providerHealthRefreshInterval: resolvedBackgroundActivity.providerHealthRefreshInterval,
     backgroundActivityProfile: resolvedBackgroundActivity.profile,
   };
-  if (!selectionPatch) {
+  if (!selectionPatch && !promptClarificationSelectionPatch) {
     return nextWithReplacements;
   }
 
-  const instanceId = selectionPatch.instanceId ?? current.textGenerationModelSelection.instanceId;
-  const model = selectionPatch.model ?? current.textGenerationModelSelection.model;
-  const options = shouldReplaceTextGenerationModelSelection(selectionPatch)
-    ? selectionPatch.options
-    : mergeModelSelectionOptionsById({
-        current: current.textGenerationModelSelection.options,
-        patch: selectionPatch.options,
-      });
+  const applySelectionPatch = (
+    selection: ServerSettings["textGenerationModelSelection"],
+    selectionPatch: NonNullable<
+      | ServerSettingsPatch["textGenerationModelSelection"]
+      | ServerSettingsPatch["promptClarificationModelSelection"]
+    >,
+  ) => {
+    const instanceId = selectionPatch.instanceId ?? selection.instanceId;
+    const model = selectionPatch.model ?? selection.model;
+    const options = shouldReplaceModelSelection(selectionPatch)
+      ? selectionPatch.options
+      : mergeModelSelectionOptionsById({
+          current: selection.options,
+          patch: selectionPatch.options,
+        });
+    return createModelSelection(instanceId, model, options);
+  };
 
   return {
     ...nextWithReplacements,
-    textGenerationModelSelection: createModelSelection(instanceId, model, options),
+    ...(selectionPatch
+      ? {
+          textGenerationModelSelection: applySelectionPatch(
+            current.textGenerationModelSelection,
+            selectionPatch,
+          ),
+        }
+      : {}),
+    ...(promptClarificationSelectionPatch
+      ? {
+          promptClarificationModelSelection: applySelectionPatch(
+            current.promptClarificationModelSelection,
+            promptClarificationSelectionPatch,
+          ),
+        }
+      : {}),
   };
 }

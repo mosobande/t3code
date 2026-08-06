@@ -54,7 +54,8 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       | "generateCommitMessage"
       | "generatePrContent"
       | "generateBranchName"
-      | "generateThreadTitle";
+      | "generateThreadTitle"
+      | "generatePromptClarification";
     cwd: string;
     prompt: string;
     outputSchemaJson: S;
@@ -84,7 +85,20 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
 
       const promptResult = yield* Effect.gen(function* () {
         yield* runtime.start();
-        yield* Effect.ignore(runtime.setMode("ask"));
+        if (operation === "generatePromptClarification") {
+          yield* runtime.setMode("ask").pipe(
+            Effect.mapError(
+              (cause) =>
+                new TextGenerationError({
+                  operation,
+                  detail: "Cursor ACP ask-mode setup failed.",
+                  cause,
+                }),
+            ),
+          );
+        } else {
+          yield* Effect.ignore(runtime.setMode("ask"));
+        }
         yield* applyCursorAcpModelSelection({
           runtime,
           model: modelSelection.model,
@@ -259,10 +273,25 @@ export const makeCursorTextGeneration = Effect.fn("makeCursorTextGeneration")(fu
       } satisfies TextGeneration.ThreadTitleGenerationResult;
     });
 
+  const generatePromptClarification: TextGeneration.TextGeneration["Service"]["generatePromptClarification"] =
+    Effect.fn("CursorTextGeneration.generatePromptClarification")(function* (input) {
+      const prompt = input.prompt;
+      const outputSchema = TextGeneration.PromptClarificationOutputSchema;
+      const generated = yield* runCursorJson({
+        operation: "generatePromptClarification",
+        cwd: input.cwd,
+        prompt,
+        outputSchemaJson: outputSchema,
+        modelSelection: input.modelSelection,
+      });
+      return { text: generated.text.trim() };
+    });
+
   return {
     generateCommitMessage,
     generatePrContent,
     generateBranchName,
     generateThreadTitle,
+    generatePromptClarification,
   } satisfies TextGeneration.TextGeneration["Service"];
 });
