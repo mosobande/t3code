@@ -3579,41 +3579,38 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const closeOtherRightPanelSurfaces = useCallback(
     (surface: RightPanelSurface) => {
-      if (!activeThreadRef) return;
       const surfaces = rightPanelState.surfaces.filter((entry) => entry.id !== surface.id);
       cleanupRightPanelSurfaces(surfaces);
-      useRightPanelStore.getState().closeOtherSurfaces(activeThreadRef, surface.id);
+      useRightPanelStore.getState().closeOtherSurfaces(rightPanelThreadRef, surface.id);
       syncActivePreviewSurface();
     },
     [
-      activeThreadRef,
       cleanupRightPanelSurfaces,
       rightPanelState.surfaces,
+      rightPanelThreadRef,
       syncActivePreviewSurface,
     ],
   );
   const closeRightPanelSurfacesToRight = useCallback(
     (surface: RightPanelSurface) => {
-      if (!activeThreadRef) return;
       const surfaceIndex = rightPanelState.surfaces.findIndex((entry) => entry.id === surface.id);
       if (surfaceIndex < 0) return;
       const surfaces = rightPanelState.surfaces.slice(surfaceIndex + 1);
       cleanupRightPanelSurfaces(surfaces);
-      useRightPanelStore.getState().closeSurfacesToRight(activeThreadRef, surface.id);
+      useRightPanelStore.getState().closeSurfacesToRight(rightPanelThreadRef, surface.id);
       syncActivePreviewSurface();
     },
     [
-      activeThreadRef,
       cleanupRightPanelSurfaces,
       rightPanelState.surfaces,
+      rightPanelThreadRef,
       syncActivePreviewSurface,
     ],
   );
   const closeAllRightPanelSurfaces = useCallback(() => {
-    if (!activeThreadRef) return;
     cleanupRightPanelSurfaces(rightPanelState.surfaces);
-    useRightPanelStore.getState().closeAllSurfaces(activeThreadRef);
-  }, [activeThreadRef, cleanupRightPanelSurfaces, rightPanelState.surfaces]);
+    useRightPanelStore.getState().closeAllSurfaces(rightPanelThreadRef);
+  }, [cleanupRightPanelSurfaces, rightPanelState.surfaces, rightPanelThreadRef]);
   const copyRightPanelFilePath = useCallback((relativePath: string) => {
     if (typeof window === "undefined" || !navigator.clipboard?.writeText) {
       toastManager.add(
