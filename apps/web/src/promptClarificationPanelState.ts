@@ -1,7 +1,4 @@
-import type {
-  PromptClarificationRewriteResult,
-  PromptClarificationSnapshot,
-} from "@t3tools/client-runtime/promptClarification";
+import type { PromptClarificationRewriteResult } from "@t3tools/client-runtime/promptClarification";
 
 /**
  * Ephemeral composer-owned state rendered by the singleton right-panel surface.
@@ -11,7 +8,6 @@ export interface PromptClarificationPanelState {
   readonly currentDraft: string;
   /** Monotonic draft revision catches an edit that returns to the same text. */
   readonly draftChanged: boolean;
-  readonly requestSnapshot: PromptClarificationSnapshot | null;
   readonly result: PromptClarificationRewriteResult | null;
   readonly isRunning: boolean;
   readonly disabledReason: string | null;
