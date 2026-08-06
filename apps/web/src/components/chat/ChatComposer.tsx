@@ -114,6 +114,7 @@ import { basenameOfPath } from "../../pierre-icons";
 import { cn, randomUUID } from "~/lib/utils";
 import { Separator } from "../ui/separator";
 import {
+  activatePromptClarification,
   promptClarificationDisabledReason,
   promptClarificationDraftChanged,
   promptClarificationDraftKey,
@@ -454,9 +455,14 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
                   : "text-muted-foreground/70 hover:text-foreground/80",
               )}
               type="button"
-              disabled={props.clarification.disabledReason !== null}
               onClick={props.clarification.onActivate}
-              aria-label={props.clarification.disabledReason ?? "Clarify draft"}
+              aria-label={
+                props.clarification.panelOpen
+                  ? "Close Clarify panel"
+                  : props.clarification.disabledReason
+                    ? `Open Clarify panel: ${props.clarification.disabledReason}`
+                    : "Clarify draft"
+              }
             />
           }
         >
@@ -467,7 +473,9 @@ const ComposerFooterModeControls = memo(function ComposerFooterModeControls(prop
           <span className="sr-only">Clarify</span>
         </TooltipTrigger>
         <TooltipPopup side="top">
-          {props.clarification.disabledReason ?? "Clarify draft"}
+          {props.clarification.panelOpen
+            ? "Close Clarify panel"
+            : (props.clarification.disabledReason ?? "Clarify draft")}
         </TooltipPopup>
       </Tooltip>
     </>
@@ -670,7 +678,6 @@ export interface ChatComposerProps {
   /** Omitted while entry-point wiring has not supplied the environment-bound command. */
   promptClarification?: ChatComposerPromptClarification;
   clarificationPanelOpen: boolean;
-  onOpenClarificationPanel: () => void;
   onToggleClarificationPanel: () => void;
   onClarificationPanelStateChange: (state: PromptClarificationPanelState | null) => void;
 
@@ -766,7 +773,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     gitCwd,
     promptClarification,
     clarificationPanelOpen,
-    onOpenClarificationPanel,
     onToggleClarificationPanel,
     onClarificationPanelStateChange,
     promptRef,
@@ -1501,7 +1507,10 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     if (clarificationDisabledReason !== null || !clarificationRewriteRef.current) return false;
     setClarificationReview(null);
     const started = clarificationController.start(clarificationSnapshotRef.current);
-    if (started) setClarificationRequestVersion((version) => version + 1);
+    if (started) {
+      clarificationIconActivatedRef.current = true;
+      setClarificationRequestVersion((version) => version + 1);
+    }
     return started;
   }, [clarificationController, clarificationDisabledReason]);
   const cancelClarification = useCallback(() => {
@@ -1535,20 +1544,16 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     ],
   );
   const activateClarification = useCallback(() => {
-    if (clarificationDisabledReason !== null) return false;
-    if (clarificationIconActivatedRef.current) {
-      onToggleClarificationPanel();
-      return true;
-    }
-    onOpenClarificationPanel();
-    const started = startClarification();
-    if (started) {
-      clarificationIconActivatedRef.current = true;
-    }
-    return started;
+    return activatePromptClarification({
+      disabledReason: clarificationDisabledReason,
+      hasActivated: clarificationIconActivatedRef.current,
+      panelOpen: clarificationPanelOpen,
+      togglePanel: onToggleClarificationPanel,
+      start: startClarification,
+    });
   }, [
     clarificationDisabledReason,
-    onOpenClarificationPanel,
+    clarificationPanelOpen,
     onToggleClarificationPanel,
     startClarification,
   ]);

@@ -88,8 +88,11 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
           </>
         ) : null}
         <MenuItem
-          disabled={props.clarifyDisabledReason !== null}
-          aria-label={props.clarifyDisabledReason ?? "Clarify draft"}
+          aria-label={
+            props.clarifyDisabledReason
+              ? `Toggle Clarify panel: ${props.clarifyDisabledReason}`
+              : "Clarify draft"
+          }
           title={props.clarifyDisabledReason ?? undefined}
           onClick={props.onToggleClarify}
         >

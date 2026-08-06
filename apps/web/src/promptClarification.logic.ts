@@ -87,3 +87,15 @@ export function promptClarificationDisabledReason(input: {
   if (input.phase === "plan-follow-up") return "Finish the plan follow-up before clarifying";
   return null;
 }
+
+export function activatePromptClarification(input: {
+  readonly disabledReason: string | null;
+  readonly hasActivated: boolean;
+  readonly panelOpen: boolean;
+  readonly togglePanel: () => void;
+  readonly start: () => boolean;
+}): boolean {
+  input.togglePanel();
+  if (input.panelOpen || input.hasActivated || input.disabledReason !== null) return true;
+  return input.start();
+}

@@ -1621,9 +1621,6 @@ function ChatViewContent(props: ChatViewProps) {
 
   const planSidebarOpen = activeRightPanelKind === "plan";
   const clarificationPanelOpen = activeRightPanelKind === "clarify";
-  const openClarificationPanel = useCallback(() => {
-    useRightPanelStore.getState().open(rightPanelThreadRef, "clarify");
-  }, [rightPanelThreadRef]);
   const toggleClarificationPanel = useCallback(() => {
     useRightPanelStore.getState().toggle(rightPanelThreadRef, "clarify");
   }, [rightPanelThreadRef]);
@@ -6392,7 +6389,6 @@ function ChatViewContent(props: ChatViewProps) {
                             gitCwd={gitCwd}
                             promptClarification={promptClarification}
                             clarificationPanelOpen={clarificationPanelOpen}
-                            onOpenClarificationPanel={openClarificationPanel}
                             onToggleClarificationPanel={toggleClarificationPanel}
                             onClarificationPanelStateChange={setClarificationPanelState}
                             promptRef={promptRef}

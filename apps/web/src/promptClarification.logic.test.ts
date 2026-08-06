@@ -12,6 +12,7 @@ import {
   type PromptClarificationRewriteResult,
 } from "@t3tools/client-runtime/promptClarification";
 import {
+  activatePromptClarification,
   promptClarificationDisabledReason,
   promptClarificationDraftChanged,
   promptClarificationDraftKey,
@@ -37,6 +38,60 @@ const provider = (overrides: Partial<ServerProvider> = {}): ServerProvider => ({
 });
 
 describe("prompt clarification availability", () => {
+  it("opens the panel when the rewrite action is unavailable", () => {
+    const events: string[] = [];
+
+    expect(
+      activatePromptClarification({
+        disabledReason: "Configured Clarify model is stale",
+        hasActivated: false,
+        panelOpen: false,
+        togglePanel: () => events.push("toggle"),
+        start: () => {
+          events.push("start");
+          return true;
+        },
+      }),
+    ).toBe(true);
+    expect(events).toEqual(["toggle"]);
+  });
+
+  it("toggles an open panel without starting a rewrite", () => {
+    const events: string[] = [];
+
+    expect(
+      activatePromptClarification({
+        disabledReason: "Wait for the running turn before clarifying",
+        hasActivated: false,
+        panelOpen: true,
+        togglePanel: () => events.push("toggle"),
+        start: () => {
+          events.push("start");
+          return true;
+        },
+      }),
+    ).toBe(true);
+    expect(events).toEqual(["toggle"]);
+  });
+
+  it("opens the panel and starts the first eligible rewrite", () => {
+    const events: string[] = [];
+
+    expect(
+      activatePromptClarification({
+        disabledReason: null,
+        hasActivated: false,
+        panelOpen: false,
+        togglePanel: () => events.push("toggle"),
+        start: () => {
+          events.push("start");
+          return true;
+        },
+      }),
+    ).toBe(true);
+    expect(events).toEqual(["toggle", "start"]);
+  });
+
   it("marks an A to B to A edit as changed by revision", () => {
     expect(
       promptClarificationDraftChanged(
