@@ -542,7 +542,7 @@ export interface ChatComposerHandle {
   openModelPicker: () => void;
   toggleModelPicker: () => void;
   isModelPickerOpen: () => boolean;
-  /** Start the composer-owned clarification request when the idle draft permits it. */
+  /** Activate the composer-owned clarification panel and first eligible rewrite. */
   clarify: () => boolean;
   /** Explain why clarify cannot start for this exact composer snapshot. */
   clarifyDisabledReason: () => string | null;
@@ -1535,26 +1535,31 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     ],
   );
   const activateClarification = useCallback(() => {
-    if (clarificationDisabledReason !== null) return;
+    if (clarificationDisabledReason !== null) return false;
     if (clarificationIconActivatedRef.current) {
       onToggleClarificationPanel();
-      return;
+      return true;
     }
     onOpenClarificationPanel();
-    if (startClarification()) {
+    const started = startClarification();
+    if (started) {
       clarificationIconActivatedRef.current = true;
     }
+    return started;
   }, [
     clarificationDisabledReason,
     onOpenClarificationPanel,
     onToggleClarificationPanel,
     startClarification,
   ]);
-  const clarificationControl: ComposerClarificationControl = {
-    disabledReason: clarificationDisabledReason,
-    panelOpen: clarificationPanelOpen,
-    onActivate: activateClarification,
-  };
+  const clarificationControl = useMemo<ComposerClarificationControl>(
+    () => ({
+      disabledReason: clarificationDisabledReason,
+      panelOpen: clarificationPanelOpen,
+      onActivate: activateClarification,
+    }),
+    [activateClarification, clarificationDisabledReason, clarificationPanelOpen],
+  );
 
   const clarificationPanelState = useMemo<PromptClarificationPanelState>(
     () => ({
@@ -2923,7 +2928,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         setIsComposerModelPickerOpen((open) => !open);
       },
       isModelPickerOpen: () => isComposerModelPickerOpen,
-      clarify: startClarification,
+      clarify: activateClarification,
       clarifyDisabledReason: () => clarificationDisabledReason,
       readSnapshot: () => {
         return readComposerSnapshot();
@@ -3012,7 +3017,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       composerReviewComments,
       insertComposerTextAtEnd,
       isComposerModelPickerOpen,
-      startClarification,
+      activateClarification,
       clarificationDisabledReason,
       noteClarificationPromptMutation,
       readComposerSnapshot,

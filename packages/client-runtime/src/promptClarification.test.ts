@@ -33,30 +33,27 @@ describe("prompt clarification controller", () => {
 
   it("offers the result for explicit review without changing the draft", async () => {
     const result = deferred<PromptClarificationRewriteResult>();
-    let current = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
-    const applied: string[] = [];
-    const offered: PromptClarificationRewriteResult[] = [];
+    const current = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
+    const offered: Array<{
+      result: PromptClarificationRewriteResult;
+      snapshot: typeof current;
+    }> = [];
     const controller = createPromptClarificationController({
       rewrite: () => result.promise,
-      readCurrent: () => current,
-      applyText: (text) => applied.push(text),
-      offerReview: (value) => offered.push(value),
+      offerReview: (value, snapshot) => offered.push({ result: value, snapshot }),
     });
 
     expect(controller.start(current)).toBe(true);
     result.resolve(clarified());
     await Promise.resolve();
 
-    expect(applied).toEqual([]);
-    expect(offered).toEqual([clarified()]);
+    expect(offered).toEqual([{ result: clarified(), snapshot: current }]);
   });
 
   it("rejects duplicate work for one environment and draft but permits another draft", () => {
     const pending = deferred<PromptClarificationRewriteResult>();
     const controller = createPromptClarificationController({
       rewrite: () => pending.promise,
-      readCurrent: () => ({ environmentId: "env", draftKey: "draft", text: "rough", revision: 1 }),
-      applyText: () => {},
     });
 
     expect(
@@ -80,33 +77,37 @@ describe("prompt clarification controller", () => {
     expect(controller.start(snapshot)).toBe(true);
   });
 
-  it("leaves an edited then restored draft stale because its revision changed", async () => {
+  it("returns the captured snapshot so the caller can detect A to B to A edits", async () => {
     const result = deferred<PromptClarificationRewriteResult>();
     let current = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
-    const stale: PromptClarificationRewriteResult[] = [];
+    const offeredSnapshots: (typeof current)[] = [];
     const controller = createPromptClarificationController({
       rewrite: () => result.promise,
-      readCurrent: () => current,
-      applyText: () => {},
-      offerReview: (value) => stale.push(value),
+      offerReview: (_value, snapshot) => offeredSnapshots.push(snapshot),
     });
 
-    controller.start(current);
+    const requested = current;
+    controller.start(requested);
     current = { ...current, text: "edited", revision: 2 };
     current = { ...current, text: "rough", revision: 3 };
     result.resolve(clarified());
     await Promise.resolve();
 
-    expect(stale).toEqual([clarified()]);
+    expect(current).toEqual({
+      environmentId: "env",
+      draftKey: "draft",
+      text: "rough",
+      revision: 3,
+    });
+    expect(offeredSnapshots).toEqual([requested]);
   });
 
   it("abandons a late result after local cancellation", async () => {
     const result = deferred<PromptClarificationRewriteResult>();
-    const applied: string[] = [];
+    const offered: PromptClarificationRewriteResult[] = [];
     const controller = createPromptClarificationController({
       rewrite: () => result.promise,
-      readCurrent: () => ({ environmentId: "env", draftKey: "draft", text: "rough", revision: 1 }),
-      applyText: (text) => applied.push(text),
+      offerReview: (value) => offered.push(value),
     });
     const snapshot = { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 };
 
@@ -115,7 +116,7 @@ describe("prompt clarification controller", () => {
     result.resolve(clarified());
     await Promise.resolve();
 
-    expect(applied).toEqual([]);
+    expect(offered).toEqual([]);
     expect(controller.isActive(snapshot)).toBe(false);
   });
 
@@ -125,12 +126,11 @@ describe("prompt clarification controller", () => {
       deferred<PromptClarificationRewriteResult>(),
       deferred<PromptClarificationRewriteResult>(),
     ];
-    const applied: string[] = [];
+    const offered: PromptClarificationRewriteResult[] = [];
     let index = 0;
     const controller = createPromptClarificationController({
       rewrite: () => results[index++]!.promise,
-      readCurrent: () => ({ environmentId: "env", draftKey: "draft", text: "rough", revision: 1 }),
-      applyText: (text) => applied.push(text),
+      offerReview: (value) => offered.push(value),
     });
     const snapshots = [
       { environmentId: "env", draftKey: "draft", text: "rough", revision: 1 },
@@ -145,7 +145,7 @@ describe("prompt clarification controller", () => {
     }
     await Promise.resolve();
 
-    expect(applied).toEqual([]);
+    expect(offered).toEqual([]);
     expect(snapshots.every((snapshot) => !controller.isActive(snapshot))).toBe(true);
   });
 });

@@ -90,10 +90,18 @@ export const CompactComposerControlsMenu = memo(function CompactComposerControls
         <MenuItem
           disabled={props.clarifyDisabledReason !== null}
           aria-label={props.clarifyDisabledReason ?? "Clarify draft"}
+          title={props.clarifyDisabledReason ?? undefined}
           onClick={props.onToggleClarify}
         >
           <WandSparklesIcon className="size-4 shrink-0" />
-          Clarify
+          <span className="flex min-w-0 flex-col">
+            <span>Clarify</span>
+            {props.clarifyDisabledReason ? (
+              <span className="max-w-64 whitespace-normal text-muted-foreground text-xs">
+                {props.clarifyDisabledReason}
+              </span>
+            ) : null}
+          </span>
         </MenuItem>
       </MenuPopup>
     </Menu>
