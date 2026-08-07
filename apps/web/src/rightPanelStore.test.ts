@@ -186,6 +186,18 @@ describe("rightPanelStore", () => {
     });
   });
 
+  it("keeps Notes state local to each thread", () => {
+    useRightPanelStore.getState().open(refA, "notes");
+    useRightPanelStore.getState().open(refB, "plan");
+
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("notes");
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refB)).toBe("plan");
+
+    useRightPanelStore.getState().open(refB, "notes");
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("notes");
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refB)).toBe("notes");
+  });
+
   it("replaces the standalone explorer with peer file surfaces", () => {
     useRightPanelStore.getState().open(refA, "files");
     useRightPanelStore.getState().openFile(refA, "src/index.ts");

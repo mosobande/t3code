@@ -7,46 +7,9 @@ import {
   projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
   projectNotesTargetMatchesActiveProject,
-  resolveProjectNotesNavigation,
 } from "./projectNotesWindowState";
 
 describe("project notes window state", () => {
-  it("carries a pinned note to another thread in the same project", () => {
-    expect(
-      resolveProjectNotesNavigation({
-        ownerProjectKey: "local:project-a",
-        activeProjectKey: "local:project-a",
-        ownerThreadKey: "local:thread-a",
-        activeThreadKey: "local:thread-b",
-        keepOpenAcrossThreads: true,
-      }),
-    ).toEqual({ action: "carry", resetKeepOpen: false });
-  });
-
-  it("leaves an unpinned note in its original thread", () => {
-    expect(
-      resolveProjectNotesNavigation({
-        ownerProjectKey: "local:project-a",
-        activeProjectKey: "local:project-a",
-        ownerThreadKey: "local:thread-a",
-        activeThreadKey: "local:thread-b",
-        keepOpenAcrossThreads: false,
-      }),
-    ).toEqual({ action: "leave", resetKeepOpen: false });
-  });
-
-  it("closes a pinned note and resets the pin at a project boundary", () => {
-    expect(
-      resolveProjectNotesNavigation({
-        ownerProjectKey: "local:project-a",
-        activeProjectKey: "local:project-b",
-        ownerThreadKey: "local:thread-a",
-        activeThreadKey: "local:thread-c",
-        keepOpenAcrossThreads: true,
-      }),
-    ).toEqual({ action: "close", resetKeepOpen: true });
-  });
-
   it("hides a floating note synchronously at a project boundary", () => {
     expect(
       projectNotesTargetMatchesActiveProject({

@@ -47,37 +47,11 @@ export function projectNotePendingDraftStorageKey(
   return `t3.project-notes.pending-draft.v1:${environmentId}:${projectId}`;
 }
 
-export type ProjectNotesNavigationAction = "stay" | "carry" | "leave" | "close";
-
 export function projectNotesTargetMatchesActiveProject(input: {
   targetProjectKey: string | null;
   activeProjectKey: string | null;
 }): boolean {
   return input.targetProjectKey !== null && input.targetProjectKey === input.activeProjectKey;
-}
-
-export function resolveProjectNotesNavigation(input: {
-  ownerProjectKey: string | null;
-  activeProjectKey: string | null;
-  ownerThreadKey: string | null;
-  activeThreadKey: string | null;
-  keepOpenAcrossThreads: boolean;
-}): {
-  action: ProjectNotesNavigationAction;
-  resetKeepOpen: boolean;
-} {
-  if (input.ownerProjectKey === null || input.ownerThreadKey === null) {
-    return { action: "stay", resetKeepOpen: false };
-  }
-  if (input.activeProjectKey !== input.ownerProjectKey) {
-    return { action: "close", resetKeepOpen: true };
-  }
-  if (input.activeThreadKey === input.ownerThreadKey) {
-    return { action: "stay", resetKeepOpen: false };
-  }
-  return input.keepOpenAcrossThreads
-    ? { action: "carry", resetKeepOpen: false }
-    : { action: "leave", resetKeepOpen: false };
 }
 
 export function clampProjectNotesWindowRect(
