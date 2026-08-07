@@ -3330,6 +3330,10 @@ function ChatViewContent(props: ChatViewProps) {
     }
     addProjectNotesSurface();
   }, [activeRightPanelKind, addProjectNotesSurface, closeProjectNotes, projectNotesMode]);
+  const openProjectNotes = () => {
+    if (projectNotesMode === "floating") return;
+    addProjectNotesSurface();
+  };
   useEffect(() => subscribeProjectNotesAction(() => toggleProjectNotes()), [toggleProjectNotes]);
   const addAgentsSurface = useCallback(() => {
     if (!activeThreadRef) return;
@@ -6156,7 +6160,7 @@ function ChatViewContent(props: ChatViewProps) {
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
             projectNotesOpen={projectNotesMode === "floating" || activeRightPanelKind === "notes"}
-            onToggleProjectNotes={toggleProjectNotes}
+            onOpenProjectNotes={openProjectNotes}
           />
         </header>
 

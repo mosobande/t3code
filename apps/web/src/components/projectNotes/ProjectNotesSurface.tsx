@@ -9,7 +9,7 @@ import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { Maximize2Icon, Minimize2Icon, PinIcon, PinOffIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { projectEnvironment } from "~/state/projects";
 import { useAtomCommand } from "~/state/use-atom-command";
@@ -274,13 +274,6 @@ export function ProjectNotesSurface({
   const mounted = useRef(true);
 
   useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
     if (!loaded) return;
     projectNoteDraftCoordinator.writeServer(key, loaded);
     if (saveSession.current !== null) {
@@ -409,6 +402,16 @@ export function ProjectNotesSurface({
     savePromise.current = pending;
     return pending;
   }, [draftOwner, environmentId, key, pendingDraftKey, projectId, updateNote]);
+
+  const flushPendingAutosave = useEffectEvent(() => persistLatest());
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      void flushPendingAutosave();
+    };
+  }, []);
 
   const changeMode = useCallback(
     async (nextMode: ProjectNotesDisplayMode) => {

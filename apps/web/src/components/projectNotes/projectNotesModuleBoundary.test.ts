@@ -20,6 +20,12 @@ describe("project notes module boundary", () => {
     expect(chatHeaderSource).not.toContain('from "../projectNotes/ProjectNotesSurface"');
   });
 
+  it("opens or activates project notes from the header without toggling them closed", () => {
+    expect(chatHeaderSource).toContain("onOpenProjectNotes");
+    expect(chatHeaderSource).not.toContain("onToggleProjectNotes");
+    expect(chatViewSource).toContain("onOpenProjectNotes={openProjectNotes}");
+  });
+
   it("registers the Lexical checklist behavior used by the formatting action", () => {
     expect(projectNoteEditorSource).toContain("<CheckListPlugin />");
   });
@@ -27,6 +33,12 @@ describe("project notes module boundary", () => {
   it("lets the viewport clamp own floating-window minimum dimensions", () => {
     expect(projectNotesSurfaceSource).not.toContain("min-h-70");
     expect(projectNotesSurfaceSource).not.toContain("min-w-80");
+  });
+
+  it("flushes a pending autosave when the notes surface unmounts", () => {
+    expect(projectNotesSurfaceSource).toMatch(
+      /return \(\) => \{\s*mounted\.current = false;\s*void flushPendingAutosave\(\);\s*\};/,
+    );
   });
 
   it("routes command-palette and keybinding entry points through the notes lifecycle", () => {

@@ -46,7 +46,7 @@ interface ChatHeaderProps {
   ) => Promise<ProjectScriptActionResult>;
   onDeleteProjectScript: (scriptId: string) => Promise<ProjectScriptActionResult>;
   projectNotesOpen: boolean;
-  onToggleProjectNotes: () => void;
+  onOpenProjectNotes: () => void;
 }
 
 export function shouldShowOpenInPicker(input: {
@@ -81,7 +81,7 @@ export const ChatHeader = memo(function ChatHeader({
   onUpdateProjectScript,
   onDeleteProjectScript,
   projectNotesOpen,
-  onToggleProjectNotes,
+  onOpenProjectNotes,
 }: ChatHeaderProps) {
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const fileScripts = useT3ProjectFileScripts(
@@ -155,18 +155,16 @@ export const ChatHeader = memo(function ChatHeader({
                   type="button"
                   variant={projectNotesOpen ? "secondary" : "ghost"}
                   size="icon-sm"
-                  aria-label={projectNotesOpen ? "Close project notes" : "Open project notes"}
+                  aria-label="Open project notes"
                   aria-expanded={projectNotesOpen}
                   aria-controls={projectNotesOpen ? PROJECT_NOTES_SURFACE_ID : undefined}
-                  onClick={onToggleProjectNotes}
+                  onClick={onOpenProjectNotes}
                 >
                   <NotebookPenIcon />
                 </Button>
               }
             />
-            <TooltipPopup>
-              {projectNotesOpen ? "Close project notes" : "Project notes"}
-            </TooltipPopup>
+            <TooltipPopup>Project notes</TooltipPopup>
           </Tooltip>
         ) : null}
         {activeProjectScripts && (
