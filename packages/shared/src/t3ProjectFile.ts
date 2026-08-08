@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { T3ProjectFile, T3_PROJECT_FILE_SCHEMA_URL } from "@t3tools/contracts";
+import { T3ProjectFile } from "@t3tools/contracts";
 
 import { fromLenientJson } from "./schemaJson.ts";
 
@@ -13,14 +13,16 @@ export const T3ProjectFileFromJson = fromLenientJson(T3ProjectFile);
 /**
  * Build the publishable JSON Schema document for `t3.json` (draft 2020-12).
  *
- * Served from the marketing site at {@link T3_PROJECT_FILE_SCHEMA_URL} so
- * editors get LSP support via a `$schema` reference.
+ * The public `$id` is optional because publishing it requires a separately
+ * authorized SIGIDI domain. Existing files can keep the legacy T3 URL.
  */
-export function buildT3ProjectFileJsonSchema(): Record<string, unknown> {
+export function buildT3ProjectFileJsonSchema(
+  options: { readonly id?: string } = {},
+): Record<string, unknown> {
   const document = Schema.toJsonSchemaDocument(T3ProjectFile);
   const jsonSchema: Record<string, unknown> = {
     $schema: "https://json-schema.org/draft/2020-12/schema",
-    $id: T3_PROJECT_FILE_SCHEMA_URL,
+    ...(options.id ? { $id: options.id } : {}),
     ...document.schema,
   };
   if (document.definitions && Object.keys(document.definitions).length > 0) {

@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as NetService from "@t3tools/shared/Net";
 import * as Crypto from "effect/Crypto";
@@ -31,7 +32,9 @@ import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 
 const DEFAULT_DESKTOP_BACKEND_PORT = 3773;
 const MAX_TCP_PORT = 65_535;
-const DESKTOP_BACKEND_PORT_PROBE_HOSTS = ["127.0.0.1", "0.0.0.0", "::"] as const;
+const DESKTOP_BACKEND_PORT_PROBE_HOSTS = productProfile.capabilities.networkExposure
+  ? (["127.0.0.1", "0.0.0.0", "::"] as const)
+  : (["127.0.0.1"] as const);
 
 const makeDesktopRunId = Crypto.Crypto.pipe(
   Effect.flatMap((crypto) => crypto.randomUUIDv4),
@@ -167,7 +170,10 @@ const bootstrap = Effect.gen(function* () {
   );
 
   const settings = yield* desktopSettings.get;
-  if (settings.serverExposureMode !== environment.defaultDesktopSettings.serverExposureMode) {
+  if (
+    productProfile.capabilities.networkExposure &&
+    settings.serverExposureMode !== environment.defaultDesktopSettings.serverExposureMode
+  ) {
     yield* logBootstrapInfo("bootstrap restoring persisted server exposure mode", {
       mode: settings.serverExposureMode,
     });
@@ -182,39 +188,41 @@ const bootstrap = Effect.gen(function* () {
     scheme: environment.protocolScheme,
     targetOrigin: rendererTarget,
     backendOrigin: backendConfig.httpBaseUrl,
-    clerkFrontendApiHostname: DesktopClerk.desktopClerkFrontendApiHostname,
+    clerkFrontendApiHostname: productProfile.capabilities.hostedAuthentication
+      ? DesktopClerk.desktopClerkFrontendApiHostname
+      : undefined,
   });
   yield* logBootstrapInfo("bootstrap resolved backend endpoint", {
     baseUrl: backendConfig.httpBaseUrl.href,
   });
-  if (serverExposureState.endpointUrl) {
+  if (productProfile.capabilities.networkExposure && serverExposureState.endpointUrl) {
     yield* logBootstrapInfo("bootstrap enabled network access", {
       endpointUrl: serverExposureState.endpointUrl,
     });
-  } else if (settings.serverExposureMode === "network-accessible") {
+  } else if (
+    productProfile.capabilities.networkExposure &&
+    settings.serverExposureMode === "network-accessible"
+  ) {
     yield* logBootstrapWarning(
       "bootstrap fell back to local-only because no advertised network host was available",
     );
   }
-
   yield* installDesktopIpcHandlers();
   yield* logBootstrapInfo("bootstrap ipc handlers registered");
 
   if (!(yield* Ref.get(state.quitting))) {
-    // In wsl-only mode the renderer is served by the WSL backend, which can be
-    // slow to cold-boot — show a "Connecting to WSL" splash immediately so the
-    // app feels responsive instead of presenting no window until WSL is ready.
-    // (Dual mode opens fast off the Windows primary, so no splash there.)
-    if (settings.wslOnly === true && settings.wslBackendEnabled === true) {
+    if (
+      productProfile.capabilities.wsl &&
+      settings.wslOnly === true &&
+      settings.wslBackendEnabled === true
+    ) {
       yield* desktopWindow.showConnectingSplash;
     }
     yield* primaryBackend.start;
     yield* logBootstrapInfo("bootstrap backend start requested");
-    // Bring up the WSL backend if the user previously enabled it. The
-    // primary is already starting; reconcile fires off the WSL register
-    // in parallel rather than blocking primary readiness on a possibly
-    // slow first wsl.exe spawn.
-    yield* Effect.forkScoped(wslBackend.reconcile);
+    if (productProfile.capabilities.wsl) {
+      yield* Effect.forkScoped(wslBackend.reconcile);
+    }
   }
 }).pipe(Effect.withSpan("desktop.bootstrap"));
 

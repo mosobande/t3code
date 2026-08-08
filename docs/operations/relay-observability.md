@@ -1,4 +1,6 @@
-# Relay observability
+# Relay observability (source-only upstream reference)
+
+> The relay is not part of the `local-desktop` product and this runbook grants no deployment or credential authority. It is retained only for inherited `upstream-full` maintenance.
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 

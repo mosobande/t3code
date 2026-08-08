@@ -5,6 +5,7 @@ import type {
   DesktopRuntimeInfo,
 } from "@t3tools/contracts";
 import { resolveDesktopIdentity } from "@t3tools/shared/desktopIdentity";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -25,6 +26,8 @@ export interface MakeDesktopEnvironmentInput {
   readonly appVersion: string;
   readonly appPath: string;
   readonly isPackaged: boolean;
+  /** Test/development injection only. The packaged product root never supplies this value. */
+  readonly packagedBaseDirOverride?: string;
   readonly resourcesPath: string;
   readonly runningUnderArm64Translation: boolean;
 }
@@ -152,10 +155,14 @@ const make = Effect.fn("desktop.environment.make")(function* (
       : input.platform === "darwin"
         ? path.join(homeDirectory, "Library", "Application Support")
         : Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config"));
+  const configuredBaseDir =
+    input.isPackaged && productProfile.publishableAsSigidi
+      ? Option.fromUndefinedOr(input.packagedBaseDirOverride)
+      : config.t3Home;
   const baseDir = resolveDesktopBaseDir({
     homeDirectory,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home: configuredBaseDir,
   });
   const rootDir = path.resolve(input.dirname, "../../..");
   const appRoot = input.isPackaged ? input.appPath : rootDir;
@@ -175,7 +182,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     baseDir,
     isDevelopment,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home: configuredBaseDir,
   });
   const userDataDirName = identity.electronUserDataDirName;
   const legacyUserDataDirName = userDataDirName;

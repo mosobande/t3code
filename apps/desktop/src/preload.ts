@@ -5,11 +5,38 @@ import type {
   DesktopPreviewTabState,
 } from "@t3tools/contracts";
 import { exposeClerkBridge } from "@clerk/electron/preload";
+import { productProfile } from "@t3tools/shared/productProfile";
 import { contextBridge, ipcRenderer } from "electron";
 
 import * as IpcChannels from "./ipc/channels.ts";
 
-exposeClerkBridge({ passkeys: true });
+type LocalDesktopBridge = Pick<
+  DesktopBridge,
+  | "getAppBranding"
+  | "getLocalEnvironmentBootstraps"
+  | "getLocalEnvironmentBearerToken"
+  | "getClientSettings"
+  | "setClientSettings"
+  | "pickFolder"
+  | "confirm"
+  | "setTheme"
+  | "showContextMenu"
+  | "openExternal"
+  | "onMenuAction"
+  | "getWindowFullscreenState"
+  | "onWindowFullscreenStateChange"
+  | "getUpdateState"
+  | "setUpdateChannel"
+  | "checkForUpdate"
+  | "downloadUpdate"
+  | "installUpdate"
+  | "onUpdateState"
+  | "preview"
+>;
+
+if (productProfile.capabilities.hostedAuthentication) {
+  exposeClerkBridge({ passkeys: true });
+}
 
 function unwrapEnsureSshEnvironmentResult(result: unknown) {
   if (
@@ -27,26 +54,7 @@ function unwrapEnsureSshEnvironmentResult(result: unknown) {
   return result as Awaited<ReturnType<DesktopBridge["ensureSshEnvironment"]>>;
 }
 
-contextBridge.exposeInMainWorld("desktopBridge", {
-  getAppBranding: () => {
-    const result = ipcRenderer.sendSync(IpcChannels.GET_APP_BRANDING_CHANNEL);
-    if (typeof result !== "object" || result === null) {
-      return null;
-    }
-    return result as ReturnType<DesktopBridge["getAppBranding"]>;
-  },
-  getLocalEnvironmentBootstraps: () => {
-    const result = ipcRenderer.sendSync(IpcChannels.GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL);
-    if (!Array.isArray(result)) {
-      return [];
-    }
-    return result as ReturnType<DesktopBridge["getLocalEnvironmentBootstraps"]>;
-  },
-  getLocalEnvironmentBearerToken: () =>
-    ipcRenderer.invoke(IpcChannels.GET_LOCAL_ENVIRONMENT_BEARER_TOKEN_CHANNEL),
-  getClientSettings: () => ipcRenderer.invoke(IpcChannels.GET_CLIENT_SETTINGS_CHANNEL),
-  setClientSettings: (settings) =>
-    ipcRenderer.invoke(IpcChannels.SET_CLIENT_SETTINGS_CHANNEL, settings),
+const remoteDesktopBridge = {
   getConnectionCatalog: () => ipcRenderer.invoke(IpcChannels.GET_CONNECTION_CATALOG_CHANNEL),
   setConnectionCatalog: (catalog) =>
     ipcRenderer.invoke(IpcChannels.SET_CONNECTION_CATALOG_CHANNEL, catalog),
@@ -77,11 +85,9 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       if (typeof request !== "object" || request === null) return;
       listener(request as Parameters<typeof listener>[0]);
     };
-
     ipcRenderer.on(IpcChannels.SSH_PASSWORD_PROMPT_CHANNEL, wrappedListener);
-    return () => {
+    return () =>
       ipcRenderer.removeListener(IpcChannels.SSH_PASSWORD_PROMPT_CHANNEL, wrappedListener);
-    };
   },
   resolveSshPasswordPrompt: (requestId, password) =>
     ipcRenderer.invoke(IpcChannels.RESOLVE_SSH_PASSWORD_PROMPT_CHANNEL, { requestId, password }),
@@ -96,6 +102,29 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.invoke(IpcChannels.SET_WSL_BACKEND_ENABLED_CHANNEL, enabled),
   setWslDistro: (distro) => ipcRenderer.invoke(IpcChannels.SET_WSL_DISTRO_CHANNEL, distro),
   setWslOnly: (enabled) => ipcRenderer.invoke(IpcChannels.SET_WSL_ONLY_CHANNEL, enabled),
+} satisfies Partial<DesktopBridge>;
+
+contextBridge.exposeInMainWorld("desktopBridge", {
+  ...(productProfile.capabilities.inheritedRemoteIntegrations ? remoteDesktopBridge : {}),
+  getAppBranding: () => {
+    const result = ipcRenderer.sendSync(IpcChannels.GET_APP_BRANDING_CHANNEL);
+    if (typeof result !== "object" || result === null) {
+      return null;
+    }
+    return result as ReturnType<DesktopBridge["getAppBranding"]>;
+  },
+  getLocalEnvironmentBootstraps: () => {
+    const result = ipcRenderer.sendSync(IpcChannels.GET_LOCAL_ENVIRONMENT_BOOTSTRAPS_CHANNEL);
+    if (!Array.isArray(result)) {
+      return [];
+    }
+    return result as ReturnType<DesktopBridge["getLocalEnvironmentBootstraps"]>;
+  },
+  getLocalEnvironmentBearerToken: () =>
+    ipcRenderer.invoke(IpcChannels.GET_LOCAL_ENVIRONMENT_BEARER_TOKEN_CHANNEL),
+  getClientSettings: () => ipcRenderer.invoke(IpcChannels.GET_CLIENT_SETTINGS_CHANNEL),
+  setClientSettings: (settings) =>
+    ipcRenderer.invoke(IpcChannels.SET_CLIENT_SETTINGS_CHANNEL, settings),
   pickFolder: (options) => ipcRenderer.invoke(IpcChannels.PICK_FOLDER_CHANNEL, options),
   confirm: (message) => ipcRenderer.invoke(IpcChannels.CONFIRM_CHANNEL, message),
   setTheme: (theme) => ipcRenderer.invoke(IpcChannels.SET_THEME_CHANNEL, theme),
@@ -247,4 +276,4 @@ contextBridge.exposeInMainWorld("desktopBridge", {
         ipcRenderer.removeListener(IpcChannels.PREVIEW_POINTER_EVENT_CHANNEL, wrappedListener);
     },
   },
-} satisfies DesktopBridge);
+} satisfies LocalDesktopBridge);

@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off - tests use POSIX path joining to match the Linux startup boundary.
 import * as NodePath from "node:path";
 import { assert, describe, it } from "@effect/vitest";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import {
   resolveEarlyLinuxElectronOptions,
@@ -101,6 +102,26 @@ describe("DesktopEarlyElectronStartup", () => {
     });
 
     assert.equal(preference, "kwallet");
+  });
+
+  it("applies the packaged settings-home policy for the selected profile", () => {
+    const preference = resolveEarlyLinuxPasswordStorePreference({
+      env: { T3CODE_HOME: "/tmp/ambient-legacy-home" },
+      homeDirectory: "/home/user",
+      isPackaged: true,
+      joinPath,
+      readFileString: (path) => {
+        assert.equal(
+          path,
+          productProfile.publishableAsSigidi
+            ? "/home/user/.sigidi/userdata/desktop-settings.json"
+            : "/tmp/ambient-legacy-home/userdata/desktop-settings.json",
+        );
+        return JSON.stringify({ linuxPasswordStore: "kwallet6" });
+      },
+    });
+
+    assert.equal(preference, "kwallet6");
   });
 
   it("treats whitespace-only T3CODE_HOME as unconfigured in development", () => {

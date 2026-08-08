@@ -1,4 +1,6 @@
-# Mobile app-store screenshot harness
+# Mobile app-store screenshot harness (source-only upstream reference)
+
+> SIGIDI does not ship a mobile product. This runbook is retained for inherited source maintenance and is not part of the `local-desktop` build or release.
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 

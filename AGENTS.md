@@ -6,6 +6,14 @@ SIGIDI is a separate downstream product built from its open-source upstream proj
 
 ## Product constraints
 
+### Build profiles
+
+`local-desktop` is the default SIGIDI product build. It is fixed at compile time and must use the existing desktop, server, renderer, registry, resolver, configuration, and packaging owners. A user setting, CLI argument, persisted record, or runtime environment variable cannot enable a capability that this build excludes.
+
+`upstream-full` is an explicit maintainer-only build. It keeps inherited remote, relay, mobile, hosted-authentication, WSL, and deployment code testable for low-conflict T3 Code syncs. It is not a SIGIDI release and does not authorize an external write.
+
+Do not add a parallel local implementation when an existing owner can apply the profile. If the existing seam cannot express the required boundary, stop and use Atona to record the gap before adding a new owner.
+
 ### 1. Performance without compromise
 
 Audit every change for performance regressions. Common causes include excessive WebSocket traffic, GPU-heavy CSS animation, and poorly bounded list rendering. SIGIDI users drive agents for long sessions and notice dropped frames, stale labels, and excess resource use.
@@ -27,6 +35,8 @@ SIGIDI has three source surfaces: **web**, **desktop**, and **mobile**.
 ### 4. Downstream maintainability
 
 Keep SIGIDI behavior in standalone modules and upstream host edits registration-only where practical. Preserve product-neutral upstream improvements. Record unavoidable fork patches and their removal conditions in the downstream-boundary document.
+
+Changing the established technology stack is a non-goal. Keep the repository's Node, pnpm, Vite+, Electron, Effect, React, Astro, SQLite, Rust, and test/build tool choices unless a maintainer explicitly approves a technology decision.
 
 ## Design direction
 

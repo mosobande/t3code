@@ -6,13 +6,21 @@ import { buildT3ProjectFileJsonSchema, T3ProjectFileFromJson } from "./t3Project
 const decodeJson = Schema.decodeUnknownSync(T3ProjectFileFromJson);
 
 describe("buildT3ProjectFileJsonSchema", () => {
-  it("emits a draft 2020-12 schema with the published $id", () => {
+  it("does not claim an unowned public $id by default", () => {
     const schema = buildT3ProjectFileJsonSchema();
 
     expect(schema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
-    expect(schema.$id).toBe("https://t3.codes/schema/t3.json");
+    expect(schema.$id).toBeUndefined();
     expect(schema.type).toBe("object");
     expect(schema.additionalProperties).toBe(false);
+  });
+
+  it("uses the separately authorized SIGIDI schema URL when supplied", () => {
+    const schema = buildT3ProjectFileJsonSchema({
+      id: "https://example.sigidi.invalid/schema/t3.json",
+    });
+
+    expect(schema.$id).toBe("https://example.sigidi.invalid/schema/t3.json");
   });
 
   it("documents every supported field", () => {

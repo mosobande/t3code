@@ -10,6 +10,7 @@ import {
   type DesktopServerExposureState,
 } from "@t3tools/contracts";
 import { readTailscaleStatus } from "@t3tools/tailscale";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Context from "effect/Context";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -433,10 +434,17 @@ export const make = Effect.gen(function* () {
     function* ({ port }: { readonly port: number }) {
       yield* Effect.annotateCurrentSpan({ port });
       const settings = yield* desktopSettings.get;
+      const effectiveSettings = productProfile.capabilities.networkExposure
+        ? settings
+        : {
+            ...settings,
+            serverExposureMode: "local-only" as const,
+            tailscaleServeEnabled: false,
+          };
       const currentNetworkInterfaces = yield* readNetworkInterfaces;
       const resolved = resolveRuntimeState({
-        requestedMode: settings.serverExposureMode,
-        settings,
+        requestedMode: effectiveSettings.serverExposureMode,
+        settings: effectiveSettings,
         port,
         networkInterfaces: currentNetworkInterfaces,
         advertisedHostOverride: config.desktopLanHostOverride,
@@ -451,6 +459,12 @@ export const make = Effect.gen(function* () {
   ) {
     yield* Effect.annotateCurrentSpan({ mode });
     const previous = yield* Ref.get(stateRef);
+    if (!productProfile.capabilities.networkExposure) {
+      return {
+        state: toContractState(previous),
+        requiresRelaunch: false,
+      };
+    }
     const currentSettings = yield* desktopSettings.get;
     const nextSettings = {
       ...currentSettings,
@@ -492,6 +506,12 @@ export const make = Effect.gen(function* () {
         enabled: input.enabled,
         ...(input.port === undefined ? {} : { port: input.port }),
       });
+      if (!productProfile.capabilities.networkExposure) {
+        return {
+          state: toContractState(yield* Ref.get(stateRef)),
+          requiresRelaunch: false,
+        };
+      }
       const result = yield* desktopSettings
         .setTailscaleServe({
           enabled: input.enabled,
@@ -522,6 +542,9 @@ export const make = Effect.gen(function* () {
   );
 
   const getAdvertisedEndpoints = Effect.gen(function* () {
+    if (!productProfile.capabilities.networkExposure) {
+      return [];
+    }
     const state = yield* Ref.get(stateRef);
     const currentNetworkInterfaces = yield* readNetworkInterfaces;
     const coreEndpoints = resolveDesktopCoreAdvertisedEndpoints({

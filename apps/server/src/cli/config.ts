@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as LogLevel from "effect/LogLevel";
 import * as Option from "effect/Option";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
@@ -97,7 +98,9 @@ const EnvServerConfig = Config.all({
   otlpExportIntervalMs: Config.int("T3CODE_OTLP_EXPORT_INTERVAL_MS").pipe(
     Config.withDefault(10_000),
   ),
-  otlpServiceName: Config.string("T3CODE_OTLP_SERVICE_NAME").pipe(Config.withDefault("t3-server")),
+  otlpServiceName: Config.string("T3CODE_OTLP_SERVICE_NAME").pipe(
+    Config.withDefault("sigidi-server"),
+  ),
   mode: Config.schema(ServerConfig.RuntimeMode, "T3CODE_MODE").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
@@ -322,14 +325,16 @@ export const resolveServerConfig = (
       ),
       () => Boolean(devUrl),
     );
-    const tailscaleServeEnabled = Option.getOrElse(
-      resolveOptionPrecedence(
-        normalizedFlags.tailscaleServeEnabled,
-        Option.fromUndefinedOr(env.tailscaleServeEnabled),
-        Option.fromUndefinedOr(bootstrap?.tailscaleServeEnabled),
-      ),
-      () => false,
-    );
+    const tailscaleServeEnabled = productProfile.capabilities.networkExposure
+      ? Option.getOrElse(
+          resolveOptionPrecedence(
+            normalizedFlags.tailscaleServeEnabled,
+            Option.fromUndefinedOr(env.tailscaleServeEnabled),
+            Option.fromUndefinedOr(bootstrap?.tailscaleServeEnabled),
+          ),
+          () => false,
+        )
+      : false;
     const tailscaleServePort = Option.getOrElse(
       resolveOptionPrecedence(
         normalizedFlags.tailscaleServePort,
@@ -339,14 +344,16 @@ export const resolveServerConfig = (
       () => 443,
     );
     const staticDir = devUrl ? undefined : yield* ServerConfig.resolveStaticDir();
-    const host = Option.getOrElse(
-      resolveOptionPrecedence(
-        normalizedFlags.host,
-        Option.fromUndefinedOr(env.host),
-        Option.fromUndefinedOr(bootstrap?.host),
-      ),
-      () => (mode === "desktop" ? "127.0.0.1" : undefined),
-    );
+    const host = productProfile.capabilities.networkExposure
+      ? Option.getOrElse(
+          resolveOptionPrecedence(
+            normalizedFlags.host,
+            Option.fromUndefinedOr(env.host),
+            Option.fromUndefinedOr(bootstrap?.host),
+          ),
+          () => (mode === "desktop" ? "127.0.0.1" : undefined),
+        )
+      : "127.0.0.1";
     const logLevel = Option.getOrElse(cliLogLevel, () => env.logLevel);
 
     const config: ServerConfig.ServerConfig["Service"] = {

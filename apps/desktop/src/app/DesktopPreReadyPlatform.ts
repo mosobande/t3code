@@ -8,8 +8,10 @@ import * as Layer from "effect/Layer";
 
 import * as Electron from "electron";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as DesktopEarlyElectronStartup from "./DesktopEarlyElectronStartup.ts";
+import { ensureFocusedProductHomeSync } from "./FocusedProductHome.ts";
 import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 
 export interface DesktopPreReadyCommandLineReader {
@@ -29,12 +31,16 @@ export function readCommandLineSwitchValue(
   return value.length > 0 ? value : null;
 }
 
+export const shouldEnsureFocusedProductHome = (isPackaged: boolean): boolean =>
+  isPackaged && productProfile.publishableAsSigidi;
+
 export const resolveEarlyLinuxElectronOptionsFromProcess =
   (): DesktopEarlyElectronStartup.EarlyLinuxElectronOptions =>
     DesktopEarlyElectronStartup.resolveEarlyLinuxElectronOptions({
       env: process.env,
       appVersion: Electron.app.getVersion(),
       homeDirectory: NodeOS.homedir(),
+      isPackaged: Electron.app.isPackaged,
       joinPath: NodePath.posix.join,
       readFileString: (path) => NodeFS.readFileSync(path, "utf8"),
     });
@@ -50,6 +56,9 @@ export class DesktopPreReadyElectronOptions extends Context.Service<
 export const make = Effect.gen(function* () {
   const platform = yield* HostProcessPlatform;
   return yield* Effect.sync((): DesktopPreReadyElectronOptions["Service"] => {
+    if (shouldEnsureFocusedProductHome(Electron.app.isPackaged)) {
+      ensureFocusedProductHomeSync(NodePath.join(NodeOS.homedir(), ".sigidi"));
+    }
     const linuxPasswordStoreCommandLine =
       platform === "linux"
         ? readCommandLineSwitchValue(Electron.app.commandLine, "password-store")

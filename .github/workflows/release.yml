@@ -2,34 +2,73 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*.*.*"
-      - "!v*-nightly.*"
-  schedule:
-    - cron: "0 */3 * * *"
-  workflow_dispatch:
-    inputs:
-      channel:
-        description: "Release channel"
-        required: false
-        default: stable
-        type: choice
-        options:
-          - stable
-          - nightly
-      version:
-        description: "Release version (for example 1.2.3 or v1.2.3)"
-        required: false
-        type: string
+    tags: ["v*.*.*"]
+  pull_request:
 
 permissions:
   contents: read
   id-token: none
 
 jobs:
+  rehearse:
+    name: Rehearse local desktop (${{ matrix.arch }})
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      SIGIDI_BUILD_PROFILE: local-desktop
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            rust_target: aarch64-apple-darwin
+          - arch: x64
+            rust_target: x86_64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Build unsigned local desktop artifact
+        run: |
+          vp run dist:desktop:artifact \
+            --platform mac \
+            --target dmg \
+            --arch "${{ matrix.arch }}" \
+            --build-version "0.0.0-rehearsal.${{ github.run_number }}" \
+            --output-dir "$RUNNER_TEMP/sigidi-rehearsal-${{ matrix.arch }}"
+
+      - name: Inspect rehearsal outputs
+        run: |
+          set -euo pipefail
+          output_dir="$RUNNER_TEMP/sigidi-rehearsal-${{ matrix.arch }}"
+          test "$(find "$output_dir" -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')" -eq 1
+          test "$(find "$output_dir" -maxdepth 1 -type f -name '*.zip' | wc -l | tr -d ' ')" -eq 1
+          ! find "$output_dir" -maxdepth 1 -type f \
+            \( -name '*.exe' -o -name '*.AppImage' -o -name '*.blockmap' -o -name '*.yml' \) | grep -q .
+
+  # Retained upstream-full automation is source-only. A product profile is not
+  # publication authority, so no event can run these jobs.
   check_changes:
     name: Check for changes since last nightly
-    if: github.event_name == 'schedule'
+    if: ${{ false }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
@@ -67,9 +106,7 @@ jobs:
   preflight:
     name: Preflight
     needs: [check_changes]
-    if: |
-      !failure() && !cancelled() &&
-      (github.event_name != 'schedule' || needs.check_changes.outputs.has_changes == 'true')
+    if: ${{ false }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -177,7 +214,7 @@ jobs:
   relay_public_config:
     name: Resolve T3 Connect public config
     needs: preflight
-    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' }}
+    if: ${{ false }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 5
     environment:
@@ -321,7 +358,7 @@ jobs:
     name: Build ${{ matrix.label }}
     # The first release builds only the two macOS architectures.
     needs: [preflight, relay_public_config]
-    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' }}
+    if: ${{ false }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
@@ -756,7 +793,7 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: [preflight, build]
-    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build.result == 'success' }}
+    if: ${{ false }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:

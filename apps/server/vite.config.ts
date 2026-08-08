@@ -2,6 +2,7 @@ import "vite-plus/test/config";
 import { defineConfig, mergeConfig } from "vite-plus";
 
 import baseConfig from "../../vite.config.ts";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 import packageJson from "./package.json" with { type: "json" };
 
@@ -17,11 +18,16 @@ export function shouldBundleCliDependency(id: string): boolean {
 }
 
 const repoEnv = loadRepoEnv();
+const buildProfile = resolveProductProfile(process.env.SIGIDI_BUILD_PROFILE);
+const inheritedRemoteConfig = buildProfile.capabilities.inheritedRemoteIntegrations ? repoEnv : {};
 const cliBuildChannel = packageJson.version.includes("-nightly.") ? "nightly" : "latest";
 
 export default mergeConfig(
   baseConfig,
   defineConfig({
+    define: {
+      __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
+    },
     run: {
       tasks: {
         build: {
@@ -44,22 +50,25 @@ export default mergeConfig(
         js: "#!/usr/bin/env node\n",
       },
       define: {
+        __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
         __T3CODE_BUILD_CHANNEL__: JSON.stringify(cliBuildChannel),
-        __T3CODE_BUILD_RELAY_URL__: JSON.stringify(repoEnv.T3CODE_RELAY_URL?.trim() ?? ""),
+        __T3CODE_BUILD_RELAY_URL__: JSON.stringify(
+          inheritedRemoteConfig.T3CODE_RELAY_URL?.trim() ?? "",
+        ),
         __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: JSON.stringify(
-          repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
+          inheritedRemoteConfig.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
         ),
         __T3CODE_BUILD_CLERK_CLI_OAUTH_CLIENT_ID__: JSON.stringify(
-          repoEnv.T3CODE_CLERK_CLI_OAUTH_CLIENT_ID?.trim() ?? "",
+          inheritedRemoteConfig.T3CODE_CLERK_CLI_OAUTH_CLIENT_ID?.trim() ?? "",
         ),
         __T3CODE_BUILD_RELAY_CLIENT_OTLP_TRACES_URL__: JSON.stringify(
-          repoEnv.T3CODE_RELAY_CLIENT_OTLP_TRACES_URL?.trim() ?? "",
+          inheritedRemoteConfig.T3CODE_RELAY_CLIENT_OTLP_TRACES_URL?.trim() ?? "",
         ),
         __T3CODE_BUILD_RELAY_CLIENT_OTLP_TRACES_DATASET__: JSON.stringify(
-          repoEnv.T3CODE_RELAY_CLIENT_OTLP_TRACES_DATASET?.trim() ?? "",
+          inheritedRemoteConfig.T3CODE_RELAY_CLIENT_OTLP_TRACES_DATASET?.trim() ?? "",
         ),
         __T3CODE_BUILD_RELAY_CLIENT_OTLP_TRACES_TOKEN__: JSON.stringify(
-          repoEnv.T3CODE_RELAY_CLIENT_OTLP_TRACES_TOKEN?.trim() ?? "",
+          inheritedRemoteConfig.T3CODE_RELAY_CLIENT_OTLP_TRACES_TOKEN?.trim() ?? "",
         ),
       },
     },

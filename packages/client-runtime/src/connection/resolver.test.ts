@@ -90,6 +90,7 @@ function relayClient(
 }
 
 const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((options?: {
+  readonly allowsTarget?: ConnectionResolver.ConnectionTargetPolicy;
   readonly profiles?: ReadonlyArray<ConnectionProfile>;
   readonly credentials?: ReadonlyArray<readonly [string, ConnectionCredential]>;
   readonly connectEnvironment?: ManagedRelay.ManagedRelayClient["Service"]["connectEnvironment"];
@@ -197,7 +198,10 @@ const makeDependencies = Effect.fn("TestConnectionResolver.makeDependencies")((o
     ),
   );
 
-  return Effect.succeed(ConnectionResolver.layer.pipe(Layer.provide(dependencies)));
+  const resolverLayer = options?.allowsTarget
+    ? ConnectionResolver.layerWithTargetPolicy(options.allowsTarget)
+    : ConnectionResolver.layer;
+  return Effect.succeed(resolverLayer.pipe(Layer.provide(dependencies)));
 });
 
 describe("ConnectionResolver", () => {
@@ -358,6 +362,35 @@ describe("ConnectionResolver", () => {
         },
       ]);
       expect(yield* Ref.get(bootstrapCredentials)).toEqual(["relay-bootstrap"]);
+    }),
+  );
+
+  it.effect("rejects a target blocked by the product profile before remote resolution", () =>
+    Effect.gen(function* () {
+      const relayCalls = yield* Ref.make(0);
+      const target = new RelayConnectionTarget({
+        environmentId: ENVIRONMENT_ID,
+        label: "Cloud",
+      });
+      const dependencies = yield* makeDependencies({
+        allowsTarget: (candidate) => candidate._tag === "PrimaryConnectionTarget",
+        connectEnvironment: () =>
+          Ref.update(relayCalls, (count) => count + 1).pipe(
+            Effect.as({
+              environmentId: ENVIRONMENT_ID,
+              endpoint: ENDPOINT,
+              credential: "relay-bootstrap",
+              expiresAt: "2026-06-06T00:00:00.000Z",
+            }),
+          ),
+      });
+      const broker = yield* ConnectionResolver.ConnectionResolver.pipe(
+        Effect.provide(dependencies),
+      );
+      const error = yield* Effect.flip(broker.prepare(catalogEntry(target)));
+
+      expect(error._tag).toBe("ConnectionBlockedError");
+      expect(yield* Ref.get(relayCalls)).toBe(0);
     }),
   );
 

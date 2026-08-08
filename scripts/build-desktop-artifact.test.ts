@@ -10,6 +10,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   BuildCommandFailedError,
+  canReuseDesktopBuildOutputs,
   createStageWorkspaceConfig,
   createStagePatchedDependencies,
   createBuildConfig,
@@ -36,6 +37,7 @@ import {
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
   resolveResourceMonitorRustTargets,
+  shouldCopyDesktopArtifact,
   resourceMonitorExecutableName,
   resolveGitHubPublishConfig,
   resolveMockUpdateServerPort,
@@ -47,6 +49,7 @@ import {
 } from "./build-desktop-artifact.ts";
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 
 function mockProcess(exitCode: number) {
   return ChildProcessSpawner.makeHandle({
@@ -63,6 +66,11 @@ function mockProcess(exitCode: number) {
     getOutputFd: () => Stream.empty,
   });
 }
+
+it("allows stale build-output reuse only for the non-publishable maintainer profile", () => {
+  assert.isFalse(canReuseDesktopBuildOutputs(resolveProductProfile("local-desktop")));
+  assert.isTrue(canReuseDesktopBuildOutputs(resolveProductProfile("upstream-full")));
+});
 
 function iconResizeSpawnerLayer(
   commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }>,
@@ -122,7 +130,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
   it.effect("resolves GitHub desktop publish config from Effect config", () =>
     Effect.gen(function* () {
-      const latestConfig = yield* resolveGitHubPublishConfig("latest").pipe(
+      const upstreamFull = resolveProductProfile("upstream-full");
+      const latestConfig = yield* resolveGitHubPublishConfig("latest", upstreamFull).pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -133,7 +142,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           ),
         ),
       );
-      const nightlyConfig = yield* resolveGitHubPublishConfig("nightly").pipe(
+      const nightlyConfig = yield* resolveGitHubPublishConfig("nightly", upstreamFull).pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -161,6 +170,39 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
+  it.effect("does not configure a public updater in the local desktop artifact", () =>
+    Effect.gen(function* () {
+      const config = yield* resolveGitHubPublishConfig(
+        "latest",
+        resolveProductProfile("local-desktop"),
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                T3CODE_DESKTOP_UPDATE_REPOSITORY: "pingdotgg/t3code",
+                GITHUB_REPOSITORY: "quantipixels/sigidi",
+              },
+            }),
+          ),
+        ),
+      );
+
+      assert.isUndefined(config);
+    }),
+  );
+
+  it("copies only installable macOS files from a local-desktop rehearsal", () => {
+    const localDesktop = resolveProductProfile("local-desktop");
+    const upstreamFull = resolveProductProfile("upstream-full");
+
+    assert.isTrue(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.dmg", localDesktop));
+    assert.isTrue(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.zip", localDesktop));
+    assert.isFalse(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.dmg.blockmap", localDesktop));
+    assert.isFalse(shouldCopyDesktopArtifact("builder-debug.yml", localDesktop));
+    assert.isTrue(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.dmg.blockmap", upstreamFull));
+  });
+
   it("omits bundled workspace packages from staged desktop dependencies", () => {
     assert.deepStrictEqual(
       resolveDesktopRuntimeDependencies(
@@ -180,6 +222,41 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       ),
       {
         "@effect/platform-node": "4.0.0-beta.59",
+        effect: "4.0.0-beta.59",
+      },
+    );
+  });
+
+  it("stages Clerk dependencies only for the upstream-full profile", () => {
+    const dependencies = {
+      "@clerk/electron": "catalog:",
+      "@clerk/electron-passkeys": "catalog:",
+      effect: "catalog:",
+      electron: "41.5.0",
+    };
+    const catalog = {
+      "@clerk/electron": "6.6.2",
+      "@clerk/electron-passkeys": "1.4.7",
+      effect: "4.0.0-beta.59",
+    };
+
+    assert.deepStrictEqual(
+      resolveDesktopRuntimeDependencies(
+        dependencies,
+        catalog,
+        resolveProductProfile("local-desktop"),
+      ),
+      { effect: "4.0.0-beta.59" },
+    );
+    assert.deepStrictEqual(
+      resolveDesktopRuntimeDependencies(
+        dependencies,
+        catalog,
+        resolveProductProfile("upstream-full"),
+      ),
+      {
+        "@clerk/electron": "6.6.2",
+        "@clerk/electron-passkeys": "1.4.7",
         effect: "4.0.0-beta.59",
       },
     );

@@ -1,4 +1,6 @@
-# Remote Access
+# Remote Access (source-only upstream reference)
+
+> This inherited guide does not describe the `local-desktop` SIGIDI product. Remote environments, relay, tunnels, Tailscale exposure, and remote UI are compiled out of that profile. Maintainers can use this document only when testing the explicit `upstream-full` source path; it grants no service or deployment authority.
 
 Use this when you want to connect to a SIGIDI server from another device such as a phone, tablet, or separate desktop app.
 

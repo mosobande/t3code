@@ -137,6 +137,7 @@ function makeHarness(options: UpdatesHarnessOptions = {}) {
     appVersion: "1.2.3",
     appPath: "/repo",
     isPackaged: true,
+    packagedBaseDirOverride: `/tmp/t3-desktop-updates-test-${process.pid}`,
     resourcesPath: "/missing/resources",
     runningUnderArm64Translation: false,
   }).pipe(

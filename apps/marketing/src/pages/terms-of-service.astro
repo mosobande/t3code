@@ -1,5 +1,8 @@
 ---
 import LegalPage from "../components/LegalPage.astro";
+import { productProfile } from "@t3tools/shared/productProfile";
+
+if (productProfile.publishableAsSigidi) return Astro.redirect("/");
 
 const sections = [
   ["introduction", "Introduction"],

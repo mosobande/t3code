@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -77,6 +78,14 @@ describe("DesktopPreReadyPlatform", () => {
     );
 
     assert.isNull(value);
+  });
+
+  it("applies the focused product-home gate only to packaged SIGIDI builds", () => {
+    assert.isFalse(DesktopPreReadyPlatform.shouldEnsureFocusedProductHome(false));
+    assert.equal(
+      DesktopPreReadyPlatform.shouldEnsureFocusedProductHome(true),
+      productProfile.publishableAsSigidi,
+    );
   });
 
   it.effect(

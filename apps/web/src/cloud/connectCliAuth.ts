@@ -5,6 +5,7 @@ import {
   type ConnectAuthorizeRequest,
 } from "@t3tools/shared/connectAuth";
 import { clerkFrontendApiUrlFromPublishableKey } from "@t3tools/shared/relayAuth";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import { configuredHostedAppUrl, isHostedStaticApp } from "../hostedPairing";
 import { hasCloudPublicConfig, resolveCloudPublicConfig, trimNonEmpty } from "./publicConfig";
@@ -27,7 +28,12 @@ export function hasConnectCliAuthConfig(): boolean {
  * Clerk CLI OAuth client configured at build time.
  */
 export function connectCliAuthRoutesEnabled(): boolean {
-  return isHostedStaticApp() && hasCloudPublicConfig() && hasConnectCliAuthConfig();
+  return (
+    productProfile.capabilities.hostedAuthentication &&
+    isHostedStaticApp() &&
+    hasCloudPublicConfig() &&
+    hasConnectCliAuthConfig()
+  );
 }
 
 /**

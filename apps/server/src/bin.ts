@@ -6,6 +6,7 @@ import { Argument, Command } from "effect/unstable/cli";
 import * as CliError from "effect/unstable/cli/CliError";
 
 import * as NetService from "@t3tools/shared/Net";
+import { productProfile } from "@t3tools/shared/productProfile";
 import packageJson from "../package.json" with { type: "json" };
 import { authCommand } from "./cli/auth.ts";
 import { connectCommand } from "./cli/connect.ts";
@@ -43,21 +44,32 @@ const connectUnavailableCommand = Command.make("connect", {
   ),
 );
 
-export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
-  Command.make("t3", { ...sharedServerCommandFlags }).pipe(
+export const makeCli = (
+  options: { readonly remoteEnabled?: boolean; readonly cloudEnabled?: boolean } = {},
+) => {
+  const remoteEnabled =
+    options.remoteEnabled ??
+    (options.cloudEnabled === true || productProfile.capabilities.inheritedRemoteIntegrations);
+  const cloudEnabled = options.cloudEnabled ?? (remoteEnabled && hasCloudPublicConfig);
+  return Command.make("t3", { ...sharedServerCommandFlags }).pipe(
     Command.withDescription("Run the T3 Code server."),
     Command.withHandler((flags) => runServerCommand(flags)),
-    Command.withSubcommands([
-      startCommand,
-      serveCommand,
-      pairCommand,
-      authCommand,
-      projectCommand,
-      serviceCommand,
-      servicePreflightCommand,
-      cloudEnabled ? connectCommand : connectUnavailableCommand,
-    ]),
+    Command.withSubcommands(
+      remoteEnabled
+        ? [
+            startCommand,
+            serveCommand,
+            pairCommand,
+            authCommand,
+            projectCommand,
+            serviceCommand,
+            servicePreflightCommand,
+            cloudEnabled ? connectCommand : connectUnavailableCommand,
+          ]
+        : [startCommand, projectCommand],
+    ),
   );
+};
 
 export const cli = makeCli();
 

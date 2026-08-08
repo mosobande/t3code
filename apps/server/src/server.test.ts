@@ -3,6 +3,7 @@ import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeCrypto from "node:crypto";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import {
   AuthAccessTokenType,
@@ -1817,7 +1818,11 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud link proofs for non-loopback managed endpoint origins", () =>
+  const inheritedRemoteIt = it.effect.skipIf(
+    !productProfile.capabilities.inheritedRemoteIntegrations,
+  );
+
+  inheritedRemoteIt("rejects cloud link proofs for non-loopback managed endpoint origins", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -1854,7 +1859,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud link proofs for unsupported endpoint providers", () =>
+  inheritedRemoteIt("rejects cloud link proofs for unsupported endpoint providers", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -1895,7 +1900,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud link proofs requested through a public managed endpoint", () =>
+  inheritedRemoteIt("rejects cloud link proofs requested through a public managed endpoint", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -1937,7 +1942,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect(
+  inheritedRemoteIt(
     "rejects cloud link proofs when a public request spoofs loopback forwarded headers",
     () =>
       Effect.gen(function* () {
@@ -1981,7 +1986,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud link proofs with malformed forwarded request hosts", () =>
+  inheritedRemoteIt("rejects cloud link proofs with malformed forwarded request hosts", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2023,7 +2028,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects local cloud link proofs for a different loopback port", () =>
+  inheritedRemoteIt("rejects local cloud link proofs for a different loopback port", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2061,7 +2066,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("allows standard clients to read managed relay configuration state", () =>
+  it.effect("applies the selected profile to managed relay configuration state", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2077,17 +2082,25 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         headers: { cookie: pairedCookie },
       });
       const body = yield* responseJsonEffect<{
+        readonly _tag?: string;
+        readonly message?: string;
         readonly linked?: boolean;
         readonly publishAgentActivity?: boolean;
       }>(response);
 
-      assert.equal(response.status, 200);
-      assert.equal(body.linked, false);
-      assert.equal(body.publishAgentActivity, false);
+      if (productProfile.capabilities.inheritedRemoteIntegrations) {
+        assert.equal(response.status, 200);
+        assert.equal(body.linked, false);
+        assert.equal(body.publishAgentActivity, false);
+      } else {
+        assert.equal(response.status, 400);
+        assert.equal(body._tag, "EnvironmentHttpBadRequestError");
+        assert.equal(body.message, "Remote integrations are disabled in this SIGIDI build.");
+      }
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect(
+  inheritedRemoteIt(
     "reports relay client status and streams installation progress over environment RPC",
     () =>
       Effect.gen(function* () {
@@ -2133,7 +2146,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("requires relay write scope to update agent activity publication", () =>
+  inheritedRemoteIt("requires relay write scope to update agent activity publication", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2177,7 +2190,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects relay config with an invalid cloud mint public key", () =>
+  inheritedRemoteIt("rejects relay config with an invalid cloud mint public key", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2208,7 +2221,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects relay config with insecure relay metadata or empty credentials", () =>
+  inheritedRemoteIt("rejects relay config with insecure relay metadata or empty credentials", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2285,7 +2298,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects relay config replacement from a different cloud account", () =>
+  inheritedRemoteIt("rejects relay config replacement from a different cloud account", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2328,7 +2341,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("reports local cloud link state from persisted relay config", () =>
+  inheritedRemoteIt("reports local cloud link state from persisted relay config", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2390,7 +2403,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("does not expose internal cloud reconciliation over HTTP", () =>
+  inheritedRemoteIt("does not expose internal cloud reconciliation over HTTP", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2403,7 +2416,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("unlinks local cloud state and disables the managed endpoint runtime", () =>
+  inheritedRemoteIt("unlinks local cloud state and disables the managed endpoint runtime", () =>
     Effect.gen(function* () {
       const appliedRuntimeConfigs: Array<unknown> = [];
       yield* buildAppUnderTest({
@@ -2499,7 +2512,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects replayed cloud mint requests atomically", () =>
+  inheritedRemoteIt("rejects replayed cloud mint requests atomically", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2558,7 +2571,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("serves the documented T3 Connect mint credential endpoint", () =>
+  inheritedRemoteIt("serves the documented T3 Connect mint credential endpoint", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2617,7 +2630,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("serves signed T3 Connect environment health checks", () =>
+  inheritedRemoteIt("serves signed T3 Connect environment health checks", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2677,7 +2690,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects replayed cloud health requests atomically", () =>
+  inheritedRemoteIt("rejects replayed cloud health requests atomically", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2736,7 +2749,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect(
+  inheritedRemoteIt(
     "validates cloud proofs against the configured relay issuer, not the transport URL",
     () =>
       Effect.gen(function* () {
@@ -2806,7 +2819,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
       }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("fails relay config when the managed endpoint connector cannot start", () =>
+  inheritedRemoteIt("fails relay config when the managed endpoint connector cannot start", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest({
         layers: {
@@ -2887,7 +2900,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud mint requests with the wrong issuer or audience", () =>
+  inheritedRemoteIt("rejects cloud mint requests with the wrong issuer or audience", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -2954,58 +2967,60 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud mint requests for a cloud subject other than the linked user", () =>
-    Effect.gen(function* () {
-      yield* buildAppUnderTest();
+  inheritedRemoteIt(
+    "rejects cloud mint requests for a cloud subject other than the linked user",
+    () =>
+      Effect.gen(function* () {
+        yield* buildAppUnderTest();
 
-      const cloudKeyPair = NodeCrypto.generateKeyPairSync("ed25519", {
-        privateKeyEncoding: { format: "pem", type: "pkcs8" },
-        publicKeyEncoding: { format: "pem", type: "spki" },
-      });
-      const ownerCookie = yield* getAuthenticatedSessionCookieHeader();
-      const relayConfigUrl = yield* getHttpServerUrl("/api/connect/relay-config");
-      const relayConfigResponse = yield* fetchEffect(relayConfigUrl, {
-        method: "POST",
-        headers: {
-          cookie: ownerCookie,
-          "content-type": "application/json",
-        },
-        body: jsonRequestBody({
-          relayUrl: "https://relay.example.test/",
-          cloudUserId: "user_123",
-          environmentCredential: "t3env_test_credential",
-          cloudMintPublicKey: cloudKeyPair.publicKey,
-          endpointRuntime: null,
-        }),
-      });
-      assert.equal(relayConfigResponse.status, 200);
-
-      const now = yield* DateTime.now;
-      const mintUrl = yield* getHttpServerUrl("/api/t3-connect/mint-credential");
-      const response = yield* fetchEffect(mintUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: jsonRequestBody(
-          makeCloudMintCredentialRequest({
-            privateKey: cloudKeyPair.privateKey,
-            environmentId: testEnvironmentDescriptor.environmentId,
-            clientProofKeyThumbprint: "client-proof-key-thumbprint",
-            subject: "user_other",
-            jti: "cloud-mint-jti-wrong-subject",
-            nonce: "cloud-mint-nonce-wrong-subject",
-            issuedAt: DateTime.formatIso(now),
-            expiresAt: DateTime.formatIso(DateTime.add(now, { minutes: 5 })),
+        const cloudKeyPair = NodeCrypto.generateKeyPairSync("ed25519", {
+          privateKeyEncoding: { format: "pem", type: "pkcs8" },
+          publicKeyEncoding: { format: "pem", type: "spki" },
+        });
+        const ownerCookie = yield* getAuthenticatedSessionCookieHeader();
+        const relayConfigUrl = yield* getHttpServerUrl("/api/connect/relay-config");
+        const relayConfigResponse = yield* fetchEffect(relayConfigUrl, {
+          method: "POST",
+          headers: {
+            cookie: ownerCookie,
+            "content-type": "application/json",
+          },
+          body: jsonRequestBody({
+            relayUrl: "https://relay.example.test/",
+            cloudUserId: "user_123",
+            environmentCredential: "t3env_test_credential",
+            cloudMintPublicKey: cloudKeyPair.publicKey,
+            endpointRuntime: null,
           }),
-        ),
-      });
+        });
+        assert.equal(relayConfigResponse.status, 200);
 
-      assert.equal(response.status, 401);
-    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+        const now = yield* DateTime.now;
+        const mintUrl = yield* getHttpServerUrl("/api/t3-connect/mint-credential");
+        const response = yield* fetchEffect(mintUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: jsonRequestBody(
+            makeCloudMintCredentialRequest({
+              privateKey: cloudKeyPair.privateKey,
+              environmentId: testEnvironmentDescriptor.environmentId,
+              clientProofKeyThumbprint: "client-proof-key-thumbprint",
+              subject: "user_other",
+              jti: "cloud-mint-jti-wrong-subject",
+              nonce: "cloud-mint-nonce-wrong-subject",
+              issuedAt: DateTime.formatIso(now),
+              expiresAt: DateTime.formatIso(DateTime.add(now, { minutes: 5 })),
+            }),
+          ),
+        });
+
+        assert.equal(response.status, 401);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud mint requests without the exact connect scope", () =>
+  inheritedRemoteIt("rejects cloud mint requests without the exact connect scope", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -3056,7 +3071,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud health requests with the wrong issuer or audience", () =>
+  inheritedRemoteIt("rejects cloud health requests with the wrong issuer or audience", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 
@@ -3121,57 +3136,59 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
     }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud health requests for a cloud subject other than the linked user", () =>
-    Effect.gen(function* () {
-      yield* buildAppUnderTest();
+  inheritedRemoteIt(
+    "rejects cloud health requests for a cloud subject other than the linked user",
+    () =>
+      Effect.gen(function* () {
+        yield* buildAppUnderTest();
 
-      const cloudKeyPair = NodeCrypto.generateKeyPairSync("ed25519", {
-        privateKeyEncoding: { format: "pem", type: "pkcs8" },
-        publicKeyEncoding: { format: "pem", type: "spki" },
-      });
-      const ownerCookie = yield* getAuthenticatedSessionCookieHeader();
-      const relayConfigUrl = yield* getHttpServerUrl("/api/connect/relay-config");
-      const relayConfigResponse = yield* fetchEffect(relayConfigUrl, {
-        method: "POST",
-        headers: {
-          cookie: ownerCookie,
-          "content-type": "application/json",
-        },
-        body: jsonRequestBody({
-          relayUrl: "https://relay.example.test/",
-          cloudUserId: "user_123",
-          environmentCredential: "t3env_test_credential",
-          cloudMintPublicKey: cloudKeyPair.publicKey,
-          endpointRuntime: null,
-        }),
-      });
-      assert.equal(relayConfigResponse.status, 200);
-
-      const now = yield* DateTime.now;
-      const healthUrl = yield* getHttpServerUrl("/api/t3-connect/health");
-      const response = yield* fetchEffect(healthUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: jsonRequestBody(
-          makeCloudEnvironmentHealthRequest({
-            privateKey: cloudKeyPair.privateKey,
-            environmentId: testEnvironmentDescriptor.environmentId,
-            subject: "user_other",
-            jti: "cloud-health-jti-wrong-subject",
-            nonce: "cloud-health-nonce-wrong-subject",
-            issuedAt: DateTime.formatIso(now),
-            expiresAt: DateTime.formatIso(DateTime.add(now, { minutes: 5 })),
+        const cloudKeyPair = NodeCrypto.generateKeyPairSync("ed25519", {
+          privateKeyEncoding: { format: "pem", type: "pkcs8" },
+          publicKeyEncoding: { format: "pem", type: "spki" },
+        });
+        const ownerCookie = yield* getAuthenticatedSessionCookieHeader();
+        const relayConfigUrl = yield* getHttpServerUrl("/api/connect/relay-config");
+        const relayConfigResponse = yield* fetchEffect(relayConfigUrl, {
+          method: "POST",
+          headers: {
+            cookie: ownerCookie,
+            "content-type": "application/json",
+          },
+          body: jsonRequestBody({
+            relayUrl: "https://relay.example.test/",
+            cloudUserId: "user_123",
+            environmentCredential: "t3env_test_credential",
+            cloudMintPublicKey: cloudKeyPair.publicKey,
+            endpointRuntime: null,
           }),
-        ),
-      });
+        });
+        assert.equal(relayConfigResponse.status, 200);
 
-      assert.equal(response.status, 401);
-    }).pipe(Effect.provide(NodeHttpServer.layerTest)),
+        const now = yield* DateTime.now;
+        const healthUrl = yield* getHttpServerUrl("/api/t3-connect/health");
+        const response = yield* fetchEffect(healthUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: jsonRequestBody(
+            makeCloudEnvironmentHealthRequest({
+              privateKey: cloudKeyPair.privateKey,
+              environmentId: testEnvironmentDescriptor.environmentId,
+              subject: "user_other",
+              jti: "cloud-health-jti-wrong-subject",
+              nonce: "cloud-health-nonce-wrong-subject",
+              issuedAt: DateTime.formatIso(now),
+              expiresAt: DateTime.formatIso(DateTime.add(now, { minutes: 5 })),
+            }),
+          ),
+        });
+
+        assert.equal(response.status, 401);
+      }).pipe(Effect.provide(NodeHttpServer.layerTest)),
   );
 
-  it.effect("rejects cloud health requests without the exact status scope", () =>
+  inheritedRemoteIt("rejects cloud health requests without the exact status scope", () =>
     Effect.gen(function* () {
       yield* buildAppUnderTest();
 

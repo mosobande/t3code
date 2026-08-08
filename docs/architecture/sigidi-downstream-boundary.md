@@ -4,6 +4,16 @@ SIGIDI is a separate product that imports T3 Code. T3 Code supplies reusable cap
 
 This document is the durable boundary for SIGIDI-specific work. The root `AGENTS.md` contains only the rules that apply to most tasks.
 
+## Build-profile boundary
+
+`local-desktop` is the default, immutable SIGIDI product profile. The build resolves it once and compiles its capability map into the existing desktop, server, renderer, client-runtime, and packaging owners. It cannot hydrate or register inherited remote targets, bind outside loopback, start Tailscale or WSL, expose remote IPC or UI, use hosted authentication, or package inherited service configuration.
+
+`upstream-full` is an explicit maintainer-only profile. It preserves the established inherited paths for focused proof and upstream sync. It is not publishable as SIGIDI. A profile selects application composition only; it never authorizes a workflow, credential, deployment, signing operation, notarization submission, or publication.
+
+Apply the profile at the earliest existing lifecycle owner: before persisted target hydration, broker resolution, settings reconciliation, process launch, route generation, IPC/preload exposure, or artifact staging. Do not add a second local registry, resolver, platform implementation, Effect graph, or packaging path. If no existing owner can enforce a capability, record the wall with Atona and obtain a maintainer decision before adding implementation.
+
+The packaged `local-desktop` runtime also requires the focused-product home marker before it consumes persisted state. It ignores ambient legacy home overrides and supplies the selected home explicitly to its child server.
+
 ## Choose the narrowest ownership boundary
 
 Apply this decision ladder in order:

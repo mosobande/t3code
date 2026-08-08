@@ -242,31 +242,65 @@ export const registerSshConnection = Effect.fn(
   return registration.target.environmentId;
 });
 
-export const make = Effect.gen(function* () {
-  const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
-  const presentation = yield* ClientCapabilities.ClientPresentation;
-  const httpClient = yield* HttpClient.HttpClient;
-  const ssh = yield* ClientCapabilities.SshEnvironmentGateway;
-  const credentials = yield* ConnectionCredentialStore.ConnectionCredentialStore;
+export interface ConnectionOnboardingOptions {
+  readonly remoteEnabled?: boolean;
+}
 
-  return ConnectionOnboarding.of({
-    registerPairing: (input) =>
-      registerPairingConnection(input).pipe(
-        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
-        Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
-        Effect.provideService(HttpClient.HttpClient, httpClient),
-      ),
-    registerSsh: (input) =>
-      registerSshConnection(input).pipe(
-        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
-        Effect.provideService(ClientCapabilities.SshEnvironmentGateway, ssh),
-      ),
-    updateBearer: (input) =>
-      updateBearerConnection(input).pipe(
-        Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
-        Effect.provideService(ConnectionCredentialStore.ConnectionCredentialStore, credentials),
-      ),
+export const makeWithOptions = ({ remoteEnabled = true }: ConnectionOnboardingOptions = {}) =>
+  Effect.gen(function* () {
+    const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+    const presentation = yield* ClientCapabilities.ClientPresentation;
+    const httpClient = yield* HttpClient.HttpClient;
+    const ssh = yield* ClientCapabilities.SshEnvironmentGateway;
+    const credentials = yield* ConnectionCredentialStore.ConnectionCredentialStore;
+
+    return ConnectionOnboarding.of({
+      registerPairing: (input) =>
+        remoteEnabled
+          ? registerPairingConnection(input).pipe(
+              Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+              Effect.provideService(ClientCapabilities.ClientPresentation, presentation),
+              Effect.provideService(HttpClient.HttpClient, httpClient),
+            )
+          : Effect.fail(
+              new ConnectionBlockedError({
+                reason: "unsupported",
+                detail: "Remote pairing is disabled in the selected product profile.",
+              }),
+            ),
+      registerSsh: (input) =>
+        remoteEnabled
+          ? registerSshConnection(input).pipe(
+              Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+              Effect.provideService(ClientCapabilities.SshEnvironmentGateway, ssh),
+            )
+          : Effect.fail(
+              new ConnectionBlockedError({
+                reason: "unsupported",
+                detail: "SSH environments are disabled in the selected product profile.",
+              }),
+            ),
+      updateBearer: (input) =>
+        remoteEnabled
+          ? updateBearerConnection(input).pipe(
+              Effect.provideService(EnvironmentRegistry.EnvironmentRegistry, registry),
+              Effect.provideService(
+                ConnectionCredentialStore.ConnectionCredentialStore,
+                credentials,
+              ),
+            )
+          : Effect.fail(
+              new ConnectionBlockedError({
+                reason: "unsupported",
+                detail: "Remote connections are disabled in the selected product profile.",
+              }),
+            ),
+    });
   });
-});
+
+export const make = makeWithOptions();
 
 export const layer = Layer.effect(ConnectionOnboarding, make);
+
+export const layerWithOptions = (options: ConnectionOnboardingOptions) =>
+  Layer.effect(ConnectionOnboarding, makeWithOptions(options));

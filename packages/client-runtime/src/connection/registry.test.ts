@@ -128,6 +128,7 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
   initialProfiles: ReadonlyArray<ConnectionProfile> = [],
   initialCredentials: ReadonlyArray<readonly [string, ConnectionCredential]> = [],
   options?: {
+    readonly allowsTarget?: EnvironmentRegistry.ConnectionTargetPolicy;
     readonly beforeSessionConnect?: (environmentId: EnvironmentId) => Effect.Effect<void>;
     readonly beforeRegistrationRegister?: (
       registration: ConnectionRegistration,
@@ -365,7 +366,9 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
   });
 
   const cacheLayer = Layer.succeed(Persistence.EnvironmentCacheStore, cacheStore);
-  const layer = EnvironmentRegistry.layer.pipe(
+  const layer = EnvironmentRegistry.layerWithTargetPolicy(
+    options?.allowsTarget ?? (() => true),
+  ).pipe(
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(Persistence.ConnectionTargetStore, targetStore),
@@ -594,6 +597,56 @@ describe("EnvironmentRegistry", () => {
         );
         expect(yield* Ref.get(harness.sessions)).toHaveLength(1);
       }).pipe(Effect.provide(harness.layer));
+    }),
+  );
+
+  it.effect("does not hydrate or start persisted targets blocked by the product profile", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness([TARGET, RELAY_TARGET], [], [], {
+        allowsTarget: (target) => target._tag === "PrimaryConnectionTarget",
+      });
+
+      yield* Effect.gen(function* () {
+        const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+        const entries = yield* SubscriptionRef.get(registry.entries);
+
+        expect(entries.has(TARGET.environmentId)).toBe(true);
+        expect(entries.has(RELAY_TARGET.environmentId)).toBe(false);
+
+        yield* registry.start;
+        yield* awaitConnectionState(
+          registry,
+          TARGET.environmentId,
+          (state) => state.phase === "connected",
+        );
+
+        expect(yield* Ref.get(harness.sessions)).toHaveLength(1);
+        expect((yield* Ref.get(harness.storedTargets)).has(RELAY_TARGET.environmentId)).toBe(true);
+      }).pipe(Effect.provide(harness.layer), Effect.scoped);
+    }),
+  );
+
+  it.effect("rejects registration before persisting a target blocked by the product profile", () =>
+    Effect.gen(function* () {
+      const persistedRegistrations = yield* Ref.make(0);
+      const harness = yield* makeHarness([], [], [], {
+        allowsTarget: (target) => target._tag === "PrimaryConnectionTarget",
+        beforeRegistrationRegister: () => Ref.update(persistedRegistrations, (count) => count + 1),
+      });
+
+      yield* Effect.gen(function* () {
+        const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+        const error = yield* Effect.flip(
+          registry.register(new RelayConnectionRegistration({ target: RELAY_TARGET })),
+        );
+
+        expect(error._tag).toBe("ConnectionBlockedError");
+        expect(yield* Ref.get(persistedRegistrations)).toBe(0);
+        expect((yield* Ref.get(harness.storedTargets)).has(RELAY_TARGET.environmentId)).toBe(false);
+        expect((yield* SubscriptionRef.get(registry.entries)).has(RELAY_TARGET.environmentId)).toBe(
+          false,
+        );
+      }).pipe(Effect.provide(harness.layer), Effect.scoped);
     }),
   );
 

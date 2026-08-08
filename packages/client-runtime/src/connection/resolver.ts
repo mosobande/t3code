@@ -241,33 +241,49 @@ const makeSshBroker = Effect.fn("clientRuntime.connection.broker.makeSsh")(funct
   });
 });
 
-export const make = Effect.gen(function* () {
-  const primary = yield* makePrimaryBroker();
-  const bearer = yield* makeBearerBroker();
-  const relay = yield* makeRelayBroker();
-  const ssh = yield* makeSshBroker();
+export type ConnectionTargetPolicy = (target: ConnectionTarget) => boolean;
 
-  const prepare = Effect.fn("clientRuntime.connection.broker.prepare")(function* (
-    entry: ConnectionCatalogEntry,
-  ) {
-    const target: ConnectionTarget = entry.target;
-    yield* Effect.annotateCurrentSpan({
-      "connection.environment.id": target.environmentId,
-      "connection.target.kind": target._tag,
+const allowAllConnectionTargets: ConnectionTargetPolicy = () => true;
+
+export const makeWithTargetPolicy = (allowsTarget: ConnectionTargetPolicy) =>
+  Effect.gen(function* () {
+    const primary = yield* makePrimaryBroker();
+    const bearer = yield* makeBearerBroker();
+    const relay = yield* makeRelayBroker();
+    const ssh = yield* makeSshBroker();
+
+    const prepare = Effect.fn("clientRuntime.connection.broker.prepare")(function* (
+      entry: ConnectionCatalogEntry,
+    ) {
+      const target: ConnectionTarget = entry.target;
+      if (!allowsTarget(target)) {
+        return yield* new ConnectionBlockedError({
+          reason: "unsupported",
+          detail: "This connection type is disabled in the selected product profile.",
+        });
+      }
+      yield* Effect.annotateCurrentSpan({
+        "connection.environment.id": target.environmentId,
+        "connection.target.kind": target._tag,
+      });
+      switch (target._tag) {
+        case "PrimaryConnectionTarget":
+          return yield* primary(target);
+        case "BearerConnectionTarget":
+          return yield* bearer({ ...entry, target });
+        case "RelayConnectionTarget":
+          return yield* relay(target);
+        case "SshConnectionTarget":
+          return yield* ssh({ ...entry, target });
+      }
     });
-    switch (target._tag) {
-      case "PrimaryConnectionTarget":
-        return yield* primary(target);
-      case "BearerConnectionTarget":
-        return yield* bearer({ ...entry, target });
-      case "RelayConnectionTarget":
-        return yield* relay(target);
-      case "SshConnectionTarget":
-        return yield* ssh({ ...entry, target });
-    }
+
+    return ConnectionResolver.of({ prepare });
   });
 
-  return ConnectionResolver.of({ prepare });
-});
+export const make = makeWithTargetPolicy(allowAllConnectionTargets);
 
 export const layer = Layer.effect(ConnectionResolver, make);
+
+export const layerWithTargetPolicy = (allowsTarget: ConnectionTargetPolicy) =>
+  Layer.effect(ConnectionResolver, makeWithTargetPolicy(allowsTarget));

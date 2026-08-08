@@ -1,5 +1,8 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { productProfile } from "@t3tools/shared/productProfile";
+
+if (productProfile.publishableAsSigidi) return Astro.redirect("/");
 
 const documents = [
   {

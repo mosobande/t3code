@@ -1,8 +1,14 @@
 import "vite-plus/test/config";
 import { defineConfig } from "vite-plus";
+import { resolveProductProfile } from "./packages/shared/src/productProfile.ts";
 import * as NodeURL from "node:url";
 
+const buildProfile = resolveProductProfile(process.env.SIGIDI_BUILD_PROFILE);
+
 export default defineConfig({
+  define: {
+    __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
+  },
   resolve: {
     alias: {
       "~": NodeURL.fileURLToPath(new URL("./apps/web/src", import.meta.url)),

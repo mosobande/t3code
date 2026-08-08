@@ -1,5 +1,6 @@
 import { fromLenientJson } from "@t3tools/shared/schemaJson";
 import { resolveDesktopIdentity } from "@t3tools/shared/desktopIdentity";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
@@ -20,6 +21,7 @@ import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 interface EarlyDesktopSettingsInput {
   readonly env: NodeJS.ProcessEnv;
   readonly homeDirectory: string;
+  readonly isPackaged?: boolean;
   readonly joinPath: JoinPath;
   readonly readFileString: (path: string) => string;
 }
@@ -51,9 +53,13 @@ const isDevelopmentEnvironment = (env: NodeJS.ProcessEnv): boolean =>
 function resolveEarlyDesktopSettingsPath(input: {
   readonly env: NodeJS.ProcessEnv;
   readonly homeDirectory: string;
+  readonly isPackaged?: boolean;
   readonly joinPath: JoinPath;
 }): string {
-  const t3Home = Option.fromUndefinedOr(input.env.T3CODE_HOME);
+  const t3Home =
+    input.isPackaged && productProfile.publishableAsSigidi
+      ? Option.none<string>()
+      : Option.fromUndefinedOr(input.env.T3CODE_HOME);
   const baseDir = resolveDesktopBaseDir({
     homeDirectory: input.homeDirectory,
     joinPath: input.joinPath,

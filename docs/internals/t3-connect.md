@@ -1,4 +1,6 @@
-# T3 Connect
+# T3 Connect (source-only upstream reference)
+
+> T3 Connect is not a SIGIDI service. The `local-desktop` profile cannot activate or expose it. This document is retained for `upstream-full` maintenance only.
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 

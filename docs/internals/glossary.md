@@ -14,6 +14,32 @@ This is a living glossary for T3 Code. It explains what common terms mean in thi
 
 ## Concepts
 
+### Product profiles
+
+#### local-desktop
+
+The default SIGIDI build profile. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, and diagnostics owners, while preventing inherited remote capabilities from hydrating, starting, or appearing in product UI.
+
+#### upstream-full
+
+An explicit maintainer-only build profile that keeps inherited T3 Code integrations testable. It is not a SIGIDI release and does not authorize external writes.
+
+#### Remote Environment SSH
+
+Inherited SSH execution against another environment. It is unavailable in `local-desktop`.
+
+#### SCM Git-over-SSH
+
+SSH transport used by source-control providers for clone, fetch, and push. It remains available in `local-desktop` and is distinct from Remote Environment SSH.
+
+#### Loopback bootstrap bearer exchange
+
+The existing `bootstrapRemoteBearerSession`-named exchange used to authenticate the renderer to its loopback desktop server. The compatibility name includes “remote,” but this local authentication path remains required.
+
+#### Relay session
+
+The inherited relay/DPoP environment-discovery and connection path. It is unavailable in `local-desktop` and retained only through `upstream-full`.
+
 ### Project and workspace
 
 #### Project
