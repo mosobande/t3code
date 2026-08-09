@@ -4,6 +4,18 @@ SIGIDI is a separate product that imports T3 Code. T3 Code supplies reusable cap
 
 This document is the durable boundary for SIGIDI-specific work. The root `AGENTS.md` contains only the rules that apply to most tasks.
 
+## Build-purpose and profile boundary
+
+**Local (`local`)** is the customer profile and the default. The build resolves it once and compiles its capability map into the existing desktop, server, renderer, client-runtime, and packaging owners. It can bind directly to the local network for explicit mobile pairing. It cannot hydrate or register inherited remote targets, start Tailscale or WSL, expose remote IPC or UI, use hosted authentication, or package inherited service configuration.
+
+**Upstream (`upstream`)** is the maintainer-only compatibility profile. It preserves the established inherited paths for focused proof and upstream sync. It is not publishable as SIGIDI. A profile selects application composition only; it never authorizes a workflow, credential, deployment, signing operation, notarization submission, or publication.
+
+Stable and Nightly are release channels for `local`. They communicate maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both channels compile `local`; Nightly must not unlock remote or hosted capabilities that Stable excludes.
+
+Apply the profile at the earliest existing lifecycle owner: before persisted target hydration, broker resolution, settings reconciliation, process launch, route generation, IPC/preload exposure, or artifact staging. Do not add a second local registry, resolver, platform implementation, Effect graph, or packaging path. If no existing owner can enforce a capability, record the wall with Atona and obtain a maintainer decision before adding implementation.
+
+Build purposes do not partition local data. Stable and Nightly `local` builds use the established `~/.sigidi/userdata` home so projects, threads, provider state, and settings remain available across compatible builds. The profile still ignores ambient home overrides in the packaged SIGIDI product and supplies the selected shared home explicitly to its child server.
+
 ## Choose the narrowest ownership boundary
 
 Apply this decision ladder in order:
@@ -82,7 +94,7 @@ SIGIDI-owned schema uses a separate migration ledger and `sigidi_*` objects. Nev
 
 Migration compatibility is content-sensitive, not order-only. A source hash identifies the canonical bytes of one known migration implementation. The compatibility gate must reject a known migration ID and name when its source hash differs, because identical labels can hide different SQL or data transformations. Engine identity, the applied-ledger prefix, required schema capabilities, supported upgrade baselines, concurrency, rollback, and remote preflight also require proof. The tracked migration ADR will own the complete contract when the lane is implemented.
 
-Do not automatically read or mutate an installed T3 database. An import or migration requires an accepted ownership, consent, backup, compatibility, and recovery decision.
+Do not copy, import, or rewrite an installed database as a profile transition. Compatible SIGIDI and inherited runtime code can read the established shared database in place. A schema or data migration still requires accepted ownership, backup, compatibility, and recovery decisions.
 
 ## External services and releases
 

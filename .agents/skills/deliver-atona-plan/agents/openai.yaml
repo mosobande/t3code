@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deliver Atona Plan"
+  short_description: "Turn a live Atona plan into a working app"
+  default_prompt: "Use $deliver-atona-plan to slice this confirmed Atona plan, preserve the repository technology, and deliver a working reviewed app."

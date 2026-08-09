@@ -6,8 +6,10 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
+import * as Electron from "electron";
 
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronProtocol from "../electron/ElectronProtocol.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
@@ -95,6 +97,30 @@ export const make = Effect.gen(function* () {
   // detection in resolveUserDataPath match on fresh installs.
   const userDataPath = yield* DesktopAppIdentity.resolveUserDataPath;
   yield* electronApp.setPath("userData", userDataPath);
+
+  if (!productProfile.capabilities.hostedAuthentication) {
+    return DesktopClerk.of({
+      configure: Effect.gen(function* () {
+        const electronWindow = yield* ElectronWindow.ElectronWindow;
+        const context = yield* Effect.context<ElectronWindow.ElectronWindow>();
+        const runPromise = Effect.runPromiseWith(context);
+        if (!Electron.app.requestSingleInstanceLock()) {
+          yield* electronApp.quit;
+          return yield* Effect.interrupt;
+        }
+        yield* electronApp.on("second-instance", () => {
+          void runPromise(
+            Effect.gen(function* () {
+              const mainWindow = yield* electronWindow.currentMainOrFirst;
+              if (Option.isSome(mainWindow)) {
+                yield* electronWindow.reveal(mainWindow.value);
+              }
+            }),
+          );
+        });
+      }).pipe(Effect.withSpan("desktop.instance.configure")),
+    });
+  }
 
   const bridge = yield* Effect.acquireRelease(
     Effect.try({

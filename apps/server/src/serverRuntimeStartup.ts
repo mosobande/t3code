@@ -149,7 +149,7 @@ export const recordStartupHeartbeat = Effect.gen(function* () {
     ),
   );
 
-  yield* analytics.record("server.boot.heartbeat", {
+  yield* analytics.record("sigidi.server.boot.heartbeat", {
     threadCount,
     projectCount,
   });

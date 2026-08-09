@@ -102,12 +102,22 @@ function relayAccountId(clerkToken: string): Option.Option<string> {
   }
 }
 
-export const make = Effect.fn("RelayEnvironmentDiscovery.make")(function* () {
+export interface RelayEnvironmentDiscoveryOptions {
+  readonly enabled?: boolean;
+}
+
+export const make = Effect.fn("RelayEnvironmentDiscovery.make")(function* ({
+  enabled = true,
+}: RelayEnvironmentDiscoveryOptions = {}) {
+  const state = yield* SubscriptionRef.make(EMPTY_RELAY_ENVIRONMENT_DISCOVERY_STATE);
+  if (!enabled) {
+    return RelayEnvironmentDiscovery.of({ state, refresh: Effect.void });
+  }
+
   const relay = yield* ManagedRelay.ManagedRelayClient;
   const session = yield* ClientCapabilities.CloudSession;
   const connectivity = yield* Connectivity.Connectivity;
   const wakeups = yield* ConnectionWakeups.ConnectionWakeups;
-  const state = yield* SubscriptionRef.make(EMPTY_RELAY_ENVIRONMENT_DISCOVERY_STATE);
   const refreshLock = yield* Semaphore.make(1);
   const hasRefreshed = yield* Ref.make(false);
   const accountGeneration = yield* Ref.make(0);
@@ -347,3 +357,6 @@ export const make = Effect.fn("RelayEnvironmentDiscovery.make")(function* () {
 });
 
 export const layer = Layer.effect(RelayEnvironmentDiscovery, make());
+
+export const layerWithOptions = (options: RelayEnvironmentDiscoveryOptions) =>
+  Layer.effect(RelayEnvironmentDiscovery, make(options));

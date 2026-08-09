@@ -1,16 +1,18 @@
 # SIGIDI
 
-SIGIDI is a local-first desktop development workspace for directing coding agents. Its server also supports web and the inherited mobile client. SIGIDI connects to provider CLIs already configured on your machine and keeps agent execution, project files, terminals, and version-control operations on the host environment.
+SIGIDI is a local-first macOS desktop development workspace for directing coding agents. It connects to provider CLIs already configured on your machine and keeps agent execution, project files, terminals, and version-control operations on the host environment.
 
 SIGIDI currently supports Codex, Claude Code, Cursor, Grok Build, and OpenCode.
 
 > [!IMPORTANT]
 > SIGIDI is in pre-release development. This repository does not currently publish SIGIDI installers, package releases, or a hosted SIGIDI service. Build and run it from source.
-> The first release pipeline targets signed macOS desktop artifacts only. Linux, Windows, CLI, hosted-web, and mobile publication remain disabled.
+> The active release workflow is an unsigned, no-publish macOS rehearsal. Signing, notarization, updater publication, installers, and hosted services require separate release authority.
 
 ## Relationship to T3 Code
 
-SIGIDI is a downstream product built from the open-source [T3 Code](https://github.com/pingdotgg/t3code) project. It reuses T3 Code's server, client, provider, and remote-connection capabilities while keeping SIGIDI product identity, data, releases, policy, and external services separate.
+SIGIDI is a downstream product built from the open-source [T3 Code](https://github.com/pingdotgg/t3code) project. It reuses T3 Code's server, client, provider, and workbench capabilities while keeping SIGIDI product identity, data, releases, policy, and external services separate.
+
+The default `local` profile fixes the customer capability set at compile time. The explicit maintainer-only `upstream` profile keeps inherited integrations testable for upstream sync. It is not a SIGIDI release and grants no deployment or publication authority.
 
 Some internal names remain T3-compatible because changing them would add divergence without changing the SIGIDI experience. A T3 Code command, installer, mobile app, hosted domain, or managed service is an upstream resource unless this repository explicitly documents a SIGIDI-owned replacement.
 
@@ -58,7 +60,7 @@ Start the Electron desktop client:
 vp run dev:desktop
 ```
 
-See the [development scripts](./docs/internals/scripts.md) for server-only, web-only, remote-sharing, and multi-worktree commands.
+See the [development scripts](./docs/internals/scripts.md) for server-only, web-only, desktop, and multi-worktree commands.
 
 ## Provider setup
 
@@ -72,12 +74,12 @@ Install and authenticate at least one provider before starting SIGIDI:
 
 ## Architecture
 
-SIGIDI retains T3 Code's multi-surface architecture:
+SIGIDI reuses T3 Code's source architecture:
 
 - `apps/server` owns provider processes, orchestration, terminals, persistence, and version control.
 - `apps/web` provides the browser client.
 - `apps/desktop` packages the web client with the Electron host.
-- `apps/mobile` contains the inherited React Native client; SIGIDI does not yet publish a mobile distribution.
+- `apps/mobile` contains a source-only inherited React Native client. It is not a published `local` mobile product.
 - `packages/contracts` defines typed client-server contracts.
 - `packages/client-runtime` contains runtime behavior shared by web and mobile.
 
@@ -88,13 +90,12 @@ SIGIDI-specific features should use standalone `sigidi` modules and narrow regis
 - [Install and first run](./docs/user/install.md)
 - [Permission modes](./docs/user/permission-modes.md)
 - [Keyboard shortcuts](./docs/user/keybindings.md)
-- [Remote access](./docs/user/remote-access.md)
 - [Source-control integrations](./docs/user/source-control.md)
 - [Internal architecture](./docs/internals/overview.md)
 - [SIGIDI downstream boundary](./docs/architecture/sigidi-downstream-boundary.md)
 - [Approved SIGIDI identity](./docs/brand/approved/README.md)
 
-Some inherited documentation still describes T3 Code services or compatibility identifiers. Treat those references as upstream behavior until the corresponding [SIGIDI service migration](./docs/operations/sigidi-service-migration.md) is complete.
+Source-only maintainer documents describe inherited T3 Code services and compatibility identifiers. They are not shipped SIGIDI behavior.
 
 ## Contributing
 

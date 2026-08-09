@@ -1,10 +1,29 @@
-# Release Checklist
+# Release and rehearsal
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
-This document covers the unified release workflow for stable and nightly desktop releases.
+The active `.github/workflows/release.yml` path is a no-publish build for `local`. Pull requests are rehearsals. Tags in the form `vX.Y.Z` build Stable, and tags in the form `vX.Y.Z-nightly.YYYYMMDD.N` build Nightly. It builds unsigned macOS arm64 and x64 DMG/ZIP artifacts, inspects them in the job, and uploads nothing.
 
-## What the workflow does
+The workflow does not create a tag or GitHub Release, submit signing or notarization work, publish updater metadata, deploy a relay or hosted app, publish a CLI package, or announce a release. A maintainer creates and pushes the input tag. `upstream` is not publication authority.
+
+Run the same focused proof locally:
+
+```sh
+SIGIDI_BUILD_PROFILE=local vp run build:desktop
+SIGIDI_BUILD_PROFILE=local vp run dist:desktop:artifact --platform mac --target dmg --arch arm64
+SIGIDI_BUILD_PROFILE=local vp run dist:desktop:artifact --platform mac --target dmg --arch x64
+vp run release:smoke
+```
+
+Keep signing variables, updater repository variables, relay/Clerk/Axiom/Cloudflare configuration, tags, workflow dispatches, and publishing credentials out of rehearsal. A local artifact contains no public updater configuration. G3A must separately authorize the SIGIDI GitHub repository, signing/notarization, updater metadata, and release upload before those functions are enabled.
+
+Marketing and schema publication are a separate G3B operation. They require the exact SIGIDI domain, legal identity, hosting project, and deploy authority. Desktop publication must not depend on it.
+
+## Inherited upstream release template (disabled)
+
+The remainder of this file records the disabled inherited automation for sync and future decisions. No workflow event can run these jobs. Do not treat the commands, services, credentials, or domains below as SIGIDI release instructions.
+
+### What the inherited workflow did
 
 - Workflow: `.github/workflows/release.yml`
 - Triggers:

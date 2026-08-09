@@ -21,6 +21,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useCanGoBack, useLocation, useNavigate } from "@tanstack/react-router";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -56,11 +57,18 @@ const SETTINGS_SECTION_ICONS: Readonly<
   "/settings/archived": ArchiveIcon,
 };
 
+const settingsNavPaths = (Object.keys(SETTINGS_SECTION_LABELS) as SettingsPath[]).filter(
+  (to) =>
+    productProfile.capabilities.remoteEnvironments ||
+    productProfile.capabilities.lanMobilePairing ||
+    to !== "/settings/connections",
+);
+
 export const SETTINGS_NAV_ITEMS: ReadonlyArray<{
   label: string;
   to: SettingsPath;
   icon: ComponentType<{ className?: string }>;
-}> = (Object.keys(SETTINGS_SECTION_LABELS) as SettingsPath[]).map((to) => ({
+}> = settingsNavPaths.map((to) => ({
   to,
   label: SETTINGS_SECTION_LABELS[to],
   icon: SETTINGS_SECTION_ICONS[to],
@@ -298,7 +306,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-[var(--sidebar-content-inset)]">
-        <T3ConnectSidebarSignIn />
+        {productProfile.capabilities.hostedAuthentication ? <T3ConnectSidebarSignIn /> : null}
         <div className="flex items-center gap-1">
           <SidebarMenu className="min-w-0 flex-1">
             <SidebarMenuItem>
@@ -308,7 +316,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
-          <T3ConnectSidebarAvatar />
+          {productProfile.capabilities.hostedAuthentication ? <T3ConnectSidebarAvatar /> : null}
         </div>
       </SidebarFooter>
     </>

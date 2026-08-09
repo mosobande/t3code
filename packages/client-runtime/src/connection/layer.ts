@@ -11,34 +11,57 @@ import * as RelayEnvironmentDiscovery from "../relay/discovery.ts";
 import * as RemoteEnvironmentAuthorization from "../authorization/service.ts";
 import * as RpcSession from "../rpc/session.ts";
 
-const resolverLayer = ConnectionResolver.layer.pipe(
-  Layer.provide(RemoteEnvironmentAuthorization.layer),
-);
+import type { ConnectionTarget } from "./model.ts";
 
-const driverLayer = ConnectionDriver.layer.pipe(
-  Layer.provide(Layer.mergeAll(resolverLayer, RpcSession.layer)),
-);
+export interface ConnectionLayerOptions {
+  readonly allowsTarget?: (target: ConnectionTarget) => boolean;
+  readonly remoteEnabled?: boolean;
+}
 
-const registryLayer = EnvironmentRegistry.layer.pipe(Layer.provide(driverLayer));
+const allowAllConnectionTargets = () => true;
 
-const onboardingLayer = ConnectionOnboarding.layer.pipe(Layer.provide(registryLayer));
+const buildLayer = ({
+  allowsTarget = allowAllConnectionTargets,
+  remoteEnabled = true,
+}: ConnectionLayerOptions = {}) => {
+  const resolverLayer = ConnectionResolver.layerWithTargetPolicy(allowsTarget).pipe(
+    Layer.provide(RemoteEnvironmentAuthorization.layer),
+  );
 
-const connectionServicesLayer = Layer.mergeAll(
-  registryLayer,
-  RelayEnvironmentDiscovery.layer,
-  onboardingLayer,
-);
+  const driverLayer = ConnectionDriver.layer.pipe(
+    Layer.provide(Layer.mergeAll(resolverLayer, RpcSession.layer)),
+  );
 
-const connectionStartupLayer = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
-    const platformSource = yield* PlatformConnectionSource.PlatformConnectionSource;
-    yield* registry.start;
-    yield* platformSource.registrations.pipe(
-      Stream.runForEach(registry.reconcilePlatform),
-      Effect.forkScoped,
-    );
-  }).pipe(Effect.withSpan("clientRuntime.connection.application.start")),
-);
+  const registryLayer = EnvironmentRegistry.layerWithTargetPolicy(allowsTarget).pipe(
+    Layer.provide(driverLayer),
+  );
 
-export const layer = connectionStartupLayer.pipe(Layer.provideMerge(connectionServicesLayer));
+  const onboardingLayer = ConnectionOnboarding.layerWithOptions({
+    remoteEnabled,
+  }).pipe(Layer.provide(registryLayer));
+
+  const connectionServicesLayer = Layer.mergeAll(
+    registryLayer,
+    RelayEnvironmentDiscovery.layerWithOptions({ enabled: remoteEnabled }),
+    onboardingLayer,
+  );
+
+  const connectionStartupLayer = Layer.effectDiscard(
+    Effect.gen(function* () {
+      const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+      const platformSource = yield* PlatformConnectionSource.PlatformConnectionSource;
+      yield* registry.start;
+      yield* platformSource.registrations.pipe(
+        Stream.runForEach(registry.reconcilePlatform),
+        Effect.forkScoped,
+      );
+    }).pipe(Effect.withSpan("clientRuntime.connection.application.start")),
+  );
+
+  return connectionStartupLayer.pipe(Layer.provideMerge(connectionServicesLayer));
+};
+
+export const layer = buildLayer();
+
+export const makeLayer = (options: ConnectionLayerOptions = {}): typeof layer =>
+  buildLayer(options);

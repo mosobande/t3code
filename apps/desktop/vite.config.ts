@@ -1,16 +1,27 @@
 import { defineConfig } from "vite-plus";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
 
 const repoEnv = loadRepoEnv();
+const buildProfile = resolveProductProfile(process.env.SIGIDI_BUILD_PROFILE);
 const shouldLaunchElectronAfterPack = process.env.T3CODE_DESKTOP_DEV === "1";
 const publicConfigDefine = {
+  __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
   __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: JSON.stringify(
-    repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
+    buildProfile.capabilities.hostedAuthentication
+      ? (repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "")
+      : "",
   ),
 };
 
+export const shouldBundleDesktopMainDependency = (id: string): boolean =>
+  id.startsWith("@t3tools/") || id === "@clerk/electron" || id.startsWith("@clerk/electron/");
+
 export default defineConfig({
+  define: {
+    __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
+  },
   run: {
     tasks: {
       build: {
@@ -45,7 +56,7 @@ export default defineConfig({
       entry: ["src/main.ts"],
       clean: true,
       deps: {
-        alwaysBundle: (id) => id.startsWith("@t3tools/"),
+        alwaysBundle: shouldBundleDesktopMainDependency,
       },
       ...(shouldLaunchElectronAfterPack ? { onSuccess: "node scripts/dev-electron.mjs" } : {}),
     },
@@ -59,8 +70,13 @@ export default defineConfig({
       deps: {
         // Sandboxed Electron preloads cannot reliably resolve package imports
         // from inside the packaged ASAR. Bundle Clerk's preload bridge into the
-        // preload artifact instead of leaving a runtime require() behind.
-        alwaysBundle: (id) => id === "@clerk/electron" || id.startsWith("@clerk/electron/"),
+        // preload artifact instead of leaving a runtime require() behind. The
+        // product profile must also be bundled so this build's immutable
+        // __SIGIDI_BUILD_PROFILE__ define reaches the preload boundary.
+        alwaysBundle: (id) =>
+          id === "@t3tools/shared/productProfile" ||
+          id === "@clerk/electron" ||
+          id.startsWith("@clerk/electron/"),
       },
     },
     {

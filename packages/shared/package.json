@@ -11,6 +11,10 @@
       "types": "./src/desktopIdentity.ts",
       "import": "./src/desktopIdentity.ts"
     },
+    "./productProfile": {
+      "types": "./src/productProfile.ts",
+      "import": "./src/productProfile.ts"
+    },
     "./model": {
       "types": "./src/model.ts",
       "import": "./src/model.ts"

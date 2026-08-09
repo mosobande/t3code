@@ -6,11 +6,13 @@ import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NetService from "@t3tools/shared/Net";
+import { productProfile } from "@t3tools/shared/productProfile";
 import { assert, describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as TestConsole from "effect/testing/TestConsole";
 import { Command } from "effect/unstable/cli";
+import * as CliError from "effect/unstable/cli/CliError";
 
 import { cli } from "../bin.ts";
 import {
@@ -194,7 +196,7 @@ describe("t3 pair", () => {
     ).pipe(Effect.provide(NodeServices.layer)),
   );
 
-  it.effect("directs to t3 serve or t3 connect when no server is running", () =>
+  it.effect("directs to an available server command when no server is running", () =>
     Effect.gen(function* () {
       const baseDir = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-pair-none-test-"));
 
@@ -207,8 +209,31 @@ describe("t3 pair", () => {
       );
       assert.include(rendered, "No running T3 Code server found.");
       assert.include(rendered, "npx t3 serve");
-      assert.include(rendered, "npx t3 connect");
+      if (productProfile.capabilities.inheritedRemoteIntegrations) {
+        assert.include(rendered, "npx t3 connect");
+      } else {
+        assert.notInclude(rendered, "npx t3 connect");
+      }
     }).pipe(Effect.provide(NodeServices.layer)),
+  );
+
+  it.effect.skipIf(productProfile.capabilities.tailscaleExposure)(
+    "does not register Tailscale pairing flags in the local profile",
+    () =>
+      provideCliTestLayers(
+        Effect.gen(function* () {
+          const error = yield* runCli(["pair", "--tailscale"]).pipe(Effect.flip);
+          if (!CliError.isCliError(error) || error._tag !== "ShowHelp") {
+            assert.fail(`Expected ShowHelp, got ${String(error)}`);
+          }
+          assert.deepEqual(error.commandPath, ["t3", "pair"]);
+          const optionError = error.errors[0] as CliError.CliError | undefined;
+          if (!optionError || optionError._tag !== "UnrecognizedOption") {
+            assert.fail(`Expected UnrecognizedOption, got ${String(optionError?._tag)}`);
+          }
+          assert.equal(optionError.option, "--tailscale");
+        }),
+      ),
   );
 
   it.effect("ignores runtime state whose recorded pid is no longer alive", () =>

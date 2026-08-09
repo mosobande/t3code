@@ -3,6 +3,7 @@ import {
   ANDROID_PLAY_STORE_URL,
   GITHUB_REPOSITORY_URL,
   IOS_APP_STORE_URL,
+  IS_SIGIDI_MARKETING,
   MARKETING_STATS,
 } from "../lib/site";
 
@@ -19,7 +20,7 @@ const {
 } = Astro.props;
 ---
 
-<html lang="en">
+<html lang="en" data-product-profile={IS_SIGIDI_MARKETING ? "local" : "upstream"}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -44,18 +45,20 @@ const {
             <img class="nav-brand-wordmark" src="/sigidi-wordmark.png" alt="" />
           </a>
           <div class="nav-right">
-            <a
-              class="nav-stars"
-              href={GITHUB_REPOSITORY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Star T3 Code on GitHub — ${MARKETING_STATS.githubStars} stars`}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 2.3l2.9 5.88 6.49.94-4.7 4.58 1.11 6.47L12 17.12l-5.8 3.05 1.11-6.47-4.7-4.58 6.49-.94L12 2.3z"/>
-              </svg>
-              <span><strong>{MARKETING_STATS.githubStars}</strong> GitHub stars</span>
-            </a>
+            {MARKETING_STATS.githubStars && (
+              <a
+                class="nav-stars"
+                href={GITHUB_REPOSITORY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Star T3 Code on GitHub — ${MARKETING_STATS.githubStars} stars`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 2.3l2.9 5.88 6.49.94-4.7 4.58 1.11 6.47L12 17.12l-5.8 3.05 1.11-6.47-4.7-4.58 6.49-.94L12 2.3z"/>
+                </svg>
+                <span><strong>{MARKETING_STATS.githubStars}</strong> GitHub stars</span>
+              </a>
+            )}
           </div>
         </div>
       </nav>
@@ -68,17 +71,21 @@ const {
         <div class="footer-inner">
           <div class="footer-brand">
             <img src="/icon.png" alt="" />
-            <span>&copy; {new Date().getFullYear()} T3 Tools Inc · MIT licensed</span>
+            <span>&copy; {new Date().getFullYear()} {IS_SIGIDI_MARKETING ? "SIGIDI contributors" : "T3 Tools Inc"} · MIT licensed</span>
           </div>
           <div class="footer-links">
             <a href={GITHUB_REPOSITORY_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
-            <a href="https://discord.gg/jn4EGJjrvv" target="_blank" rel="noopener noreferrer">Discord</a>
             <a href="/download">Download</a>
-            <a href={IOS_APP_STORE_URL} target="_blank" rel="noopener noreferrer">iOS app</a>
-            <a href={ANDROID_PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Android app</a>
-            <a href="/terms-of-service">Terms</a>
-            <a href="/privacy-policy">Privacy</a>
-            <a href="/security-policy">Security</a>
+            {!IS_SIGIDI_MARKETING && (
+              <>
+                <a href="https://discord.gg/jn4EGJjrvv" target="_blank" rel="noopener noreferrer">Discord</a>
+                <a href={IOS_APP_STORE_URL} target="_blank" rel="noopener noreferrer">iOS app</a>
+                <a href={ANDROID_PLAY_STORE_URL} target="_blank" rel="noopener noreferrer">Android app</a>
+                <a href="/terms-of-service">Terms</a>
+                <a href="/privacy-policy">Privacy</a>
+                <a href="/security-policy">Security</a>
+              </>
+            )}
           </div>
         </div>
       </footer>

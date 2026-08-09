@@ -17,6 +17,7 @@ import {
 } from "@t3tools/contracts";
 import * as NetService from "@t3tools/shared/Net";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { productProfile } from "@t3tools/shared/productProfile";
 import { deriveServerPaths } from "../config.ts";
 import { resolveServerConfig } from "./config.ts";
 
@@ -49,7 +50,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
     otlpTracesUrl: undefined,
     otlpMetricsUrl: undefined,
     otlpExportIntervalMs: 10_000,
-    otlpServiceName: "t3-server",
+    otlpServiceName: "sigidi-server",
     devAllowedOrigins: [],
   } as const;
 
@@ -121,13 +122,16 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         cwd: process.cwd(),
         baseDir,
         ...derivedPaths,
-        host: "0.0.0.0",
+        host: productProfile.capabilities.lanMobilePairing ? "0.0.0.0" : "127.0.0.1",
         staticDir: undefined,
         devUrl: new URL("http://127.0.0.1:5173"),
         devAllowedOrigins: ["https://host.example.ts.net", "https://phone.example.ts.net"],
         noBrowser: true,
         startupPresentation: "browser",
         desktopBootstrapToken: undefined,
+        desktopTelemetryFd: undefined,
+        desktopTelemetryControlFd: undefined,
+        resourceMonitorPath: undefined,
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: true,
         tailscaleServeEnabled: false,
@@ -198,9 +202,12 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         noBrowser: true,
         startupPresentation: "browser",
         desktopBootstrapToken: undefined,
+        desktopTelemetryFd: undefined,
+        desktopTelemetryControlFd: undefined,
+        resourceMonitorPath: undefined,
         autoBootstrapProjectFromCwd: true,
         logWebSocketEvents: true,
-        tailscaleServeEnabled: true,
+        tailscaleServeEnabled: productProfile.capabilities.tailscaleExposure,
         tailscaleServePort: 8443,
       });
       assert.equal(resolved.dbPath, join(baseDir, "userdata", "state.sqlite"));
@@ -341,7 +348,7 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         cwd: process.cwd(),
         baseDir,
         ...derivedPaths,
-        host: "127.0.0.2",
+        host: productProfile.capabilities.lanMobilePairing ? "127.0.0.2" : "127.0.0.1",
         staticDir: resolved.staticDir,
         devUrl: undefined,
         noBrowser: true,
@@ -549,6 +556,9 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         noBrowser: true,
         startupPresentation: "browser",
         desktopBootstrapToken: undefined,
+        desktopTelemetryFd: undefined,
+        desktopTelemetryControlFd: undefined,
+        resourceMonitorPath: undefined,
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,
         tailscaleServeEnabled: false,
@@ -606,12 +616,15 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         cwd: process.cwd(),
         baseDir,
         ...derivedPaths,
-        host: undefined,
+        host: productProfile.capabilities.inheritedRemoteIntegrations ? undefined : "127.0.0.1",
         staticDir: resolved.staticDir,
         devUrl: undefined,
         noBrowser: true,
         startupPresentation: "headless",
         desktopBootstrapToken: undefined,
+        desktopTelemetryFd: undefined,
+        desktopTelemetryControlFd: undefined,
+        resourceMonitorPath: undefined,
         autoBootstrapProjectFromCwd: false,
         logWebSocketEvents: false,
         tailscaleServeEnabled: false,

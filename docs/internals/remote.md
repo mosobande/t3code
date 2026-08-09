@@ -1,4 +1,6 @@
-# Remote Architecture
+# Remote Architecture (source-only upstream reference)
+
+> `local` cannot hydrate, register, start, or expose these capabilities. This document is retained for `upstream` maintenance and T3 Code sync only.
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 

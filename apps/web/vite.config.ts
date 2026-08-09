@@ -8,10 +8,13 @@ import { defineConfig } from "vite-plus";
 import pkg from "./package.json" with { type: "json" };
 
 import { DEV_PROXIED_PATH_PREFIXES } from "@t3tools/shared/devProxy";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config";
 
 const repoEnv = loadRepoEnv();
+const buildProfile = resolveProductProfile(process.env.SIGIDI_BUILD_PROFILE);
+const inheritedRemoteConfigEnabled = buildProfile.capabilities.inheritedRemoteIntegrations;
 Object.assign(process.env, repoEnv);
 
 // Single-origin dev is signalled positively, because it cannot be inferred
@@ -28,16 +31,35 @@ const explicitHost = process.env.HOST?.trim();
 const host = explicitHost || "localhost";
 const configuredWsUrl = isSingleOriginDev ? undefined : process.env.VITE_WS_URL?.trim();
 const configuredHttpUrl = isSingleOriginDev ? undefined : process.env.VITE_HTTP_URL?.trim();
-const configuredRelayUrl = repoEnv.VITE_T3CODE_RELAY_URL?.trim() || "";
-const configuredClerkPublishableKey = repoEnv.VITE_CLERK_PUBLISHABLE_KEY?.trim() || "";
-const configuredClerkJwtTemplate = repoEnv.VITE_CLERK_JWT_TEMPLATE?.trim() || "";
-const configuredClerkCliOAuthClientId = repoEnv.VITE_CLERK_CLI_OAUTH_CLIENT_ID?.trim() || "";
-const configuredRelayTracingUrl = repoEnv.VITE_RELAY_OTLP_TRACES_URL?.trim() || "";
-const configuredRelayTracingDataset = repoEnv.VITE_RELAY_OTLP_TRACES_DATASET?.trim() || "";
-const configuredRelayTracingToken = repoEnv.VITE_RELAY_OTLP_TRACES_TOKEN?.trim() || "";
-const configuredHostedAppChannel = process.env.VITE_HOSTED_APP_CHANNEL?.trim() || "";
+const configuredRelayUrl = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_T3CODE_RELAY_URL?.trim() || ""
+  : "";
+const configuredClerkPublishableKey = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_CLERK_PUBLISHABLE_KEY?.trim() || ""
+  : "";
+const configuredClerkJwtTemplate = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_CLERK_JWT_TEMPLATE?.trim() || ""
+  : "";
+const configuredClerkCliOAuthClientId = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_CLERK_CLI_OAUTH_CLIENT_ID?.trim() || ""
+  : "";
+const configuredRelayTracingUrl = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_RELAY_OTLP_TRACES_URL?.trim() || ""
+  : "";
+const configuredRelayTracingDataset = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_RELAY_OTLP_TRACES_DATASET?.trim() || ""
+  : "";
+const configuredRelayTracingToken = inheritedRemoteConfigEnabled
+  ? repoEnv.VITE_RELAY_OTLP_TRACES_TOKEN?.trim() || ""
+  : "";
+const configuredHostedAppChannel = inheritedRemoteConfigEnabled
+  ? process.env.VITE_HOSTED_APP_CHANNEL?.trim() || ""
+  : "";
 const configuredAppVersion = process.env.APP_VERSION?.trim() || pkg.version;
 const configuredHostedAppUrl = (() => {
+  if (!inheritedRemoteConfigEnabled) {
+    return undefined;
+  }
   const explicitHostedAppUrl = process.env.VITE_HOSTED_APP_URL?.trim();
   if (explicitHostedAppUrl) {
     return explicitHostedAppUrl;
@@ -154,6 +176,7 @@ export default defineConfig(() => {
       ],
     },
     define: {
+      __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
       // In dev mode, tell the web app where the WebSocket server lives
       "import.meta.env.VITE_WS_URL": JSON.stringify(configuredWsUrl ?? ""),
       // Pinned explicitly rather than left to Vite's automatic VITE_ exposure:

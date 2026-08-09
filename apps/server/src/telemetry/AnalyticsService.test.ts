@@ -3,6 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as HttpServer from "effect/unstable/http/HttpServer";
 import * as HttpServerRequest from "effect/unstable/http/HttpServerRequest";
@@ -20,6 +21,7 @@ interface RecordedBatchRequest {
       readonly properties?: {
         readonly index?: number;
         readonly clientType?: string;
+        readonly sigidiVersion?: string;
       };
     }>;
   } | null;
@@ -31,6 +33,7 @@ interface RecordedBatchBody {
     readonly properties?: {
       readonly index?: number;
       readonly clientType?: string;
+      readonly sigidiVersion?: string;
     };
   }>;
 }
@@ -46,9 +49,9 @@ it.layer(NodeServices.layer)("AnalyticsService test", (it) => {
       const telemetryLayer = AnalyticsService.layer.pipe(Layer.provideMerge(serverConfigLayer));
       const configLayer = ConfigProvider.layer(
         ConfigProvider.fromUnknown({
-          T3CODE_TELEMETRY_ENABLED: true,
-          T3CODE_POSTHOG_KEY: "phc_test_key",
-          T3CODE_POSTHOG_HOST: "http://localhost",
+          SIGIDI_TELEMETRY_ENABLED: true,
+          SIGIDI_POSTHOG_KEY: "phc_test_key",
+          SIGIDI_POSTHOG_HOST: "http://localhost",
           T3CODE_TELEMETRY_FLUSH_BATCH_SIZE: 20,
         }),
       );
@@ -113,9 +116,40 @@ it.layer(NodeServices.layer)("AnalyticsService test", (it) => {
       );
       assert.equal(
         batchRequests.every((request) =>
-          request.body.batch.every((event) => event.properties?.clientType === "cli-web-client"),
+          request.body.batch.every(
+            (event) =>
+              event.properties?.clientType === "cli-web-client" &&
+              typeof event.properties.sigidiVersion === "string",
+          ),
         ),
         true,
+      );
+    }),
+  );
+
+  it.effect("is off by default and does not create a telemetry identity", () =>
+    Effect.gen(function* () {
+      const serverConfigLayer = ServerConfig.ServerConfig.layerTest(process.cwd(), {
+        prefix: "sigidi-telemetry-disabled-",
+      });
+      const telemetryLayer = AnalyticsService.layer.pipe(Layer.provideMerge(serverConfigLayer));
+
+      yield* Effect.gen(function* () {
+        const analytics = yield* AnalyticsService.AnalyticsService;
+        const config = yield* ServerConfig.ServerConfig;
+        const fileSystem = yield* Effect.service(FileSystem.FileSystem);
+
+        yield* analytics.record("sigidi.test.disabled");
+        yield* analytics.flush;
+
+        assert.isFalse(yield* fileSystem.exists(config.anonymousIdPath));
+      }).pipe(
+        Effect.provide(
+          telemetryLayer.pipe(
+            Layer.provide(ConfigProvider.layer(ConfigProvider.fromUnknown({}))),
+            Layer.provideMerge(NodeHttpServer.layerTest),
+          ),
+        ),
       );
     }),
   );

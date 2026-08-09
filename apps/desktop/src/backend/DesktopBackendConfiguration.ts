@@ -13,6 +13,7 @@ import * as Schema from "effect/Schema";
 import * as SynchronizedRef from "effect/SynchronizedRef";
 
 import serverPackageJson from "../../../server/package.json" with { type: "json" };
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as DesktopBackendManager from "./DesktopBackendManager.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
@@ -96,6 +97,9 @@ const WSL_SERVER_SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bi
 
 const backendChildEnvPatch = (): Record<string, string | undefined> =>
   Object.fromEntries(DESKTOP_BACKEND_ENV_NAMES.map((name) => [name, undefined]));
+
+const parentEnvWithoutT3Home = (): Record<string, string | undefined> =>
+  Object.fromEntries(Object.entries(process.env).filter(([name]) => name !== "T3CODE_HOME"));
 
 const getWslEnvEntryName = (entry: string): string => {
   const slashIndex = entry.indexOf("/");
@@ -393,6 +397,7 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       }),
       ...buildObservabilityFragment(input.observabilitySettings),
     };
+    const isolateProductHome = productProfile.publishableAsSigidi;
 
     return {
       executablePath: process.execPath,
@@ -400,11 +405,13 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       entryPath: environment.backendEntryPath,
       cwd: environment.backendCwd,
       env: {
+        ...(isolateProductHome ? parentEnvWithoutT3Home() : process.env),
         ...backendChildEnvPatch(),
         ELECTRON_RUN_AS_NODE: "1",
       },
-      // Primary wants process.env (PATH, dev-runner's T3CODE_HOME, etc.).
-      extendEnv: true,
+      // The local bootstrap envelope owns the product data home. The full
+      // maintainer profile preserves the inherited parent-environment behavior.
+      extendEnv: !isolateProductHome,
       bootstrap,
       bootstrapDelivery: "fd3",
       httpBaseUrl: backendExposure.httpBaseUrl,
@@ -525,19 +532,15 @@ const resolveWslStartConfig = Effect.fn("desktop.backendConfiguration.resolveWsl
   // the WSL backend the Linux side ends up sharing C:\Users\...\.sigidi via
   // /mnt/c, which means both backends read/write the same database and
   // their env-ids collide).
-  const parentEnvWithoutT3Home: Record<string, string | undefined> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (key === "T3CODE_HOME") continue;
-    parentEnvWithoutT3Home[key] = value;
-  }
-  const wslEnv = mergeWslEnv(parentEnvWithoutT3Home.WSLENV, forwardedEnvNames);
+  const parentEnv = parentEnvWithoutT3Home();
+  const wslEnv = mergeWslEnv(parentEnv.WSLENV, forwardedEnvNames);
 
   const baseConfig = {
     executablePath: "wsl.exe",
     entryPath: wslEntryPath,
     cwd: environment.backendCwd,
     env: {
-      ...parentEnvWithoutT3Home,
+      ...parentEnv,
       ...backendChildEnvPatch(),
       ...forwardedEnv,
       ...(wslEnv !== undefined ? { WSLENV: wslEnv } : {}),
@@ -690,7 +693,10 @@ export const make = Effect.gen(function* () {
   // created once at layer init, but configResolve fires on each restart).
   const describePrimary = Effect.gen(function* () {
     const persistedSettings = yield* settings.get;
-    const wslRequested = persistedSettings.wslOnly && persistedSettings.wslBackendEnabled;
+    const wslRequested =
+      productProfile.capabilities.wsl &&
+      persistedSettings.wslOnly &&
+      persistedSettings.wslBackendEnabled;
     // Only honor wsl-only when WSL is actually usable. If the user
     // persisted wsl-only but WSL has since become unavailable (wsl.exe
     // removed, no distro), fall back to the Windows primary instead of

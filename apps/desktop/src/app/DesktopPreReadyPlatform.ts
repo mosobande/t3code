@@ -35,6 +35,7 @@ export const resolveEarlyLinuxElectronOptionsFromProcess =
       env: process.env,
       appVersion: Electron.app.getVersion(),
       homeDirectory: NodeOS.homedir(),
+      isPackaged: Electron.app.isPackaged,
       joinPath: NodePath.posix.join,
       readFileString: (path) => NodeFS.readFileSync(path, "utf8"),
     });

@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/react";
 import { passkeys } from "@clerk/electron/passkeys";
 import { ClerkProvider as ElectronClerkProvider } from "@clerk/electron/react";
 import { createHashHistory, createBrowserHistory } from "@tanstack/react-router";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import "./index.css";
 
@@ -28,23 +29,24 @@ if (isElectron) {
 }
 
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
-
 const app = <AppRoot router={router} />;
+const configuredApp =
+  productProfile.capabilities.hostedAuthentication &&
+  clerkPublishableKey &&
+  hasCloudPublicConfig() ? (
+    isElectron ? (
+      <ElectronClerkProvider publishableKey={clerkPublishableKey} passkeys={passkeys}>
+        <ManagedRelayAuthProvider>{app}</ManagedRelayAuthProvider>
+      </ElectronClerkProvider>
+    ) : (
+      <ClerkProvider publishableKey={clerkPublishableKey}>
+        <ManagedRelayAuthProvider>{app}</ManagedRelayAuthProvider>
+      </ClerkProvider>
+    )
+  ) : (
+    app
+  );
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    {clerkPublishableKey && hasCloudPublicConfig() ? (
-      isElectron ? (
-        <ElectronClerkProvider publishableKey={clerkPublishableKey} passkeys={passkeys}>
-          <ManagedRelayAuthProvider>{app}</ManagedRelayAuthProvider>
-        </ElectronClerkProvider>
-      ) : (
-        <ClerkProvider publishableKey={clerkPublishableKey}>
-          <ManagedRelayAuthProvider>{app}</ManagedRelayAuthProvider>
-        </ClerkProvider>
-      )
-    ) : (
-      app
-    )}
-  </React.StrictMode>,
+  <React.StrictMode>{configuredApp}</React.StrictMode>,
 );

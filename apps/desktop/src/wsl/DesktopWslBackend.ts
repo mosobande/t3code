@@ -29,6 +29,7 @@ import * as Ref from "effect/Ref";
 import * as Semaphore from "effect/Semaphore";
 
 import * as NetService from "@t3tools/shared/Net";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopBackendConfiguration from "../backend/DesktopBackendConfiguration.ts";
@@ -187,6 +188,9 @@ export const layer = Layer.effect(
     });
 
     const reconcileBody = Effect.gen(function* () {
+      if (!productProfile.capabilities.wsl) {
+        return;
+      }
       const settings = yield* appSettings.get;
       const available = yield* wslEnvironment.isAvailable;
       const existing = yield* findExistingWslInstance;

@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as DesktopIpc from "./DesktopIpc.ts";
 import { getClientSettings, setClientSettings } from "./methods/clientSettings.ts";
@@ -55,29 +56,33 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
 
   yield* ipc.handle(getClientSettings);
   yield* ipc.handle(setClientSettings);
-  yield* ipc.handle(getConnectionCatalog);
-  yield* ipc.handle(setConnectionCatalog);
-  yield* ipc.handle(clearConnectionCatalog);
+  if (productProfile.capabilities.lanMobilePairing) {
+    yield* ipc.handle(getServerExposureState);
+    yield* ipc.handle(setServerExposureMode);
+    yield* ipc.handle(getAdvertisedEndpoints);
+  }
+  if (productProfile.capabilities.tailscaleExposure) {
+    yield* ipc.handle(setTailscaleServeEnabled);
+  }
+  if (productProfile.capabilities.inheritedRemoteIntegrations) {
+    yield* ipc.handle(getConnectionCatalog);
+    yield* ipc.handle(setConnectionCatalog);
+    yield* ipc.handle(clearConnectionCatalog);
 
-  yield* ipc.handle(discoverSshHosts);
-  yield* ipc.handle(ensureSshEnvironment);
-  yield* ipc.handle(disconnectSshEnvironment);
-  yield* ipc.handle(fetchSshEnvironmentDescriptor);
-  yield* ipc.handle(bootstrapSshBearerSession);
-  yield* ipc.handle(fetchSshSessionState);
-  yield* ipc.handle(issueSshWebSocketTicket);
-  yield* ipc.handle(resolveSshPasswordPrompt);
+    yield* ipc.handle(discoverSshHosts);
+    yield* ipc.handle(ensureSshEnvironment);
+    yield* ipc.handle(disconnectSshEnvironment);
+    yield* ipc.handle(fetchSshEnvironmentDescriptor);
+    yield* ipc.handle(bootstrapSshBearerSession);
+    yield* ipc.handle(fetchSshSessionState);
+    yield* ipc.handle(issueSshWebSocketTicket);
+    yield* ipc.handle(resolveSshPasswordPrompt);
 
-  yield* ipc.handle(getServerExposureState);
-  yield* ipc.handle(setServerExposureMode);
-  yield* ipc.handle(setTailscaleServeEnabled);
-  yield* ipc.handle(getAdvertisedEndpoints);
-
-  yield* ipc.handle(getWslState);
-  yield* ipc.handle(setWslBackendEnabled);
-  yield* ipc.handle(setWslDistro);
-  yield* ipc.handle(setWslOnly);
-
+    yield* ipc.handle(getWslState);
+    yield* ipc.handle(setWslBackendEnabled);
+    yield* ipc.handle(setWslDistro);
+    yield* ipc.handle(setWslOnly);
+  }
   yield* ipc.handle(pickFolder);
   yield* ipc.handle(confirm);
   yield* ipc.handle(setTheme);

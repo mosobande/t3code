@@ -13,6 +13,7 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 import * as NetService from "@t3tools/shared/Net";
+import { productProfile } from "@t3tools/shared/productProfile";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
@@ -161,6 +162,11 @@ const withLiveProjectCliServer = <A, E, R>(baseDir: string, run: () => Effect.Ef
   });
 
 it.layer(NodeServices.layer)("bin cli parsing", (it) => {
+  const inheritedRemoteIt = it.effect.skipIf(
+    !productProfile.capabilities.inheritedRemoteIntegrations,
+  );
+  const localIt = it.effect.skipIf(productProfile.capabilities.inheritedRemoteIntegrations);
+
   it.effect("accepts the built-in lowercase log-level flag values", () =>
     runCliWithRuntime(["--log-level", "debug", "--version"]),
   );
@@ -184,7 +190,7 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     }),
   );
 
-  it.effect("rejects connect commands when public configuration is missing", () =>
+  inheritedRemoteIt("rejects connect commands when public configuration is missing", () =>
     Effect.gen(function* () {
       const error = yield* runCli(["connect", "status"], noConnectCli).pipe(Effect.flip);
 
@@ -203,6 +209,20 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     }).pipe(Effect.provide(Layer.mergeAll(CliRuntimeLayer, TestConsole.layer))),
   );
 
+  localIt("does not register T3 Connect commands", () =>
+    Effect.gen(function* () {
+      const error = yield* runCliWithRuntime(["connect", "status"]).pipe(Effect.flip);
+
+      if (!CliError.isCliError(error)) {
+        assert.fail(`Expected CliError, got ${String(error)}`);
+      }
+      if (error._tag !== "ShowHelp") {
+        assert.fail(`Expected ShowHelp, got ${error._tag}`);
+      }
+      assert.deepEqual(error.commandPath, ["t3"]);
+    }),
+  );
+
   it.effect("exposes service lifecycle commands without T3 Connect configuration", () =>
     Effect.gen(function* () {
       const { output } = yield* captureStdout(runCli(["service", "--help"], noConnectCli));
@@ -215,32 +235,34 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     }),
   );
 
-  it.effect("reports fresh headless connect state without requiring local configuration", () =>
-    Effect.gen(function* () {
-      const baseDir = NodeFS.mkdtempSync(
-        NodePath.join(NodeOS.tmpdir(), "t3-cli-cloud-status-test-"),
-      );
-      const { output } = yield* captureStdout(
-        runConnectCli(["connect", "status", "--base-dir", baseDir, "--json"]),
-      );
-      // @effect-diagnostics-next-line preferSchemaOverJson:off - CLI JSON output is decoded as a presentation DTO.
-      const status = JSON.parse(output) as {
-        readonly desired: boolean;
-        readonly authenticated: boolean;
-        readonly linked: boolean;
-        readonly cloudUserId: string | null;
-        readonly relayUrl: string | null;
-      };
+  inheritedRemoteIt(
+    "reports fresh headless connect state without requiring local configuration",
+    () =>
+      Effect.gen(function* () {
+        const baseDir = NodeFS.mkdtempSync(
+          NodePath.join(NodeOS.tmpdir(), "t3-cli-cloud-status-test-"),
+        );
+        const { output } = yield* captureStdout(
+          runConnectCli(["connect", "status", "--base-dir", baseDir, "--json"]),
+        );
+        // @effect-diagnostics-next-line preferSchemaOverJson:off - CLI JSON output is decoded as a presentation DTO.
+        const status = JSON.parse(output) as {
+          readonly desired: boolean;
+          readonly authenticated: boolean;
+          readonly linked: boolean;
+          readonly cloudUserId: string | null;
+          readonly relayUrl: string | null;
+        };
 
-      assert.equal(status.desired, false);
-      assert.equal(status.authenticated, false);
-      assert.equal(status.linked, false);
-      assert.equal(status.cloudUserId, null);
-      assert.equal(status.relayUrl, null);
-    }),
+        assert.equal(status.desired, false);
+        assert.equal(status.authenticated, false);
+        assert.equal(status.linked, false);
+        assert.equal(status.cloudUserId, null);
+        assert.equal(status.relayUrl, null);
+      }),
   );
 
-  it.effect("reports actionable human-readable headless connect state", () =>
+  inheritedRemoteIt("reports actionable human-readable headless connect state", () =>
     Effect.gen(function* () {
       const baseDir = NodeFS.mkdtempSync(
         NodePath.join(NodeOS.tmpdir(), "t3-cli-cloud-status-human-test-"),
@@ -256,7 +278,7 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     }),
   );
 
-  it.effect("accepts the --headless login override without enabling access", () =>
+  inheritedRemoteIt("accepts the --headless login override without enabling access", () =>
     Effect.gen(function* () {
       const baseDir = NodeFS.mkdtempSync(
         NodePath.join(NodeOS.tmpdir(), "t3-cli-cloud-login-test-"),
@@ -291,7 +313,7 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     }),
   );
 
-  it.effect("disables headless connect without a running server", () =>
+  inheritedRemoteIt("disables headless connect without a running server", () =>
     Effect.gen(function* () {
       const baseDir = NodeFS.mkdtempSync(
         NodePath.join(NodeOS.tmpdir(), "t3-cli-cloud-unlink-test-"),
@@ -304,7 +326,7 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     }),
   );
 
-  it.effect("logs out of headless connect and removes the stored CLI authorization", () =>
+  inheritedRemoteIt("logs out of headless connect and removes the stored CLI authorization", () =>
     Effect.gen(function* () {
       const baseDir = NodeFS.mkdtempSync(
         NodePath.join(NodeOS.tmpdir(), "t3-cli-cloud-logout-test-"),

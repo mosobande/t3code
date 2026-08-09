@@ -28,6 +28,7 @@ function makeLayer(fileSystemLayer: Layer.Layer<FileSystem.FileSystem>) {
     appVersion: "1.2.3",
     appPath: "/repo",
     isPackaged: true,
+    packagedBaseDirOverride: baseDir,
     resourcesPath: "/missing/resources",
     runningUnderArm64Translation: false,
   }).pipe(

@@ -36,6 +36,16 @@ jobs:
                 color: "fbca04",
                 description: "Issue needs maintainer review and initial categorization.",
               },
+              {
+                name: "ci:local",
+                color: "1d76db",
+                description: "Request a fresh build of the canonical local profile.",
+              },
+              {
+                name: "ci:upstream",
+                color: "5319e7",
+                description: "Run the full maintainer-only upstream profile suite.",
+              },
             ];
 
             for (const label of managedLabels) {

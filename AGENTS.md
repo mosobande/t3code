@@ -6,6 +6,18 @@ SIGIDI is a separate downstream product built from its open-source upstream proj
 
 ## Product constraints
 
+### Build purposes and profiles
+
+**Local (`local`)** is the canonical customer profile and the default for development, tests, builds, and releases. It is local-first: reuse the established desktop, server, renderer, registry, resolver, configuration, and packaging owners, and enable only the capabilities that the profile explicitly includes. A user setting, CLI argument, persisted record, or runtime environment variable cannot enable a capability that this build excludes.
+
+**Upstream (`upstream`)** is the canonical maintainer compatibility profile. Use it only when an upstream sync, a profile-boundary change, or activation of a previously gated capability requires inherited remote, relay, mobile, hosted-authentication, WSL, or deployment code to be tested. It is not a SIGIDI release and does not authorize an external write.
+
+Stable and Nightly are channels for `local`. They show delivery maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both Stable and Nightly compile `local`.
+
+Run the full `local` suite for ordinary work. The `ci:local` PR label explicitly requests a fresh local profile build. Run the full `upstream` suite only for a standard T3 Code sync, a change to the profile boundary, activation of a previously gated capability, or an explicit maintainer request. Add the `ci:upstream` PR label when that proof is required; do not spend upstream CI resources on ordinary local-first changes.
+
+Do not add a parallel local implementation when an existing owner can apply the profile. If the existing seam cannot express the required boundary, stop and use Atona to record the gap before adding a new owner.
+
 ### 1. Performance without compromise
 
 Audit every change for performance regressions. Common causes include excessive WebSocket traffic, GPU-heavy CSS animation, and poorly bounded list rendering. SIGIDI users drive agents for long sessions and notice dropped frames, stale labels, and excess resource use.
@@ -27,6 +39,8 @@ SIGIDI has three source surfaces: **web**, **desktop**, and **mobile**.
 ### 4. Downstream maintainability
 
 Keep SIGIDI behavior in standalone modules and upstream host edits registration-only where practical. Preserve product-neutral upstream improvements. Record unavoidable fork patches and their removal conditions in the downstream-boundary document.
+
+Changing the established technology stack is a non-goal. Keep the repository's Node, pnpm, Vite+, Electron, Effect, React, Astro, SQLite, Rust, and test/build tool choices unless a maintainer explicitly approves a technology decision.
 
 ## Design direction
 

@@ -24,10 +24,14 @@ vi.mock("@clerk/electron/storage", () => ({
 
 import * as Exit from "effect/Exit";
 import * as FileSystem from "effect/FileSystem";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
 import * as DesktopClerk from "./DesktopClerk.ts";
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+
+const hostedAuthenticationIt = it.effect.skipIf(!productProfile.capabilities.hostedAuthentication);
+const localAuthenticationIt = it.effect.skipIf(productProfile.capabilities.hostedAuthentication);
 
 const makeDesktopClerkLayer = (isDevelopment = true, events: string[] = []) => {
   const environment = DesktopEnvironment.DesktopEnvironment.of({
@@ -75,7 +79,20 @@ describe("DesktopClerk", () => {
     assert.equal(DesktopClerk.resolveDesktopClerkFrontendApiHostname("invalid"), undefined);
   });
 
-  it.effect("acquires and releases the SDK bridge with the layer", () => {
+  localAuthenticationIt("does not acquire the hosted SDK bridge", () => {
+    const events: string[] = [];
+    storageMock.mockReturnValue(storageAdapter);
+
+    return Effect.gen(function* () {
+      yield* Effect.scoped(Layer.build(makeDesktopClerkLayer(true, events)));
+
+      assert.deepEqual(createClerkBridgeMock.mock.calls, []);
+      assert.deepEqual(storageMock.mock.calls, []);
+      assert.deepEqual(events, ["setPath:userData:/tmp/app-data/sigidi-dev"]);
+    });
+  });
+
+  hostedAuthenticationIt("acquires and releases the SDK bridge with the layer", () => {
     const cleanup = vi.fn();
     const events: string[] = [];
     storageMock.mockReturnValue(storageAdapter);
@@ -106,7 +123,7 @@ describe("DesktopClerk", () => {
     });
   });
 
-  it.effect("preserves bridge initialization failures", () => {
+  hostedAuthenticationIt("preserves bridge initialization failures", () => {
     const cause = new Error("bridge initialization failed");
     storageMock.mockReturnValue(storageAdapter);
     createClerkBridgeMock.mockImplementationOnce(() => {
@@ -127,7 +144,7 @@ describe("DesktopClerk", () => {
     });
   });
 
-  it.effect("preserves bridge cleanup failures", () => {
+  hostedAuthenticationIt("preserves bridge cleanup failures", () => {
     const cause = new Error("bridge cleanup failed");
     storageMock.mockReturnValue(storageAdapter);
     createClerkBridgeMock.mockReturnValue({
@@ -154,7 +171,7 @@ describe("DesktopClerk", () => {
     });
   });
 
-  it.effect("registers the second-instance handler in the primary instance", () => {
+  hostedAuthenticationIt("registers the second-instance handler in the primary instance", () => {
     storageMock.mockReturnValue(storageAdapter);
     createClerkBridgeMock.mockReturnValue({ cleanup: vi.fn(), isPrimaryInstance: true });
     const quit = vi.fn();
@@ -182,7 +199,7 @@ describe("DesktopClerk", () => {
     );
   });
 
-  it.effect("quits and interrupts startup in a secondary instance", () => {
+  hostedAuthenticationIt("quits and interrupts startup in a secondary instance", () => {
     storageMock.mockReturnValue(storageAdapter);
     createClerkBridgeMock.mockReturnValue({ cleanup: vi.fn(), isPrimaryInstance: false });
     const quit = vi.fn();

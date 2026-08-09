@@ -1,0 +1,107 @@
+name: PR Build Profiles
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile to verify
+        required: true
+        type: choice
+        options: [local, upstream]
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, ready_for_review]
+  push:
+    branches: [ori]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-build-profiles-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local:
+    name: Local profile
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'local') ||
+      (github.event_name == 'pull_request' &&
+        (github.event.action != 'labeled' ||
+          github.event.label.name == 'ci:local' ||
+          github.event.label.name == 'ci:upstream'))
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 10
+    env:
+      SIGIDI_BUILD_PROFILE: local
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Ensure Electron runtime is installed
+        run: vp run --filter @t3tools/desktop ensure:electron
+
+      - name: Build local desktop pipeline
+        run: vp run build:desktop
+
+      - name: Verify local preload bundle output
+        run: |
+          test -f apps/desktop/dist-electron/preload.cjs
+          grep -nE "desktopBridge|getLocalEnvironmentBootstrap|PICK_FOLDER_CHANNEL|wsUrl" apps/desktop/dist-electron/preload.cjs
+          grep -n "__clerk_internal_electron_passkeys" apps/desktop/dist-electron/preload.cjs
+
+  upstream:
+    name: Upstream profile
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.profile == 'upstream') ||
+      (github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'ci:upstream') &&
+        (github.event.action != 'labeled' || github.event.label.name == 'ci:upstream')) ||
+      (github.event_name == 'push' &&
+        startsWith(github.event.head_commit.message, 'chore: sync latest T3 Code main'))
+    runs-on: blacksmith-8vcpu-ubuntu-2404
+    timeout-minutes: 15
+    env:
+      SIGIDI_BUILD_PROFILE: upstream
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            /*
+            !/.repos/
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Ensure Electron runtime is installed
+        run: vp run --filter @t3tools/desktop ensure:electron
+
+      - name: Test upstream profile
+        run: vp run test
+
+      - name: Build upstream desktop pipeline
+        run: vp run build:desktop

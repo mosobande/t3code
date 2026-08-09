@@ -12,6 +12,7 @@ import {
 } from "effect/unstable/http";
 
 import { EnvironmentId } from "@t3tools/contracts";
+import { productProfile } from "@t3tools/shared/productProfile";
 import { RelayClientTracer } from "@t3tools/shared/relayTracing";
 import * as EnvironmentAuth from "../auth/EnvironmentAuth.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
@@ -29,6 +30,10 @@ import {
 } from "./http.ts";
 import * as ManagedEndpointRuntime from "./ManagedEndpointRuntime.ts";
 import { traceAuthenticatedRelayRequest, traceRelayRequest } from "./traceRelayRequest.ts";
+
+const inheritedRemoteIt = it.effect.skipIf(
+  !productProfile.capabilities.inheritedRemoteIntegrations,
+);
 
 const storeFailure = (tag: "AlreadyExists" | "PermissionDenied") =>
   new ServerSecretStore.SecretStorePersistError({
@@ -173,7 +178,7 @@ describe("relay request tracing", () => {
 });
 
 describe("reconcileDesiredCloudLink", () => {
-  it.effect("requires stored CLI authorization without exposing an HTTP endpoint", () =>
+  inheritedRemoteIt("requires stored CLI authorization without exposing an HTTP endpoint", () =>
     Effect.gen(function* () {
       const error = yield* Effect.flip(reconcileDesiredCloudLink("http://127.0.0.1:3774"));
 
@@ -315,28 +320,31 @@ describe("releaseManagedTunnelOnShutdown", () => {
     [CLOUD_CLI_DESIRED_LINK_SECRET, "managed"],
   ] as const;
 
-  it.effect("stops the connector, releases the relay tunnel, and drops the dead token", () => {
-    const { store, values } = makeMemorySecretStore(managedLinkSecrets);
-    const applyConfigCalls: Array<unknown> = [];
-    const requests: Array<HttpClientRequest.HttpClientRequest> = [];
+  inheritedRemoteIt(
+    "stops the connector, releases the relay tunnel, and drops the dead token",
+    () => {
+      const { store, values } = makeMemorySecretStore(managedLinkSecrets);
+      const applyConfigCalls: Array<unknown> = [];
+      const requests: Array<HttpClientRequest.HttpClientRequest> = [];
 
-    return Effect.gen(function* () {
-      const released = yield* releaseManagedTunnelOnShutdown();
+      return Effect.gen(function* () {
+        const released = yield* releaseManagedTunnelOnShutdown();
 
-      expect(released).toBe(true);
-      expect(applyConfigCalls).toEqual([null]);
-      expect(requests).toHaveLength(1);
-      const request = requests[0]!;
-      expect(request.method).toBe("DELETE");
-      expect(request.url).toBe(
-        "https://relay.example.test/v1/client/environment-links/env_123/tunnel",
-      );
-      expect(request.headers.authorization).toBe("Bearer cli-access-token");
-      expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(false);
-    }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
-  });
+        expect(released).toBe(true);
+        expect(applyConfigCalls).toEqual([null]);
+        expect(requests).toHaveLength(1);
+        const request = requests[0]!;
+        expect(request.method).toBe("DELETE");
+        expect(request.url).toBe(
+          "https://relay.example.test/v1/client/environment-links/env_123/tunnel",
+        );
+        expect(request.headers.authorization).toBe("Bearer cli-access-token");
+        expect(values.has(CLOUD_ENDPOINT_RUNTIME_CONFIG)).toBe(false);
+      }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
+    },
+  );
 
-  it.effect("does nothing for links without a stored managed tunnel runtime config", () => {
+  inheritedRemoteIt("does nothing for links without a stored managed tunnel runtime config", () => {
     const { store } = makeMemorySecretStore();
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -350,7 +358,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  it.effect("leaves the tunnel of a web/mobile-installed link untouched", () => {
+  inheritedRemoteIt("leaves the tunnel of a web/mobile-installed link untouched", () => {
     // A managed runtime config without a CLI-desired link: the environment was
     // linked by a web/mobile client, and nothing re-provisions the tunnel on
     // the next boot, so shutdown must not release it.
@@ -371,7 +379,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  it.effect("leaves the tunnel of a publish-only desired link untouched", () => {
+  inheritedRemoteIt("leaves the tunnel of a publish-only desired link untouched", () => {
     const { store, values } = makeMemorySecretStore([
       [CLOUD_ENDPOINT_RUNTIME_CONFIG, "runtime-config"],
       [RELAY_URL_SECRET, "https://relay.example.test"],
@@ -390,7 +398,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     }).pipe(provideReleaseHarness({ store, applyConfigCalls, requests }));
   });
 
-  it.effect("keeps a runtime config that a fast restart replaced mid-release", () => {
+  inheritedRemoteIt("keeps a runtime config that a fast restart replaced mid-release", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];
@@ -418,7 +426,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     );
   });
 
-  it.effect("keeps the stored connector token when the relay skipped the release", () => {
+  inheritedRemoteIt("keeps the stored connector token when the relay skipped the release", () => {
     // ok:false means a concurrent provision owns the recorded tunnel, so the
     // stored runtime config (possibly freshly written by that provision) must
     // survive.
@@ -442,7 +450,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
     );
   });
 
-  it.effect("keeps the stored connector token when the relay release request fails", () => {
+  inheritedRemoteIt("keeps the stored connector token when the relay release request fails", () => {
     const { store, values } = makeMemorySecretStore(managedLinkSecrets);
     const applyConfigCalls: Array<unknown> = [];
     const requests: Array<HttpClientRequest.HttpClientRequest> = [];

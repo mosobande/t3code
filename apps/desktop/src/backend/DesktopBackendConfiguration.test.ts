@@ -1,5 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -67,6 +68,7 @@ function makeEnvironmentLayer(
     appVersion: "1.2.3",
     appPath: options?.appPath ?? "/repo",
     isPackaged: options?.isPackaged ?? true,
+    packagedBaseDirOverride: baseDir,
     resourcesPath: options?.resourcesPath ?? "/missing/resources",
     runningUnderArm64Translation: false,
   }).pipe(
@@ -135,7 +137,12 @@ describe("DesktopBackendConfiguration", () => {
         assert.equal(first.entryPath, environment.backendEntryPath);
         assert.equal(first.cwd, environment.backendCwd);
         assert.equal(first.captureOutput, true);
+        assert.equal(first.extendEnv, !productProfile.publishableAsSigidi);
         assert.equal(first.env.ELECTRON_RUN_AS_NODE, "1");
+        assert.equal(
+          Object.hasOwn(first.env, "T3CODE_HOME"),
+          !productProfile.publishableAsSigidi && process.env.T3CODE_HOME !== undefined,
+        );
         assert.isUndefined(first.env.T3CODE_PORT);
         assert.isUndefined(first.env.T3CODE_MODE);
         assert.isUndefined(first.env.T3CODE_DESKTOP_LAN_HOST);
@@ -556,11 +563,15 @@ describe("DesktopBackendConfiguration", () => {
         yield* Effect.gen(function* () {
           const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
           const config = yield* configuration.resolvePrimary;
-          const failure = Option.getOrThrow(config.preflightFailure);
-
-          assert.equal(config.executablePath, "wsl.exe");
-          assert.isTrue(failure.fatal);
-          assert.include(failure.reason, "Removed-Distro");
+          if (productProfile.capabilities.wsl) {
+            const failure = Option.getOrThrow(config.preflightFailure);
+            assert.equal(config.executablePath, "wsl.exe");
+            assert.isTrue(failure.fatal);
+            assert.include(failure.reason, "Removed-Distro");
+          } else {
+            assert.equal(config.executablePath, process.execPath);
+            assert.isTrue(Option.isNone(config.preflightFailure));
+          }
         }).pipe(
           Effect.provide(
             DesktopBackendConfiguration.layer.pipe(
@@ -695,7 +706,7 @@ describe("DesktopBackendConfiguration", () => {
       yield* Effect.gen(function* () {
         const configuration = yield* DesktopBackendConfiguration.DesktopBackendConfiguration;
         const label = yield* configuration.resolvePrimaryLabel;
-        assert.equal(label, "WSL (Ubuntu)");
+        assert.equal(label, productProfile.capabilities.wsl ? "WSL (Ubuntu)" : "Windows");
       }).pipe(
         Effect.provide(
           DesktopBackendConfiguration.layer.pipe(

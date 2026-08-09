@@ -55,7 +55,9 @@ function status(
   };
 }
 
-const makeHarness = Effect.fn("RelayDiscoveryTest.makeHarness")(function* () {
+const makeHarness = Effect.fn("RelayDiscoveryTest.makeHarness")(function* (
+  options: RelayEnvironmentDiscovery.RelayEnvironmentDiscoveryOptions = {},
+) {
   const networkStatus = yield* SubscriptionRef.make<NetworkStatus>("online");
   const listCalls = yield* Ref.make(0);
   const listFailure = yield* Ref.make<ManagedRelay.ManagedRelayClientError | null>(null);
@@ -119,7 +121,7 @@ const makeHarness = Effect.fn("RelayDiscoveryTest.makeHarness")(function* () {
     status: SubscriptionRef.get(networkStatus),
     changes: SubscriptionRef.changes(networkStatus),
   });
-  const layer = RelayEnvironmentDiscovery.layer.pipe(
+  const layer = RelayEnvironmentDiscovery.layerWithOptions(options).pipe(
     Layer.provide(
       Layer.mergeAll(
         Layer.succeed(ManagedRelay.ManagedRelayClient, client),
@@ -171,6 +173,23 @@ const makeHarness = Effect.fn("RelayDiscoveryTest.makeHarness")(function* () {
 });
 
 describe("RelayEnvironmentDiscovery", () => {
+  it.effect("stays empty without remote dependencies when disabled by the product profile", () =>
+    Effect.gen(function* () {
+      const harness = yield* makeHarness({ enabled: false });
+      yield* Effect.gen(function* () {
+        const discovery = yield* RelayEnvironmentDiscovery.RelayEnvironmentDiscovery;
+
+        yield* discovery.refresh;
+        yield* harness.wake("credentials-changed");
+
+        expect(yield* SubscriptionRef.get(discovery.state)).toEqual(
+          RelayEnvironmentDiscovery.EMPTY_RELAY_ENVIRONMENT_DISCOVERY_STATE,
+        );
+        expect(yield* Ref.get(harness.listCalls)).toBe(0);
+      }).pipe(Effect.provide(harness.layer));
+    }),
+  );
+
   it.effect("publishes each environment status as soon as that lookup completes", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness();

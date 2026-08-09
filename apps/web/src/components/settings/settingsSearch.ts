@@ -1,3 +1,5 @@
+import { productProfile } from "@t3tools/shared/productProfile";
+
 export type SettingsPath =
   | "/settings/general"
   | "/settings/appearance"
@@ -229,5 +231,11 @@ export function searchSettings(
   const normalizedQuery = normalizeSearchText(query);
   if (normalizedQuery.length === 0) return [];
 
-  return items.filter((item) => normalizeSearchText(item.title).includes(normalizedQuery));
+  return items.filter(
+    (item) =>
+      (productProfile.capabilities.remoteEnvironments ||
+        productProfile.capabilities.lanMobilePairing ||
+        item.to !== "/settings/connections") &&
+      normalizeSearchText(item.title).includes(normalizedQuery),
+  );
 }

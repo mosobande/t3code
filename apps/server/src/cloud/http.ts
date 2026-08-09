@@ -48,6 +48,7 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as HttpEffect from "effect/unstable/http/HttpEffect";
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
@@ -355,6 +356,11 @@ interface CloudHttpDependencies {
 }
 
 const cloudHttpDependencies = Effect.gen(function* () {
+  if (!productProfile.capabilities.inheritedRemoteIntegrations) {
+    return yield* new EnvironmentHttpBadRequestError({
+      message: "Remote integrations are disabled in this SIGIDI build.",
+    });
+  }
   return {
     secrets: yield* ServerSecretStore.ServerSecretStore,
     environment: yield* ServerEnvironment.ServerEnvironment,
@@ -364,6 +370,13 @@ const cloudHttpDependencies = Effect.gen(function* () {
     httpClient: yield* HttpClient.HttpClient,
   } satisfies CloudHttpDependencies;
 });
+
+const remoteIntegrationsDisabled = () =>
+  Effect.fail(
+    new EnvironmentHttpBadRequestError({
+      message: "Remote integrations are disabled in this SIGIDI build.",
+    }),
+  );
 
 const makeCloudLinkProof = Effect.fn("environment.cloud.makeLinkProof")(function* (
   dependencies: CloudHttpDependencies,
@@ -1018,6 +1031,17 @@ export const connectHttpApiLayer = HttpApiBuilder.group(
   EnvironmentHttpApi,
   "connect",
   Effect.fnUntraced(function* (handlers) {
+    if (!productProfile.capabilities.inheritedRemoteIntegrations) {
+      return handlers
+        .handle("linkProof", remoteIntegrationsDisabled)
+        .handle("relayConfig", remoteIntegrationsDisabled)
+        .handle("linkState", remoteIntegrationsDisabled)
+        .handle("unlink", remoteIntegrationsDisabled)
+        .handle("preferences", remoteIntegrationsDisabled)
+        .handle("health", remoteIntegrationsDisabled)
+        .handle("mintCredential", remoteIntegrationsDisabled)
+        .handle("t3MintCredential", remoteIntegrationsDisabled);
+    }
     const dependencies = yield* cloudHttpDependencies;
     return handlers
       .handle("linkProof", ({ payload }) => cloudLinkProofHandler(dependencies, payload))

@@ -4,6 +4,7 @@ import * as NodeModule from "node:module";
 
 import { resolveDesktopIdentity } from "@t3tools/shared/desktopIdentity";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { resolveProductProfile, type ProductProfile } from "@t3tools/shared/productProfile";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
@@ -37,6 +38,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
+const buildProfile = resolveProductProfile(process.env.SIGIDI_BUILD_PROFILE);
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
@@ -48,6 +50,17 @@ const WorkspaceConfig = Schema.Struct({
   allowBuilds: Schema.optional(Schema.Record(Schema.String, Schema.Boolean)),
 });
 type WorkspaceConfig = typeof WorkspaceConfig.Type;
+
+const LockfileDependency = Schema.Struct({
+  version: Schema.String,
+});
+const LockfileImporter = Schema.Struct({
+  dependencies: Schema.optional(Schema.Record(Schema.String, LockfileDependency)),
+});
+const PnpmLockfile = Schema.Struct({
+  importers: Schema.Record(Schema.String, LockfileImporter),
+});
+type PnpmLockfile = typeof PnpmLockfile.Type;
 
 const StageWorkspaceConfig = Schema.Struct({
   supportedArchitectures: Schema.Struct({
@@ -69,6 +82,7 @@ const RepoRoot = Effect.service(Path.Path).pipe(
 );
 const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const decodeWorkspaceConfig = Schema.decodeEffect(fromYaml(WorkspaceConfig));
+const decodePnpmLockfile = Schema.decodeEffect(fromYaml(PnpmLockfile));
 const decodeNodePtyManifest = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
 );
@@ -80,6 +94,14 @@ const readWorkspaceConfig = Effect.fn("readWorkspaceConfig")(function* () {
   const repoRoot = yield* RepoRoot;
   const workspaceYaml = yield* fs.readFileString(path.join(repoRoot, "pnpm-workspace.yaml"));
   return yield* decodeWorkspaceConfig(workspaceYaml);
+});
+
+const readPnpmLockfile = Effect.fn("readPnpmLockfile")(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const repoRoot = yield* RepoRoot;
+  const lockfileYaml = yield* fs.readFileString(path.join(repoRoot, "pnpm-lock.yaml"));
+  return yield* decodePnpmLockfile(lockfileYaml);
 });
 
 interface DesktopBuildIconAssets {
@@ -387,6 +409,20 @@ export class MissingDesktopBuildInputError extends Schema.TaggedErrorClass<Missi
     return `Missing ${desktopBuildInputArtifactNames[this.artifact]} at ${this.artifactPath}. Run '${this.buildCommand}' first.`;
   }
 }
+
+export class UnsafeSkippedDesktopBuildError extends Schema.TaggedErrorClass<UnsafeSkippedDesktopBuildError>()(
+  "UnsafeSkippedDesktopBuildError",
+  {
+    profile: Schema.Literal("local"),
+  },
+) {
+  override get message(): string {
+    return "The local artifact build cannot use --skip-build because existing output may belong to another build profile.";
+  }
+}
+
+export const canReuseDesktopBuildOutputs = (profile: ProductProfile): boolean =>
+  !profile.publishableAsSigidi;
 
 export class MacProvisioningProfileNotFoundError extends Schema.TaggedErrorClass<MacProvisioningProfileNotFoundError>()(
   "MacProvisioningProfileNotFoundError",
@@ -1434,6 +1470,7 @@ function validateBundledClientAssets(clientDir: string) {
 export function resolveDesktopRuntimeDependencies(
   dependencies: Record<string, string> | undefined,
   catalog: Record<string, string>,
+  profile: ProductProfile = buildProfile,
 ): Record<string, string> {
   if (!dependencies || Object.keys(dependencies).length === 0) {
     return {};
@@ -1442,16 +1479,40 @@ export function resolveDesktopRuntimeDependencies(
   const runtimeDependencies = Object.fromEntries(
     Object.entries(dependencies).filter(
       ([dependencyName, dependencySpec]) =>
-        dependencyName !== "electron" && !dependencySpec.startsWith("workspace:"),
+        dependencyName !== "electron" &&
+        !dependencySpec.startsWith("workspace:") &&
+        (profile.capabilities.hostedAuthentication || !dependencyName.startsWith("@clerk/")),
     ),
   );
 
   return resolveCatalogDependencies(runtimeDependencies, catalog, "apps/desktop");
 }
 
+export function pinStageDependenciesToLockfile(
+  dependencies: Record<string, string>,
+  lockedDependencies: Record<string, { readonly version: string }>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.keys(dependencies).map((dependencyName) => {
+      const lockedVersion = lockedDependencies[dependencyName]?.version;
+      if (!lockedVersion) {
+        throw new Error(`Missing lockfile version for staged dependency '${dependencyName}'.`);
+      }
+      const peerSuffixIndex = lockedVersion.indexOf("(");
+      return [
+        dependencyName,
+        peerSuffixIndex === -1 ? lockedVersion : lockedVersion.slice(0, peerSuffixIndex),
+      ];
+    }),
+  );
+}
+
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
   updateChannel: "latest" | "nightly",
+  profile: ProductProfile = buildProfile,
 ) {
+  if (profile.publishableAsSigidi) return undefined;
+
   const env = yield* Config.all({
     updateRepository: Config.string("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
     githubRepository: Config.string("GITHUB_REPOSITORY").pipe(Config.option),
@@ -1481,6 +1542,10 @@ export function resolveDesktopUpdateChannel(version: string): "latest" | "nightl
 
 export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
   return resolveWebAssetBrandForChannel(resolveDesktopUpdateChannel(version));
+}
+
+export function shouldCopyDesktopArtifact(entry: string, profile: ProductProfile): boolean {
+  return !profile.publishableAsSigidi || entry.endsWith(".dmg") || entry.endsWith(".zip");
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
@@ -1557,7 +1622,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   };
   const updateChannel = resolveDesktopUpdateChannel(version);
   const identity = resolveDesktopIdentity(updateChannel);
-  const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
+  const publishConfig = yield* resolveGitHubPublishConfig(updateChannel, buildProfile);
   if (publishConfig) {
     buildConfig.publish = [publishConfig];
   } else if (mockUpdates) {
@@ -1730,16 +1795,27 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const fs = yield* FileSystem.FileSystem;
   const hostPlatform = yield* HostProcessPlatform;
   const workspaceConfig = yield* readWorkspaceConfig();
+  const pnpmLockfile = yield* readPnpmLockfile();
   const workspaceCatalog = workspaceConfig.catalog ?? {};
   const workspaceOverrides = workspaceConfig.overrides ?? {};
   const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
   const workspaceAllowBuilds = workspaceConfig.allowBuilds ?? {};
+  const lockedServerDependencies = pnpmLockfile.importers["apps/server"]?.dependencies ?? {};
+  const lockedDesktopDependencies = pnpmLockfile.importers["apps/desktop"]?.dependencies ?? {};
 
   const platformConfig = PLATFORM_CONFIG[options.platform];
   if (!platformConfig) {
     return yield* new UnsupportedDesktopBuildPlatformError({
       platform: options.platform,
     });
+  }
+  if (buildProfile.publishableAsSigidi && options.platform !== "mac") {
+    return yield* new UnsupportedDesktopBuildPlatformError({
+      platform: options.platform,
+    });
+  }
+  if (options.skipBuild && !canReuseDesktopBuildOutputs(buildProfile)) {
+    return yield* new UnsafeSkippedDesktopBuildError({ profile: "local" });
   }
 
   const electronVersion = desktopPackageJson.dependencies.electron;
@@ -1762,7 +1838,11 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   });
 
   const resolvedServerDependencies = yield* Effect.try({
-    try: () => resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
+    try: () =>
+      pinStageDependenciesToLockfile(
+        resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
+        lockedServerDependencies,
+      ),
     catch: (cause) =>
       new DesktopBuildDependencyResolutionError({
         kind: "server-production",
@@ -1771,7 +1851,11 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       }),
   });
   const resolvedDesktopRuntimeDependencies = yield* Effect.try({
-    try: () => resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
+    try: () =>
+      pinStageDependenciesToLockfile(
+        resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
+        lockedDesktopDependencies,
+      ),
     catch: (cause) =>
       new DesktopBuildDependencyResolutionError({
         kind: "desktop-runtime",
@@ -1803,6 +1887,10 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     yield* runCommand(
       ChildProcess.make(spawnCommand.command, spawnCommand.args, {
         cwd: repoRoot,
+        env: {
+          ...process.env,
+          SIGIDI_BUILD_PROFILE: buildProfile.name,
+        },
         shell: spawnCommand.shell,
       }),
       { label: "vp run build:desktop", verbose: options.verbose },
@@ -1866,7 +1954,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   yield* fs.copy(stageResourcesDir, path.join(stageAppDir, "apps/desktop/prod-resources"));
 
   const configuredMacPasskeySigning =
-    options.platform === "mac" && options.signed
+    buildProfile.capabilities.hostedAuthentication && options.platform === "mac" && options.signed
       ? yield* Effect.try({
           try: () =>
             resolveMacPasskeySigningConfiguration(
@@ -1979,11 +2067,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     }),
     { label: "vp install --prod", verbose: options.verbose },
   );
-  yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
+  if (buildProfile.capabilities.hostedAuthentication) {
+    yield* stageClerkPasskeyNativeBinaries(stageAppDir, options.platform, options.arch);
+  }
 
   // WSL is Windows-only, so only the Windows artifact carries the Linux backend
   // binary; other platforms ignore the prebuild input.
-  if (options.platform === "win") {
+  if (buildProfile.capabilities.wsl && options.platform === "win") {
     yield* stageWslNodePtyPrebuild({
       stageAppDir,
       arch: options.arch,
@@ -1996,6 +2086,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   // on `extendEnv` merging.
   const buildEnv: NodeJS.ProcessEnv = {
     ...process.env,
+    SIGIDI_BUILD_PROFILE: buildProfile.name,
   };
   buildEnv.npm_config_user_agent = resolvePackageManagerUserAgent(rootPackageJson.packageManager);
   for (const [key, value] of Object.entries(buildEnv)) {
@@ -2071,6 +2162,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
 
   const copiedArtifacts: string[] = [];
   for (const entry of stageEntries) {
+    if (!shouldCopyDesktopArtifact(entry, buildProfile)) continue;
     const from = path.join(stageDistDir, entry);
     const stat = yield* fs.stat(from).pipe(Effect.orElseSucceed(() => null));
     if (!stat || stat.type !== "File") continue;

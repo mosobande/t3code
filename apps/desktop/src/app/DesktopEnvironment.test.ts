@@ -1,5 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, it } from "@effect/vitest";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -102,6 +103,21 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.userDataDirName, "sigidi");
       assert.equal(environment.protocolScheme, "sigidi");
       assert.equal(environment.linuxDesktopEntryName, "sigidi.desktop");
+    }),
+  );
+
+  it.effect("applies the packaged data-home policy for the selected profile", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        { isPackaged: true },
+        { T3CODE_HOME: "/tmp/ambient-legacy-home" },
+      );
+
+      const expectedBaseDir = productProfile.publishableAsSigidi
+        ? "/Users/alice/.sigidi"
+        : "/tmp/ambient-legacy-home";
+      assert.equal(environment.baseDir, expectedBaseDir);
+      assert.equal(environment.stateDir, `${expectedBaseDir}/userdata`);
     }),
   );
 

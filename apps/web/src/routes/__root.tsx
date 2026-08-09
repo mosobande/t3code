@@ -1,6 +1,7 @@
 import { type ServerLifecycleWelcomePayload } from "@t3tools/contracts";
 import { scopedProjectKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { productProfile } from "@t3tools/shared/productProfile";
 import {
   Outlet,
   createRootRoute,
@@ -54,27 +55,29 @@ import {
   type KeybindingsUpdateToastController,
 } from "../components/KeybindingsUpdateToast.logic";
 
+type RootAuthGateState =
+  | Awaited<ReturnType<typeof resolveInitialServerAuthGateState>>
+  | { readonly status: "hosted-static" }
+  | { readonly status: "hosted-pairing" };
+
 export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
-    if (location.pathname === "/pair" && hasHostedPairingRequest(new URL(window.location.href))) {
-      return {
-        authGateState: {
-          status: "hosted-pairing",
-        } as const,
-      };
+    if (
+      productProfile.capabilities.hostedAuthentication &&
+      location.pathname === "/pair" &&
+      hasHostedPairingRequest(new URL(window.location.href))
+    ) {
+      return { authGateState: { status: "hosted-pairing" } as const };
     }
-
-    if (isHostedStaticApp(new URL(window.location.href))) {
-      return {
-        authGateState: {
-          status: "hosted-static",
-        } as const,
-      };
+    if (
+      productProfile.capabilities.hostedAuthentication &&
+      isHostedStaticApp(new URL(window.location.href))
+    ) {
+      return { authGateState: { status: "hosted-static" } as const };
     }
-
-    const authGateState = await resolveInitialServerAuthGateState();
+    const authGateState: RootAuthGateState = await resolveInitialServerAuthGateState();
     return {
-      authGateState,
+      authGateState: authGateState as RootAuthGateState,
     };
   },
   component: RootRouteView,
@@ -98,7 +101,11 @@ function RootRouteView() {
     };
   }, [pathname]);
 
-  if (pathname === "/pair" || pathname === "/connect" || pathname.startsWith("/connect/")) {
+  if (
+    pathname === "/pair" ||
+    (productProfile.capabilities.inheritedRemoteIntegrations &&
+      (pathname === "/connect" || pathname.startsWith("/connect/")))
+  ) {
     return (
       <>
         <DocumentTitleSync />
@@ -131,11 +138,15 @@ function RootRouteView() {
         <GlassAppearanceSync />
         <FontAppearanceSync />
         {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
-        <RelayClientInstallDialog />
-        <ConnectOnboardingDialog />
-        <SshPasswordPromptDialog />
+        {productProfile.capabilities.inheritedRemoteIntegrations ? (
+          <>
+            <RelayClientInstallDialog />
+            <ConnectOnboardingDialog />
+            <SshPasswordPromptDialog />
+            <HostedStaticEnvironmentBootstrap />
+          </>
+        ) : null}
         <SlowRpcRequestToastCoordinator />
-        <HostedStaticEnvironmentBootstrap />
         {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
         {primaryEnvironmentAuthenticated ? <ProviderUpdateLaunchNotification /> : null}
         {appShell}
@@ -215,16 +226,9 @@ function HostedStaticEnvironmentBootstrap() {
     ) {
       return;
     }
-
-    if (activeEnvironmentId) {
-      return;
-    }
-
+    if (activeEnvironmentId) return;
     const firstSavedEnvironment = environments[0];
-    if (!firstSavedEnvironment) {
-      return;
-    }
-
+    if (!firstSavedEnvironment) return;
     setActiveEnvironmentId(firstSavedEnvironment.environmentId);
   }, [activeEnvironmentId, environments]);
 

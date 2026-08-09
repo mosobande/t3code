@@ -41,6 +41,7 @@ import {
 } from "@t3tools/shared/model";
 import { CHAT_LIST_ANCHOR_OFFSET } from "@t3tools/shared/chatList";
 import { projectScriptCwd, projectScriptRuntimeEnv } from "@t3tools/shared/projectScripts";
+import { productProfile } from "@t3tools/shared/productProfile";
 import { truncate } from "@t3tools/shared/String";
 import { nextTerminalId, resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabels";
 import { Debouncer } from "@tanstack/react-pacer";
@@ -2084,13 +2085,15 @@ function ChatViewContent(props: ChatViewProps) {
               >
                 {environmentReconnecting ? "Reconnecting..." : "Reconnect"}
               </Button>
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => void navigate({ to: "/settings/connections" })}
-              >
-                Connections
-              </Button>
+              {productProfile.capabilities.remoteEnvironments ? (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => void navigate({ to: "/settings/connections" })}
+                >
+                  Connections
+                </Button>
+              ) : null}
             </>
           ),
         });

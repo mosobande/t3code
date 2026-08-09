@@ -32,6 +32,7 @@ import {
   type DesktopSshEnvironmentTarget,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
 } from "@t3tools/contracts";
+import { productProfile } from "@t3tools/shared/productProfile";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -88,29 +89,33 @@ const connectivityLayer = Connectivity.layer({
   ),
 });
 
+const applicationActiveWakeups = Stream.callback<"application-active">((queue) =>
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      const listener = () => {
+        if (document.visibilityState === "visible") {
+          Queue.offerUnsafe(queue, "application-active");
+        }
+      };
+      document.addEventListener("visibilitychange", listener);
+      return listener;
+    }),
+    (listener) =>
+      Effect.sync(() => {
+        document.removeEventListener("visibilitychange", listener);
+      }),
+  ).pipe(Effect.asVoid),
+);
+
 const wakeupsLayer = Wakeups.layer({
-  changes: Stream.merge(
-    Stream.callback<"application-active">((queue) =>
-      Effect.acquireRelease(
-        Effect.sync(() => {
-          const listener = () => {
-            if (document.visibilityState === "visible") {
-              Queue.offerUnsafe(queue, "application-active");
-            }
-          };
-          document.addEventListener("visibilitychange", listener);
-          return listener;
-        }),
-        (listener) =>
-          Effect.sync(() => {
-            document.removeEventListener("visibilitychange", listener);
-          }),
-      ).pipe(Effect.asVoid),
-    ),
-    managedRelayAccountChanges(appAtomRegistry).pipe(
-      Stream.map(() => "credentials-changed" as const),
-    ),
-  ),
+  changes: productProfile.capabilities.inheritedRemoteIntegrations
+    ? Stream.merge(
+        applicationActiveWakeups,
+        managedRelayAccountChanges(appAtomRegistry).pipe(
+          Stream.map(() => "credentials-changed" as const),
+        ),
+      )
+    : applicationActiveWakeups,
 });
 
 function clientMetadata() {
@@ -456,7 +461,7 @@ export function secondaryRegistrationsToRetainAfterTopologyRead(
 const platformConnectionSourceLayer = Layer.effect(
   PlatformConnectionSource,
   Effect.gen(function* () {
-    if (isHostedStaticApp()) {
+    if (productProfile.capabilities.hostedAuthentication && isHostedStaticApp()) {
       return PlatformConnectionSource.of({
         registrations: Stream.empty,
       });
@@ -512,51 +517,53 @@ const platformConnectionSourceLayer = Layer.effect(
         }
       }
 
-      const topologyRead = readDesktopSecondaryBootstrapsResult();
-      for (const [id, cached] of secondaryRegistrationsToRetainAfterTopologyRead(
-        previous,
-        topologyRead,
-        nowEpochMs,
-      )) {
-        next.set(id, cached);
-        registrations.push(cached.registration);
-      }
+      if (productProfile.capabilities.wsl) {
+        const topologyRead = readDesktopSecondaryBootstrapsResult();
+        for (const [id, cached] of secondaryRegistrationsToRetainAfterTopologyRead(
+          previous,
+          topologyRead,
+          nowEpochMs,
+        )) {
+          next.set(id, cached);
+          registrations.push(cached.registration);
+        }
 
-      if (topologyRead._tag === "Failure") {
-        yield* Effect.logWarning("Could not read the desktop-local backend topology.", {
-          cause: topologyRead.cause,
-        });
-      } else {
-        for (const bootstrap of topologyRead.bootstraps) {
-          const signature = `${bootstrap.httpBaseUrl}|${bootstrap.wsBaseUrl}|${bootstrap.bootstrapToken ?? ""}`;
-          const cached = previous.get(bootstrap.id);
-          if (
-            cached !== undefined &&
-            canReuseCachedPlatformRegistration(cached, signature, nowEpochMs)
-          ) {
-            next.set(bootstrap.id, cached);
-            registrations.push(cached.registration);
-            continue;
-          }
-          const built = yield* loadSecondaryConnectionRegistration(bootstrap).pipe(
-            Effect.tapError((error) =>
-              Effect.logWarning("Could not connect a desktop-local backend.", {
-                id: bootstrap.id,
-                error,
-              }),
-            ),
-            Effect.option,
-          );
-          if (Option.isSome(built)) {
-            const cacheEntry = { signature, ...built.value };
-            next.set(bootstrap.id, cacheEntry);
-            registrations.push(built.value.registration);
-          } else if (
-            cached !== undefined &&
-            canRetainCachedPlatformRegistrationAfterRefreshFailure(cached, signature, nowEpochMs)
-          ) {
-            next.set(bootstrap.id, cached);
-            registrations.push(cached.registration);
+        if (topologyRead._tag === "Failure") {
+          yield* Effect.logWarning("Could not read the desktop-local backend topology.", {
+            cause: topologyRead.cause,
+          });
+        } else {
+          for (const bootstrap of topologyRead.bootstraps) {
+            const signature = `${bootstrap.httpBaseUrl}|${bootstrap.wsBaseUrl}|${bootstrap.bootstrapToken ?? ""}`;
+            const cached = previous.get(bootstrap.id);
+            if (
+              cached !== undefined &&
+              canReuseCachedPlatformRegistration(cached, signature, nowEpochMs)
+            ) {
+              next.set(bootstrap.id, cached);
+              registrations.push(cached.registration);
+              continue;
+            }
+            const built = yield* loadSecondaryConnectionRegistration(bootstrap).pipe(
+              Effect.tapError((error) =>
+                Effect.logWarning("Could not connect a desktop-local backend.", {
+                  id: bootstrap.id,
+                  error,
+                }),
+              ),
+              Effect.option,
+            );
+            if (Option.isSome(built)) {
+              const cacheEntry = { signature, ...built.value };
+              next.set(bootstrap.id, cacheEntry);
+              registrations.push(built.value.registration);
+            } else if (
+              cached !== undefined &&
+              canRetainCachedPlatformRegistrationAfterRefreshFailure(cached, signature, nowEpochMs)
+            ) {
+              next.set(bootstrap.id, cached);
+              registrations.push(cached.registration);
+            }
           }
         }
       }

@@ -1,22 +1,18 @@
-# T3 Code docs
+# SIGIDI docs
 
-## Using T3 Code
+## Using SIGIDI
 
 - [Install and first run](./user/install.md)
 - [Permission modes](./user/permission-modes.md)
 - [Keyboard shortcuts](./user/keybindings.md)
-- [Remote access](./user/remote-access.md)
 - [Keeping app and server in sync](./user/updating.md)
 - [Source control integrations](./user/source-control.md)
-- [Background service (Linux)](./user/background-service.md)
 - [Project Notes](./user/project-notes.md)
 - Providers: [Codex](./user/providers-codex.md) · [Claude](./user/providers-claude.md)
 
-Mobile app: [apps/mobile/README.md](../apps/mobile/README.md)
-
 ---
 
-## Working on T3 Code
+## Working on SIGIDI
 
 Everything below is for maintainers. Setup lives in the [root README](../README.md);
 policy in [CONTRIBUTING.md](../CONTRIBUTING.md); agent rules in [AGENTS.md](../AGENTS.md).
@@ -27,11 +23,9 @@ policy in [CONTRIBUTING.md](../CONTRIBUTING.md); agent rules in [AGENTS.md](../A
 - [Scripts](./internals/scripts.md)
 - [Connection runtime](./internals/connection-runtime.md)
 - [Providers](./internals/providers.md)
-- [Remote environments](./internals/remote.md)
 - [Server updates](./internals/server-updates.md)
 - [Resource telemetry](./internals/resource-telemetry.md)
 - [Environment auth](./internals/environment-auth.md)
-- [T3 Connect](./internals/t3-connect.md)
 - [CI gates](./internals/ci.md)
 - [Project Notes persistence](./internals/project-notes.md)
 - [SIGIDI migration ownership](./internals/sigidi-migrations.md)
@@ -41,6 +35,13 @@ policy in [CONTRIBUTING.md](../CONTRIBUTING.md); agent rules in [AGENTS.md](../A
 - [SIGIDI service migration](./operations/sigidi-service-migration.md)
 - [Release](./operations/release.md)
 - [Observability](./operations/observability.md)
-- [Relay observability](./operations/relay-observability.md)
-- [Mobile app store screenshots](./operations/mobile-app-store-screenshots.md)
 - [SIGIDI migration recovery](./operations/sigidi-migration-recovery.md)
+
+### Source-only upstream references
+
+The [Connections and Remote Access](./user/remote-access.md) guide starts with the direct
+local-network mobile pairing available in `local`. Its remaining sections help
+maintainers test inherited `upstream` remote capabilities. Other maintainer-only references
+are [remote environments](./internals/remote.md), [T3 Connect](./internals/t3-connect.md),
+[relay observability](./operations/relay-observability.md), [mobile screenshots](./operations/mobile-app-store-screenshots.md),
+and the inherited [mobile app](../apps/mobile/README.md).

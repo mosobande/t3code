@@ -10,6 +10,7 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
   BuildCommandFailedError,
+  canReuseDesktopBuildOutputs,
   createStageWorkspaceConfig,
   createStagePatchedDependencies,
   createBuildConfig,
@@ -25,6 +26,7 @@ import {
   MacPasskeySigningConfigurationResolutionError,
   MissingMacPasskeyProvisioningProfileError,
   renderMacPasskeyEntitlements,
+  pinStageDependenciesToLockfile,
   resolveClerkPasskeyNativeArtifacts,
   resolveMacPasskeySigningConfiguration,
   resolveDesktopRuntimeDependencies,
@@ -36,6 +38,7 @@ import {
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
   resolveResourceMonitorRustTargets,
+  shouldCopyDesktopArtifact,
   resourceMonitorExecutableName,
   resolveGitHubPublishConfig,
   resolveMockUpdateServerPort,
@@ -47,6 +50,7 @@ import {
 } from "./build-desktop-artifact.ts";
 import { BRAND_ASSET_PATHS } from "./lib/brand-assets.ts";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 
 function mockProcess(exitCode: number) {
   return ChildProcessSpawner.makeHandle({
@@ -63,6 +67,11 @@ function mockProcess(exitCode: number) {
     getOutputFd: () => Stream.empty,
   });
 }
+
+it("allows stale build-output reuse only for the non-publishable maintainer profile", () => {
+  assert.isFalse(canReuseDesktopBuildOutputs(resolveProductProfile("local")));
+  assert.isTrue(canReuseDesktopBuildOutputs(resolveProductProfile("upstream")));
+});
 
 function iconResizeSpawnerLayer(
   commands: Array<{ readonly command: string; readonly args: ReadonlyArray<string> }>,
@@ -122,7 +131,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
 
   it.effect("resolves GitHub desktop publish config from Effect config", () =>
     Effect.gen(function* () {
-      const latestConfig = yield* resolveGitHubPublishConfig("latest").pipe(
+      const upstream = resolveProductProfile("upstream");
+      const latestConfig = yield* resolveGitHubPublishConfig("latest", upstream).pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -133,7 +143,7 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
           ),
         ),
       );
-      const nightlyConfig = yield* resolveGitHubPublishConfig("nightly").pipe(
+      const nightlyConfig = yield* resolveGitHubPublishConfig("nightly", upstream).pipe(
         Effect.provide(
           ConfigProvider.layer(
             ConfigProvider.fromEnv({
@@ -161,6 +171,39 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     }),
   );
 
+  it.effect("does not configure a public updater in the local desktop artifact", () =>
+    Effect.gen(function* () {
+      const config = yield* resolveGitHubPublishConfig(
+        "latest",
+        resolveProductProfile("local"),
+      ).pipe(
+        Effect.provide(
+          ConfigProvider.layer(
+            ConfigProvider.fromEnv({
+              env: {
+                T3CODE_DESKTOP_UPDATE_REPOSITORY: "pingdotgg/t3code",
+                GITHUB_REPOSITORY: "quantipixels/sigidi",
+              },
+            }),
+          ),
+        ),
+      );
+
+      assert.isUndefined(config);
+    }),
+  );
+
+  it("copies only installable macOS files from a local rehearsal", () => {
+    const local = resolveProductProfile("local");
+    const upstream = resolveProductProfile("upstream");
+
+    assert.isTrue(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.dmg", local));
+    assert.isTrue(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.zip", local));
+    assert.isFalse(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.dmg.blockmap", local));
+    assert.isFalse(shouldCopyDesktopArtifact("builder-debug.yml", local));
+    assert.isTrue(shouldCopyDesktopArtifact("SIGIDI-1.2.3-arm64.dmg.blockmap", upstream));
+  });
+
   it("omits bundled workspace packages from staged desktop dependencies", () => {
     assert.deepStrictEqual(
       resolveDesktopRuntimeDependencies(
@@ -180,6 +223,56 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       ),
       {
         "@effect/platform-node": "4.0.0-beta.59",
+        effect: "4.0.0-beta.59",
+      },
+    );
+  });
+
+  it("pins staged dependency ranges to the repository lockfile", () => {
+    assert.deepStrictEqual(
+      pinStageDependenciesToLockfile(
+        {
+          "@anthropic-ai/claude-agent-sdk": "^0.3.170",
+          effect: "4.0.0-beta.103",
+        },
+        {
+          "@anthropic-ai/claude-agent-sdk": {
+            version: "0.3.170(@anthropic-ai/sdk@0.93.0)(zod@4.4.3)",
+          },
+          effect: {
+            version: "4.0.0-beta.103(patch_hash=a18f9631)",
+          },
+        },
+      ),
+      {
+        "@anthropic-ai/claude-agent-sdk": "0.3.170",
+        effect: "4.0.0-beta.103",
+      },
+    );
+  });
+
+  it("stages Clerk dependencies only for the upstream profile", () => {
+    const dependencies = {
+      "@clerk/electron": "catalog:",
+      "@clerk/electron-passkeys": "catalog:",
+      effect: "catalog:",
+      electron: "41.5.0",
+    };
+    const catalog = {
+      "@clerk/electron": "6.6.2",
+      "@clerk/electron-passkeys": "1.4.7",
+      effect: "4.0.0-beta.59",
+    };
+
+    assert.deepStrictEqual(
+      resolveDesktopRuntimeDependencies(dependencies, catalog, resolveProductProfile("local")),
+      { effect: "4.0.0-beta.59" },
+    );
+    assert.deepStrictEqual(
+      resolveDesktopRuntimeDependencies(dependencies, catalog, resolveProductProfile("upstream")),
+      {
+        "@clerk/electron": "6.6.2",
+        "@clerk/electron-passkeys": "1.4.7",
         effect: "4.0.0-beta.59",
       },
     );
