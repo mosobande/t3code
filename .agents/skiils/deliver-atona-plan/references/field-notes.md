@@ -10,6 +10,8 @@ Workspace and lockfile membership are source-maintenance boundaries, not reliabl
 
 Build profiles control compiled composition. They do not authorize CI events, cloud deployment, signing, notarization or publication; those require separate external-action gates.
 
+Keep build purpose, release channel, and compatibility identifier separate. A Product Build and an Integration Build answer who the build serves; Dev, Nightly, and Stable answer delivery maturity; inherited identifiers can stay unchanged when renaming them would increase upstream-sync cost. Do not use Nightly as a capability-unlock path.
+
 Inspect every process and bundle boundary. A define that reaches the Electron main bundle can still be absent from an externalized preload dependency or a separately built child server. Prove the selected profile in each final entry artifact, not only in source configuration.
 
 Apply the profile to staged production dependencies as well as compiled entry points. A dormant integration can pull optional native packages into `app.asar.unpacked` through the stage manifest even when no local code activates it. Keep the dependency in the richer profile and omit it from the narrow artifact through the existing packaging owner.

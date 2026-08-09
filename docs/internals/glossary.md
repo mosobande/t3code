@@ -14,15 +14,19 @@ This is a living glossary for T3 Code. It explains what common terms mean in thi
 
 ## Concepts
 
-### Product profiles
+### Build purposes and profiles
 
-#### local-desktop
+#### SIGIDI Product Build (`local-desktop`)
 
-The default SIGIDI build profile. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, and diagnostics owners, while preventing inherited remote capabilities from hydrating, starting, or appearing in product UI.
+The customer build. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, and diagnostics owners, while preventing inherited remote capabilities from hydrating, starting, or appearing in product UI. `local-desktop` remains the internal compatibility identifier.
 
-#### upstream-full
+#### Upstream Integration Build (`upstream-full`)
 
-An explicit maintainer-only build profile that keeps inherited T3 Code integrations testable. It is not a SIGIDI release and does not authorize external writes.
+The maintainer-only build that keeps inherited T3 Code integrations testable for upstream sync. It is not a SIGIDI release and does not authorize external writes. `upstream-full` remains the internal compatibility identifier.
+
+#### Dev, Nightly, and Stable
+
+Release channels for the SIGIDI Product Build. Dev is the contributor path; Nightly is the early-adopter path; Stable is the supported customer path. They do not change the compiled product capability set.
 
 #### Remote Environment SSH
 

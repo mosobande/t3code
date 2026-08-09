@@ -21,6 +21,20 @@ const workflowJob = (name: string, nextName: string) => {
 };
 
 describe("release workflow", () => {
+  it("maps development, nightly, and stable inputs to product-build metadata", () => {
+    const metadataJob = workflowJob("release_metadata", "rehearse");
+    const rehearsalJob = workflowJob("rehearse", "check_changes");
+
+    assert.include(metadataJob, "channel=dev");
+    assert.include(metadataJob, "channel=nightly");
+    assert.include(metadataJob, "channel=stable");
+    assert.include(metadataJob, "-nightly.");
+    assert.include(metadataJob, "Invalid SIGIDI release tag");
+    assert.include(rehearsalJob, "needs: release_metadata");
+    assert.include(rehearsalJob, '--build-version "${{ needs.release_metadata.outputs.version }}"');
+    assert.include(rehearsalJob, "sigidi-${{ needs.release_metadata.outputs.channel }}");
+  });
+
   it("runs only an unsigned local-desktop macOS rehearsal", () => {
     const rehearsalJob = workflowJob("rehearse", "check_changes");
     const buildJob = workflowJob("build", "publish_cli");

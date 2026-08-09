@@ -9,9 +9,49 @@ permissions:
   contents: read
   id-token: none
 
+concurrency:
+  group: sigidi-product-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  release_metadata:
+    name: Resolve SIGIDI Product Build metadata
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.resolve.outputs.channel }}
+      version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - id: resolve
+        name: Resolve channel and version
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            channel=dev
+            version="0.0.0-dev.$RUN_NUMBER"
+          elif [[ "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            channel=stable
+            version="${BASH_REMATCH[1]}"
+          # Nightly product tags use vX.Y.Z-nightly.YYYYMMDD.N.
+          elif [[ "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}\.[0-9]+)$ ]]; then
+            channel=nightly
+            version="${BASH_REMATCH[1]}"
+          else
+            echo "Invalid SIGIDI release tag: $REF_NAME" >&2
+            exit 1
+          fi
+
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
   rehearse:
-    name: Rehearse local desktop (${{ matrix.arch }})
+    name: Build SIGIDI Product (${{ needs.release_metadata.outputs.channel }}, ${{ matrix.arch }})
+    needs: release_metadata
     runs-on: macos-15
     timeout-minutes: 45
     env:
@@ -52,13 +92,13 @@ jobs:
             --platform mac \
             --target dmg \
             --arch "${{ matrix.arch }}" \
-            --build-version "0.0.0-rehearsal.${{ github.run_number }}" \
-            --output-dir "$RUNNER_TEMP/sigidi-rehearsal-${{ matrix.arch }}"
+            --build-version "${{ needs.release_metadata.outputs.version }}" \
+            --output-dir "$RUNNER_TEMP/sigidi-${{ needs.release_metadata.outputs.channel }}-${{ matrix.arch }}"
 
       - name: Inspect rehearsal outputs
         run: |
           set -euo pipefail
-          output_dir="$RUNNER_TEMP/sigidi-rehearsal-${{ matrix.arch }}"
+          output_dir="$RUNNER_TEMP/sigidi-${{ needs.release_metadata.outputs.channel }}-${{ matrix.arch }}"
           test "$(find "$output_dir" -maxdepth 1 -type f -name '*.dmg' | wc -l | tr -d ' ')" -eq 1
           test "$(find "$output_dir" -maxdepth 1 -type f -name '*.zip' | wc -l | tr -d ' ')" -eq 1
           ! find "$output_dir" -maxdepth 1 -type f \

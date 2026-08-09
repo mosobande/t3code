@@ -3,6 +3,10 @@ declare const __SIGIDI_BUILD_PROFILE__: string | undefined;
 export const PRODUCT_PROFILE_NAMES = ["local-desktop", "upstream-full"] as const;
 export type ProductProfileName = (typeof PRODUCT_PROFILE_NAMES)[number];
 
+/** The customer-facing reason a build exists. Profile names remain compatibility identifiers. */
+export const PRODUCT_BUILD_PURPOSES = ["product", "integration"] as const;
+export type ProductBuildPurpose = (typeof PRODUCT_BUILD_PURPOSES)[number];
+
 export interface ProductCapabilities {
   readonly inheritedRemoteIntegrations: boolean;
   readonly hostedAuthentication: boolean;
@@ -13,6 +17,7 @@ export interface ProductCapabilities {
 
 export interface ProductProfile {
   readonly name: ProductProfileName;
+  readonly purpose: ProductBuildPurpose;
   readonly capabilities: ProductCapabilities;
   readonly publishableAsSigidi: boolean;
 }
@@ -20,6 +25,7 @@ export interface ProductProfile {
 const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
   "local-desktop": {
     name: "local-desktop",
+    purpose: "product",
     capabilities: {
       inheritedRemoteIntegrations: false,
       hostedAuthentication: false,
@@ -31,6 +37,7 @@ const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
   },
   "upstream-full": {
     name: "upstream-full",
+    purpose: "integration",
     capabilities: {
       inheritedRemoteIntegrations: true,
       hostedAuthentication: true,

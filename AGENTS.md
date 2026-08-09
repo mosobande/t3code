@@ -6,11 +6,13 @@ SIGIDI is a separate downstream product built from its open-source upstream proj
 
 ## Product constraints
 
-### Build profiles
+### Build purposes and profiles
 
-`local-desktop` is the default SIGIDI product build. It is fixed at compile time and must use the existing desktop, server, renderer, registry, resolver, configuration, and packaging owners. A user setting, CLI argument, persisted record, or runtime environment variable cannot enable a capability that this build excludes.
+The **SIGIDI Product Build** is the customer build. Its compatibility identifier is `local-desktop`. It is fixed at compile time and must use the existing desktop, server, renderer, registry, resolver, configuration, and packaging owners. A user setting, CLI argument, persisted record, or runtime environment variable cannot enable a capability that this build excludes.
 
-`upstream-full` is an explicit maintainer-only build. It keeps inherited remote, relay, mobile, hosted-authentication, WSL, and deployment code testable for low-conflict T3 Code syncs. It is not a SIGIDI release and does not authorize an external write.
+The **Upstream Integration Build** is a maintainer-only build. Its compatibility identifier is `upstream-full`. It keeps inherited remote, relay, mobile, hosted-authentication, WSL, and deployment code testable for low-conflict T3 Code syncs. It is not a SIGIDI release and does not authorize an external write.
+
+Dev, Nightly, and Stable are channels for the SIGIDI Product Build. They show delivery maturity, not different capability sets. The delivery path is Dev → Nightly → Stable.
 
 Do not add a parallel local implementation when an existing owner can apply the profile. If the existing seam cannot express the required boundary, stop and use Atona to record the gap before adding a new owner.
 

@@ -2,9 +2,9 @@
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
-The active `.github/workflows/release.yml` path is a no-publish rehearsal for the default `local-desktop` profile. It runs on pull requests and version tags that match `v*.*.*`, builds unsigned macOS arm64 and x64 DMG/ZIP artifacts, inspects them in the job, and uploads nothing.
+The active `.github/workflows/release.yml` path is a no-publish build for the SIGIDI Product Build (`local-desktop`). It maps pull requests to the Dev channel, tags in the form `vX.Y.Z` to Stable, and tags in the form `vX.Y.Z-nightly.YYYYMMDD.N` to Nightly. It builds unsigned macOS arm64 and x64 DMG/ZIP artifacts, inspects them in the job, and uploads nothing.
 
-The workflow does not create a tag or GitHub Release, submit signing or notarization work, publish updater metadata, deploy a relay or hosted app, publish a CLI package, or announce a release. A maintainer creates and pushes the input tag. `upstream-full` is not publication authority.
+The workflow does not create a tag or GitHub Release, submit signing or notarization work, publish updater metadata, deploy a relay or hosted app, publish a CLI package, or announce a release. A maintainer creates and pushes the input tag. The Upstream Integration Build (`upstream-full`) is not publication authority.
 
 Run the same focused proof locally:
 
@@ -19,7 +19,7 @@ Keep signing variables, updater repository variables, relay/Clerk/Axiom/Cloudfla
 
 Marketing and schema publication are a separate G3B operation. They require the exact SIGIDI domain, legal identity, hosting project, and deploy authority. Desktop publication must not depend on it.
 
-## Inherited upstream-full release template (disabled)
+## Inherited Upstream Integration Build release template (disabled)
 
 The remainder of this file records the disabled inherited automation for sync and future decisions. No workflow event can run these jobs. Do not treat the commands, services, credentials, or domains below as SIGIDI release instructions.
 

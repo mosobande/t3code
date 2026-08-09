@@ -6,12 +6,14 @@ describe("productProfile", () => {
   it("defaults to the publishable local desktop profile", () => {
     const profile = resolveProductProfile(undefined);
     assert.equal(profile.name, "local-desktop");
+    assert.equal(profile.purpose, "product");
     assert.equal(profile.publishableAsSigidi, true);
     assert.equal(profile.capabilities.inheritedRemoteIntegrations, false);
   });
 
   it("enables inherited integrations only in the maintainer profile", () => {
     const profile = resolveProductProfile("upstream-full");
+    assert.equal(profile.purpose, "integration");
     assert.equal(profile.publishableAsSigidi, false);
     assert.equal(profile.capabilities.inheritedRemoteIntegrations, true);
     assert.equal(profile.capabilities.remoteEnvironments, true);
