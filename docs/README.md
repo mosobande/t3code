@@ -40,8 +40,8 @@ policy in [CONTRIBUTING.md](../CONTRIBUTING.md); agent rules in [AGENTS.md](../A
 ### Source-only upstream references
 
 The [Connections and Remote Access](./user/remote-access.md) guide starts with the direct
-local-network mobile pairing available in the SIGIDI Product Build. Its remaining sections help
-maintainers test inherited `upstream-full` remote capabilities. Other maintainer-only references
+local-network mobile pairing available in `local`. Its remaining sections help
+maintainers test inherited `upstream` remote capabilities. Other maintainer-only references
 are [remote environments](./internals/remote.md), [T3 Connect](./internals/t3-connect.md),
 [relay observability](./operations/relay-observability.md), [mobile screenshots](./operations/mobile-app-store-screenshots.md),
 and the inherited [mobile app](../apps/mobile/README.md).

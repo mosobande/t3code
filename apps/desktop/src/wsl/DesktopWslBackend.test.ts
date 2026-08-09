@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 
 import * as NetService from "@t3tools/shared/Net";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as DesktopBackendConfiguration from "../backend/DesktopBackendConfiguration.ts";
 import * as DesktopBackendPool from "../backend/DesktopBackendPool.ts";
@@ -116,6 +117,10 @@ describe("DesktopWslBackend", () => {
 
       yield* backend.reconcile;
       const spec = registeredSpec;
+      if (!productProfile.capabilities.wsl) {
+        assert.isUndefined(spec);
+        return;
+      }
       assert.isDefined(spec);
       if (spec === undefined) {
         throw new Error("Expected WSL backend registration");
@@ -175,7 +180,7 @@ describe("DesktopWslBackend", () => {
 
       yield* backend.reconcile;
 
-      assert.equal(startCount, 1);
+      assert.equal(startCount, productProfile.capabilities.wsl ? 1 : 0);
     }).pipe(
       Effect.provide(
         DesktopWslBackend.layer.pipe(

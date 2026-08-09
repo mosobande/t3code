@@ -1,6 +1,6 @@
 # Remote Architecture (source-only upstream reference)
 
-> `local-desktop` cannot hydrate, register, start, or expose these capabilities. This document is retained for `upstream-full` maintenance and T3 Code sync only.
+> `local` cannot hydrate, register, start, or expose these capabilities. This document is retained for `upstream` maintenance and T3 Code sync only.
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 

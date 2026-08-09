@@ -14,6 +14,8 @@ jobs:
     if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
+    env:
+      SIGIDI_BUILD_PROFILE: local
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -47,20 +49,13 @@ jobs:
       - name: Check resource monitor formatting
         run: cargo fmt --manifest-path native/resource-monitor/Cargo.toml -- --check
 
-      - name: Build desktop pipeline
-        run: vp run build:desktop
-
-      - name: Verify preload bundle output
-        run: |
-          test -f apps/desktop/dist-electron/preload.cjs
-          grep -nE "desktopBridge|getLocalEnvironmentBootstrap|PICK_FOLDER_CHANNEL|wsUrl" apps/desktop/dist-electron/preload.cjs
-          grep -n "__clerk_internal_electron_passkeys" apps/desktop/dist-electron/preload.cjs
-
   test:
     name: Test
     if: github.event_name != 'push' || github.ref_name == github.event.repository.default_branch
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
+    env:
+      SIGIDI_BUILD_PROFILE: local
     steps:
       - name: Checkout
         uses: actions/checkout@v6

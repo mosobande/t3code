@@ -1,6 +1,6 @@
 declare const __SIGIDI_BUILD_PROFILE__: string | undefined;
 
-export const PRODUCT_PROFILE_NAMES = ["local-desktop", "upstream-full"] as const;
+export const PRODUCT_PROFILE_NAMES = ["local", "upstream"] as const;
 export type ProductProfileName = (typeof PRODUCT_PROFILE_NAMES)[number];
 
 /** The customer-facing reason a build exists. Profile names remain compatibility identifiers. */
@@ -26,8 +26,8 @@ export interface ProductProfile {
 }
 
 const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
-  "local-desktop": {
-    name: "local-desktop",
+  local: {
+    name: "local",
     purpose: "product",
     capabilities: {
       inheritedRemoteIntegrations: false,
@@ -39,8 +39,8 @@ const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
     },
     publishableAsSigidi: true,
   },
-  "upstream-full": {
-    name: "upstream-full",
+  upstream: {
+    name: "upstream",
     purpose: "integration",
     capabilities: {
       inheritedRemoteIntegrations: true,
@@ -68,9 +68,9 @@ export class UnknownProductProfileError extends Error {
 
 export function resolveProductProfile(value: unknown): ProductProfile {
   if (value === undefined || value === "") {
-    return PROFILES["local-desktop"];
+    return PROFILES.local;
   }
-  if (value === "local-desktop" || value === "upstream-full") {
+  if (value === "local" || value === "upstream") {
     return PROFILES[value];
   }
   throw new UnknownProductProfileError(value);

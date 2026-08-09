@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   release_metadata:
-    name: Resolve SIGIDI Product Build metadata
+    name: Resolve local release metadata
     runs-on: ubuntu-latest
     outputs:
       channel: ${{ steps.resolve.outputs.channel }}
@@ -55,7 +55,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     env:
-      SIGIDI_BUILD_PROFILE: local-desktop
+      SIGIDI_BUILD_PROFILE: local
       CSC_IDENTITY_AUTO_DISCOVERY: "false"
     strategy:
       fail-fast: false
@@ -104,7 +104,7 @@ jobs:
           ! find "$output_dir" -maxdepth 1 -type f \
             \( -name '*.exe' -o -name '*.AppImage' -o -name '*.blockmap' -o -name '*.yml' \) | grep -q .
 
-  # Retained upstream-full automation is source-only. A product profile is not
+  # Retained upstream automation is source-only. A product profile is not
   # publication authority, so no event can run these jobs.
   check_changes:
     name: Check for changes since last nightly

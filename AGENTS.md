@@ -8,11 +8,13 @@ SIGIDI is a separate downstream product built from its open-source upstream proj
 
 ### Build purposes and profiles
 
-The **SIGIDI Product Build** is the customer build. Its compatibility identifier is `local-desktop`. It is fixed at compile time and must use the existing desktop, server, renderer, registry, resolver, configuration, and packaging owners. A user setting, CLI argument, persisted record, or runtime environment variable cannot enable a capability that this build excludes.
+**Local (`local`)** is the canonical customer profile and the default for development, tests, builds, and releases. It is local-first: reuse the established desktop, server, renderer, registry, resolver, configuration, and packaging owners, and enable only the capabilities that the profile explicitly includes. A user setting, CLI argument, persisted record, or runtime environment variable cannot enable a capability that this build excludes.
 
-The **Upstream Integration Build** is a maintainer-only build. Its compatibility identifier is `upstream-full`. It keeps inherited remote, relay, mobile, hosted-authentication, WSL, and deployment code testable for low-conflict T3 Code syncs. It is not a SIGIDI release and does not authorize an external write.
+**Upstream (`upstream`)** is the canonical maintainer compatibility profile. Use it only when an upstream sync, a profile-boundary change, or activation of a previously gated capability requires inherited remote, relay, mobile, hosted-authentication, WSL, or deployment code to be tested. It is not a SIGIDI release and does not authorize an external write.
 
-Stable and Nightly are channels for the SIGIDI Product Build. They show delivery maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both Stable and Nightly compile `local-desktop`.
+Stable and Nightly are channels for `local`. They show delivery maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both Stable and Nightly compile `local`.
+
+Run the full `local` suite for ordinary work. The `ci:local` PR label explicitly requests a fresh local profile build. Run the full `upstream` suite only for a standard T3 Code sync, a change to the profile boundary, activation of a previously gated capability, or an explicit maintainer request. Add the `ci:upstream` PR label when that proof is required; do not spend upstream CI resources on ordinary local-first changes.
 
 Do not add a parallel local implementation when an existing owner can apply the profile. If the existing seam cannot express the required boundary, stop and use Atona to record the gap before adding a new owner.
 

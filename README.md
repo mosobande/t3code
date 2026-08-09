@@ -12,7 +12,7 @@ SIGIDI currently supports Codex, Claude Code, Cursor, Grok Build, and OpenCode.
 
 SIGIDI is a downstream product built from the open-source [T3 Code](https://github.com/pingdotgg/t3code) project. It reuses T3 Code's server, client, provider, and workbench capabilities while keeping SIGIDI product identity, data, releases, policy, and external services separate.
 
-The default `local-desktop` build fixes the product to loopback-only desktop operation at compile time. The explicit maintainer-only `upstream-full` build keeps inherited integrations testable for upstream sync. It is not a SIGIDI release and grants no deployment or publication authority.
+The default `local` profile fixes the customer capability set at compile time. The explicit maintainer-only `upstream` profile keeps inherited integrations testable for upstream sync. It is not a SIGIDI release and grants no deployment or publication authority.
 
 Some internal names remain T3-compatible because changing them would add divergence without changing the SIGIDI experience. A T3 Code command, installer, mobile app, hosted domain, or managed service is an upstream resource unless this repository explicitly documents a SIGIDI-owned replacement.
 
@@ -79,7 +79,7 @@ SIGIDI reuses T3 Code's source architecture:
 - `apps/server` owns provider processes, orchestration, terminals, persistence, and version control.
 - `apps/web` provides the browser client.
 - `apps/desktop` packages the web client with the Electron host.
-- `apps/mobile` contains a source-only inherited React Native client. It is not part of the `local-desktop` product.
+- `apps/mobile` contains a source-only inherited React Native client. It is not a published `local` mobile product.
 - `packages/contracts` defines typed client-server contracts.
 - `packages/client-runtime` contains runtime behavior shared by web and mobile.
 

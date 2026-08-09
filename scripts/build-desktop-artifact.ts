@@ -413,11 +413,11 @@ export class MissingDesktopBuildInputError extends Schema.TaggedErrorClass<Missi
 export class UnsafeSkippedDesktopBuildError extends Schema.TaggedErrorClass<UnsafeSkippedDesktopBuildError>()(
   "UnsafeSkippedDesktopBuildError",
   {
-    profile: Schema.Literal("local-desktop"),
+    profile: Schema.Literal("local"),
   },
 ) {
   override get message(): string {
-    return "The local-desktop artifact build cannot use --skip-build because existing output may belong to another build profile.";
+    return "The local artifact build cannot use --skip-build because existing output may belong to another build profile.";
   }
 }
 
@@ -1815,7 +1815,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     });
   }
   if (options.skipBuild && !canReuseDesktopBuildOutputs(buildProfile)) {
-    return yield* new UnsafeSkippedDesktopBuildError({ profile: "local-desktop" });
+    return yield* new UnsafeSkippedDesktopBuildError({ profile: "local" });
   }
 
   const electronVersion = desktopPackageJson.dependencies.electron;

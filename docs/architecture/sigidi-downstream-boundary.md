@@ -6,15 +6,15 @@ This document is the durable boundary for SIGIDI-specific work. The root `AGENTS
 
 ## Build-purpose and profile boundary
 
-The **SIGIDI Product Build** is the customer build. Its compatibility identifier is `local-desktop`. The build resolves it once and compiles its capability map into the existing desktop, server, renderer, client-runtime, and packaging owners. It can bind directly to the local network for explicit mobile pairing. It cannot hydrate or register inherited remote targets, start Tailscale or WSL, expose remote IPC or UI, use hosted authentication, or package inherited service configuration.
+**Local (`local`)** is the customer profile and the default. The build resolves it once and compiles its capability map into the existing desktop, server, renderer, client-runtime, and packaging owners. It can bind directly to the local network for explicit mobile pairing. It cannot hydrate or register inherited remote targets, start Tailscale or WSL, expose remote IPC or UI, use hosted authentication, or package inherited service configuration.
 
-The **Upstream Integration Build** is a maintainer-only build. Its compatibility identifier is `upstream-full`. It preserves the established inherited paths for focused proof and upstream sync. It is not publishable as SIGIDI. A profile selects application composition only; it never authorizes a workflow, credential, deployment, signing operation, notarization submission, or publication.
+**Upstream (`upstream`)** is the maintainer-only compatibility profile. It preserves the established inherited paths for focused proof and upstream sync. It is not publishable as SIGIDI. A profile selects application composition only; it never authorizes a workflow, credential, deployment, signing operation, notarization submission, or publication.
 
-Stable and Nightly are release channels for the SIGIDI Product Build. They communicate maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both channels compile `local-desktop`; Nightly must not unlock remote or hosted capabilities that Stable excludes.
+Stable and Nightly are release channels for `local`. They communicate maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both channels compile `local`; Nightly must not unlock remote or hosted capabilities that Stable excludes.
 
 Apply the profile at the earliest existing lifecycle owner: before persisted target hydration, broker resolution, settings reconciliation, process launch, route generation, IPC/preload exposure, or artifact staging. Do not add a second local registry, resolver, platform implementation, Effect graph, or packaging path. If no existing owner can enforce a capability, record the wall with Atona and obtain a maintainer decision before adding implementation.
 
-Build purposes do not partition local data. Stable and Nightly SIGIDI Product Builds use the established `~/.sigidi/userdata` home so projects, threads, provider state, and settings remain available across compatible builds. The profile still ignores ambient home overrides in the packaged SIGIDI product and supplies the selected shared home explicitly to its child server.
+Build purposes do not partition local data. Stable and Nightly `local` builds use the established `~/.sigidi/userdata` home so projects, threads, provider state, and settings remain available across compatible builds. The profile still ignores ambient home overrides in the packaged SIGIDI product and supplies the selected shared home explicitly to its child server.
 
 ## Choose the narrowest ownership boundary
 

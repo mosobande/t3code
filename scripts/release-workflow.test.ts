@@ -35,7 +35,7 @@ describe("release workflow", () => {
     assert.include(rehearsalJob, "sigidi-${{ needs.release_metadata.outputs.channel }}");
   });
 
-  it("runs only an unsigned local-desktop macOS rehearsal", () => {
+  it("runs only an unsigned local macOS rehearsal", () => {
     const rehearsalJob = workflowJob("rehearse", "check_changes");
     const buildJob = workflowJob("build", "publish_cli");
 
@@ -43,7 +43,7 @@ describe("release workflow", () => {
     assert.notInclude(releaseWorkflow, "workflow_dispatch:");
     assert.include(releaseWorkflow, 'tags: ["v*.*.*"]');
     assert.notInclude(releaseWorkflow, "branches: [main]");
-    assert.include(rehearsalJob, "SIGIDI_BUILD_PROFILE: local-desktop");
+    assert.include(rehearsalJob, "SIGIDI_BUILD_PROFILE: local");
     assert.include(rehearsalJob, 'CSC_IDENTITY_AUTO_DISCOVERY: "false"');
     assert.include(rehearsalJob, "rust_target: aarch64-apple-darwin");
     assert.include(rehearsalJob, "rust_target: x86_64-apple-darwin");

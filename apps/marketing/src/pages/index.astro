@@ -398,7 +398,7 @@ const mobileEndorsementRows = [
 
   function detectPlatform(): Platform | null {
     const ua = navigator.userAgent;
-    if (document.documentElement.dataset.productProfile === "local-desktop") {
+    if (document.documentElement.dataset.productProfile === "local") {
       return { os: "mac", label: "Download for macOS", arch: "arm64" };
     }
     if (/Win/i.test(ua)) return { os: "win", label: "Download for Windows" };
@@ -463,8 +463,8 @@ const mobileEndorsementRows = [
 </script>
 
 <style>
-  :global(html[data-product-profile="local-desktop"]) .dl-icon--windows,
-  :global(html[data-product-profile="local-desktop"]) .dl-icon--linux {
+  :global(html[data-product-profile="local"]) .dl-icon--windows,
+  :global(html[data-product-profile="local"]) .dl-icon--linux {
     display: none;
   }
 

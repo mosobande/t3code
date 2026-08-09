@@ -16,25 +16,25 @@ This is a living glossary for T3 Code. It explains what common terms mean in thi
 
 ### Build purposes and profiles
 
-#### SIGIDI Product Build (`local-desktop`)
+#### Local (`local`)
 
-The customer build. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, diagnostics owners, and explicit direct-LAN mobile pairing. It prevents inherited remote capabilities from hydrating, starting, or appearing in product UI. `local-desktop` remains the internal compatibility identifier.
+The canonical customer profile and the default for development, tests, builds, Stable, and Nightly. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, diagnostics owners, and explicit direct-LAN mobile pairing. It prevents inherited remote capabilities from hydrating, starting, or appearing in product UI.
 
-#### Upstream Integration Build (`upstream-full`)
+#### Upstream (`upstream`)
 
-The maintainer-only build that keeps inherited T3 Code integrations testable for upstream sync. It is not a SIGIDI release and does not authorize external writes. `upstream-full` remains the internal compatibility identifier.
+The canonical maintainer compatibility profile. It keeps inherited T3 Code integrations testable when a sync, boundary change, capability activation, or maintainer request requires them. It is not a SIGIDI release and does not authorize external writes.
 
 #### Stable and Nightly
 
-Release channels for the SIGIDI Product Build. Nightly is the early-adopter path; Stable is the supported customer path. Pull requests are rehearsals, not a release channel. Neither channel changes the compiled product capability set.
+Release channels for `local`. Nightly is the early-adopter path; Stable is the supported customer path. Pull requests are rehearsals, not a release channel. Neither channel changes the compiled product capability set.
 
 #### Remote Environment SSH
 
-Inherited SSH execution against another environment. It is unavailable in `local-desktop`.
+Inherited SSH execution against another environment. It is unavailable in `local`.
 
 #### SCM Git-over-SSH
 
-SSH transport used by source-control providers for clone, fetch, and push. It remains available in `local-desktop` and is distinct from Remote Environment SSH.
+SSH transport used by source-control providers for clone, fetch, and push. It remains available in `local` and is distinct from Remote Environment SSH.
 
 #### Loopback bootstrap bearer exchange
 
@@ -42,7 +42,7 @@ The existing `bootstrapRemoteBearerSession`-named exchange used to authenticate 
 
 #### Relay session
 
-The inherited relay/DPoP environment-discovery and connection path. It is unavailable in `local-desktop` and retained only through `upstream-full`.
+The inherited relay/DPoP environment-discovery and connection path. It is unavailable in `local` and retained only through `upstream`.
 
 ### Project and workspace
 

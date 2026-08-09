@@ -89,6 +89,10 @@ Confirm every original worktree still has the captured branch, HEAD, and status.
 sync_git merge --no-ff upstream/main -m "chore: sync latest T3 Code main"
 ```
 
+Keep this exact merge subject. The conditional `upstream` CI workflow uses it to run the full
+maintainer compatibility suite after the merge reaches the default branch. Ordinary SIGIDI
+commits do not spend those runner resources.
+
 For every conflict, inspect all stages:
 
 ```sh

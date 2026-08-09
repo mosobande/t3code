@@ -1,6 +1,6 @@
 # Connections and Remote Access
 
-## SIGIDI Product Build: local-network mobile access
+## Local profile: local-network mobile access
 
 The SIGIDI desktop app can accept direct connections from the inherited mobile app when both
 devices are on the same trusted Wi-Fi or local network:
@@ -19,10 +19,10 @@ Local-network access is off by default. It does not enable Tailscale, relay, tun
 environments, hosted authentication, or a public hosted web service. Treat a pairing link like a
 password and use this feature only on a network that you trust.
 
-## Upstream Integration Build reference
+## Upstream profile reference
 
 The remaining guide describes inherited remote capabilities in the maintainer-only
-`upstream-full` build. These capabilities are not available in the SIGIDI Product Build. This
+`upstream` build. These capabilities are not available in `local`. This
 reference grants no service or deployment authority.
 
 Use this when you want to connect to a SIGIDI server from another device such as a phone, tablet, or separate desktop app.
