@@ -1,23 +1,42 @@
 import { assert, describe, it } from "@effect/vitest";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { productProfile } from "@t3tools/shared/productProfile";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { beforeEach, vi } from "vite-plus/test";
 
-const { appendSwitchMock, getSwitchValueMock, hasSwitchMock, registerSchemesMock } = vi.hoisted(
-  () => ({
-    appendSwitchMock: vi.fn(),
-    getSwitchValueMock: vi.fn(),
-    hasSwitchMock: vi.fn(),
-    registerSchemesMock: vi.fn(),
-  }),
-);
+const {
+  appendSwitchMock,
+  getSwitchValueMock,
+  hasSwitchMock,
+  mkdirSyncMock,
+  readFileSyncMock,
+  readdirSyncMock,
+  registerSchemesMock,
+  writeFileSyncMock,
+} = vi.hoisted(() => ({
+  appendSwitchMock: vi.fn(),
+  getSwitchValueMock: vi.fn(),
+  hasSwitchMock: vi.fn(),
+  mkdirSyncMock: vi.fn(),
+  readFileSyncMock: vi.fn(),
+  readdirSyncMock: vi.fn(() => []),
+  registerSchemesMock: vi.fn(),
+  writeFileSyncMock: vi.fn(),
+}));
+
+vi.mock("node:fs", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:fs")>()),
+  mkdirSync: mkdirSyncMock,
+  readFileSync: readFileSyncMock,
+  readdirSync: readdirSyncMock,
+  writeFileSync: writeFileSyncMock,
+}));
 
 vi.mock("electron", () => ({
   app: {
     getVersion: () => "0.0.31",
+    isPackaged: true,
     commandLine: {
       appendSwitch: appendSwitchMock,
       getSwitchValue: getSwitchValueMock,
@@ -36,7 +55,11 @@ describe("DesktopPreReadyPlatform", () => {
     appendSwitchMock.mockReset();
     getSwitchValueMock.mockReset();
     hasSwitchMock.mockReset();
+    mkdirSyncMock.mockClear();
+    readFileSyncMock.mockClear();
+    readdirSyncMock.mockClear();
     registerSchemesMock.mockReset();
+    writeFileSyncMock.mockClear();
   });
 
   it("reads an explicit Electron command-line switch value", () => {
@@ -80,16 +103,8 @@ describe("DesktopPreReadyPlatform", () => {
     assert.isNull(value);
   });
 
-  it("applies the focused product-home gate only to packaged SIGIDI builds", () => {
-    assert.isFalse(DesktopPreReadyPlatform.shouldEnsureFocusedProductHome(false));
-    assert.equal(
-      DesktopPreReadyPlatform.shouldEnsureFocusedProductHome(true),
-      productProfile.publishableAsSigidi,
-    );
-  });
-
   it.effect(
-    "acquires a synchronous pre-ready layer before an asynchronous Clerk-shaped layer",
+    "configures Electron before asynchronous layers without inspecting the shared data home",
     () =>
       Effect.gen(function* () {
         class ClerkShaped extends Context.Service<ClerkShaped, { readonly ready: true }>()(
@@ -134,6 +149,10 @@ describe("DesktopPreReadyPlatform", () => {
         });
         assert.deepEqual(events, ["pre-ready", "clerk"]);
         assert.equal(registerSchemesMock.mock.calls.length, 1);
+        assert.equal(mkdirSyncMock.mock.calls.length, 0);
+        assert.equal(readFileSyncMock.mock.calls.length, 0);
+        assert.equal(readdirSyncMock.mock.calls.length, 0);
+        assert.equal(writeFileSyncMock.mock.calls.length, 0);
         assert.deepEqual(
           registerSchemesMock.mock.calls[0]?.[0].map(
             (entry: { readonly scheme: string }) => entry.scheme,

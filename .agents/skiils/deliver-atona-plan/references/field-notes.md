@@ -14,6 +14,14 @@ Inspect every process and bundle boundary. A define that reaches the Electron ma
 
 Apply the profile to staged production dependencies as well as compiled entry points. A dormant integration can pull optional native packages into `app.asar.unpacked` through the stage manifest even when no local code activates it. Keep the dependency in the richer profile and omit it from the narrow artifact through the existing packaging owner.
 
+When an artifact builder generates a reduced production manifest, pin every retained direct dependency to the exact version in the repository lockfile. Installing a ranged generated manifest without the root lockfile can silently select a newer native or platform package, make the build non-reproducible, and fail for reasons unrelated to the candidate.
+
+A capability can be inactive and still crash a packaged app when its top-level import is externalized. When a narrow artifact omits an integration dependency, inspect the final entry bundle for external `require` or `import` edges and launch the packaged executable. Bundle the inactive dependency through the established build owner when a source-level profile guard cannot prevent module resolution.
+
+Run packaged startup proof on a verified free port with an isolated data home. Do not accept a readiness response until the listening process belongs to the candidate; another installed build can make a broken candidate look healthy. Require the candidate process, its child server, the readiness contract, and the main-window milestone to remain healthy before stopping only the captured process.
+
+Do not invent a data-home marker when build profiles are intended to share established local data. A marker that rejects a non-empty home is a migration policy, not a capability boundary. Keep profile enforcement in existing composition owners, and use the established data-path owner unless the plan settles a separate migration, backup, and recovery contract.
+
 Do not remove a route source file merely to hide it when generated route types or links still depend on that file. Prefer the route's existing `beforeLoad`, navigation catalog, search catalog and composition owners so the route graph stays type-correct while user interaction remains unavailable.
 
 ## Preserve the established stack
@@ -22,9 +30,9 @@ Repository engine and package-manager declarations are proof inputs. Do not pres
 
 ## Isolate proof before cutover
 
-A baseline launch can mutate old state before a later migration slice protects it. Materialize explicit temporary home, app-data, state, and credential paths before the first runtime proof. Reserve the canonical user home for an authorized cutover gate.
+A baseline launch can mutate real state before the candidate is proven. Materialize explicit temporary home, app-data, state, and credential paths before the first runtime proof. A shipped app can still use the canonical shared home when that is the confirmed product contract.
 
-Audit pre-ready and synchronous startup readers as well as the main application bootstrap. A settings read used to configure a framework before its ready event can bypass a later product-home gate and consume legacy state first.
+Audit pre-ready and synchronous startup readers as well as the main application bootstrap. When profiles share state, apply capability policy at the earliest existing reader, reconciliation or activation owner; do not turn shared-state access into a profile-specific home gate.
 
 ## Separate deterministic proof from live credentials
 

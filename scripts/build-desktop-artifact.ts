@@ -51,6 +51,17 @@ const WorkspaceConfig = Schema.Struct({
 });
 type WorkspaceConfig = typeof WorkspaceConfig.Type;
 
+const LockfileDependency = Schema.Struct({
+  version: Schema.String,
+});
+const LockfileImporter = Schema.Struct({
+  dependencies: Schema.optional(Schema.Record(Schema.String, LockfileDependency)),
+});
+const PnpmLockfile = Schema.Struct({
+  importers: Schema.Record(Schema.String, LockfileImporter),
+});
+type PnpmLockfile = typeof PnpmLockfile.Type;
+
 const StageWorkspaceConfig = Schema.Struct({
   supportedArchitectures: Schema.Struct({
     os: Schema.Array(Schema.String),
@@ -71,6 +82,7 @@ const RepoRoot = Effect.service(Path.Path).pipe(
 );
 const encodeJsonString = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const decodeWorkspaceConfig = Schema.decodeEffect(fromYaml(WorkspaceConfig));
+const decodePnpmLockfile = Schema.decodeEffect(fromYaml(PnpmLockfile));
 const decodeNodePtyManifest = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
 );
@@ -82,6 +94,14 @@ const readWorkspaceConfig = Effect.fn("readWorkspaceConfig")(function* () {
   const repoRoot = yield* RepoRoot;
   const workspaceYaml = yield* fs.readFileString(path.join(repoRoot, "pnpm-workspace.yaml"));
   return yield* decodeWorkspaceConfig(workspaceYaml);
+});
+
+const readPnpmLockfile = Effect.fn("readPnpmLockfile")(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const repoRoot = yield* RepoRoot;
+  const lockfileYaml = yield* fs.readFileString(path.join(repoRoot, "pnpm-lock.yaml"));
+  return yield* decodePnpmLockfile(lockfileYaml);
 });
 
 interface DesktopBuildIconAssets {
@@ -1468,6 +1488,25 @@ export function resolveDesktopRuntimeDependencies(
   return resolveCatalogDependencies(runtimeDependencies, catalog, "apps/desktop");
 }
 
+export function pinStageDependenciesToLockfile(
+  dependencies: Record<string, string>,
+  lockedDependencies: Record<string, { readonly version: string }>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.keys(dependencies).map((dependencyName) => {
+      const lockedVersion = lockedDependencies[dependencyName]?.version;
+      if (!lockedVersion) {
+        throw new Error(`Missing lockfile version for staged dependency '${dependencyName}'.`);
+      }
+      const peerSuffixIndex = lockedVersion.indexOf("(");
+      return [
+        dependencyName,
+        peerSuffixIndex === -1 ? lockedVersion : lockedVersion.slice(0, peerSuffixIndex),
+      ];
+    }),
+  );
+}
+
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
   updateChannel: "latest" | "nightly",
   profile: ProductProfile = buildProfile,
@@ -1756,10 +1795,13 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const fs = yield* FileSystem.FileSystem;
   const hostPlatform = yield* HostProcessPlatform;
   const workspaceConfig = yield* readWorkspaceConfig();
+  const pnpmLockfile = yield* readPnpmLockfile();
   const workspaceCatalog = workspaceConfig.catalog ?? {};
   const workspaceOverrides = workspaceConfig.overrides ?? {};
   const workspacePatchedDependencies = workspaceConfig.patchedDependencies ?? {};
   const workspaceAllowBuilds = workspaceConfig.allowBuilds ?? {};
+  const lockedServerDependencies = pnpmLockfile.importers["apps/server"]?.dependencies ?? {};
+  const lockedDesktopDependencies = pnpmLockfile.importers["apps/desktop"]?.dependencies ?? {};
 
   const platformConfig = PLATFORM_CONFIG[options.platform];
   if (!platformConfig) {
@@ -1796,7 +1838,11 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   });
 
   const resolvedServerDependencies = yield* Effect.try({
-    try: () => resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
+    try: () =>
+      pinStageDependenciesToLockfile(
+        resolveCatalogDependencies(serverDependencies, workspaceCatalog, "apps/server"),
+        lockedServerDependencies,
+      ),
     catch: (cause) =>
       new DesktopBuildDependencyResolutionError({
         kind: "server-production",
@@ -1805,7 +1851,11 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       }),
   });
   const resolvedDesktopRuntimeDependencies = yield* Effect.try({
-    try: () => resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
+    try: () =>
+      pinStageDependenciesToLockfile(
+        resolveDesktopRuntimeDependencies(desktopPackageJson.dependencies, workspaceCatalog),
+        lockedDesktopDependencies,
+      ),
     catch: (cause) =>
       new DesktopBuildDependencyResolutionError({
         kind: "desktop-runtime",

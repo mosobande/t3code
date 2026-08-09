@@ -15,6 +15,9 @@ const publicConfigDefine = {
   ),
 };
 
+export const shouldBundleDesktopMainDependency = (id: string): boolean =>
+  id.startsWith("@t3tools/") || id === "@clerk/electron" || id.startsWith("@clerk/electron/");
+
 export default defineConfig({
   define: {
     __SIGIDI_BUILD_PROFILE__: JSON.stringify(buildProfile.name),
@@ -53,7 +56,7 @@ export default defineConfig({
       entry: ["src/main.ts"],
       clean: true,
       deps: {
-        alwaysBundle: (id) => id.startsWith("@t3tools/"),
+        alwaysBundle: shouldBundleDesktopMainDependency,
       },
       ...(shouldLaunchElectronAfterPack ? { onSuccess: "node scripts/dev-electron.mjs" } : {}),
     },

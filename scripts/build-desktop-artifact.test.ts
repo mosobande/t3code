@@ -26,6 +26,7 @@ import {
   MacPasskeySigningConfigurationResolutionError,
   MissingMacPasskeyProvisioningProfileError,
   renderMacPasskeyEntitlements,
+  pinStageDependenciesToLockfile,
   resolveClerkPasskeyNativeArtifacts,
   resolveMacPasskeySigningConfiguration,
   resolveDesktopRuntimeDependencies,
@@ -223,6 +224,29 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       {
         "@effect/platform-node": "4.0.0-beta.59",
         effect: "4.0.0-beta.59",
+      },
+    );
+  });
+
+  it("pins staged dependency ranges to the repository lockfile", () => {
+    assert.deepStrictEqual(
+      pinStageDependenciesToLockfile(
+        {
+          "@anthropic-ai/claude-agent-sdk": "^0.3.170",
+          effect: "4.0.0-beta.103",
+        },
+        {
+          "@anthropic-ai/claude-agent-sdk": {
+            version: "0.3.170(@anthropic-ai/sdk@0.93.0)(zod@4.4.3)",
+          },
+          effect: {
+            version: "4.0.0-beta.103(patch_hash=a18f9631)",
+          },
+        },
+      ),
+      {
+        "@anthropic-ai/claude-agent-sdk": "0.3.170",
+        effect: "4.0.0-beta.103",
       },
     );
   });

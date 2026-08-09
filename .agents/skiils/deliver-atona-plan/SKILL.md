@@ -48,7 +48,7 @@ A compiled product profile is not deployment authority. GitHub events, EAS submi
 
 - Run every pre-cutover app proof with exact temporary home, app-data, state, and credential paths.
 - Prove the real user data home was not read or written.
-- Make invalid legacy state fail before settings, catalogs, backends, or renderers can activate it.
+- When confirmed profiles share one home, do not add a profile-specific directory or marker. Prove excluded persisted capabilities cannot hydrate or activate through settings, catalogs, backends, or renderers.
 - Keep migrations forward-repairable and verify restart, idempotency, concurrency, and failure recovery where state changes.
 - Do not tag, publish, deploy, notarize, provision, authenticate, or modify external services without their separate authority.
 
