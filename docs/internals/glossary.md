@@ -18,15 +18,15 @@ This is a living glossary for T3 Code. It explains what common terms mean in thi
 
 #### SIGIDI Product Build (`local-desktop`)
 
-The customer build. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, and diagnostics owners, while preventing inherited remote capabilities from hydrating, starting, or appearing in product UI. `local-desktop` remains the internal compatibility identifier.
+The customer build. It is fixed during compilation. It keeps the existing local desktop, renderer, server, provider, workbench, loopback authentication, Git-over-SSH transport, diagnostics owners, and explicit direct-LAN mobile pairing. It prevents inherited remote capabilities from hydrating, starting, or appearing in product UI. `local-desktop` remains the internal compatibility identifier.
 
 #### Upstream Integration Build (`upstream-full`)
 
 The maintainer-only build that keeps inherited T3 Code integrations testable for upstream sync. It is not a SIGIDI release and does not authorize external writes. `upstream-full` remains the internal compatibility identifier.
 
-#### Dev, Nightly, and Stable
+#### Stable and Nightly
 
-Release channels for the SIGIDI Product Build. Dev is the contributor path; Nightly is the early-adopter path; Stable is the supported customer path. They do not change the compiled product capability set.
+Release channels for the SIGIDI Product Build. Nightly is the early-adopter path; Stable is the supported customer path. Pull requests are rehearsals, not a release channel. Neither channel changes the compiled product capability set.
 
 #### Remote Environment SSH
 

@@ -504,7 +504,7 @@ export const makeServerLayer = Layer.unwrap(
       ),
     );
     const tailscaleServeLayer =
-      productProfile.capabilities.networkExposure && config.tailscaleServeEnabled
+      productProfile.capabilities.tailscaleExposure && config.tailscaleServeEnabled
         ? Layer.effectDiscard(
             Effect.acquireRelease(
               Effect.gen(function* () {
@@ -627,7 +627,7 @@ export const makeServerLayer = Layer.unwrap(
           Deferred.await(runtimeStateParked),
           Deferred.await(cloudLinkParked),
           Deferred.await(routesReady),
-          ...(productProfile.capabilities.networkExposure && config.tailscaleServeEnabled
+          ...(productProfile.capabilities.tailscaleExposure && config.tailscaleServeEnabled
             ? [Deferred.await(tailscaleParked)]
             : []),
         ],

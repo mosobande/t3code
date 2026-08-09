@@ -21,11 +21,11 @@ const workflowJob = (name: string, nextName: string) => {
 };
 
 describe("release workflow", () => {
-  it("maps development, nightly, and stable inputs to product-build metadata", () => {
+  it("maps rehearsal, nightly, and stable inputs to product-build metadata", () => {
     const metadataJob = workflowJob("release_metadata", "rehearse");
     const rehearsalJob = workflowJob("rehearse", "check_changes");
 
-    assert.include(metadataJob, "channel=dev");
+    assert.include(metadataJob, "channel=rehearsal");
     assert.include(metadataJob, "channel=nightly");
     assert.include(metadataJob, "channel=stable");
     assert.include(metadataJob, "-nightly.");

@@ -6,11 +6,13 @@ Keeping integration source, workspace membership, tests and established build ow
 
 Prefer one checked-in build-time selector over deleting inherited integrations or creating parallel local implementations. Keep the default profile fail-closed, keep the richer profile maintainer-only, and prove that runtime state cannot change it. If an existing owner cannot express the constraint, reopen the architecture decision before adding a new owner.
 
+When one inherited gate controls a retained local feature and a deferred integration, split it by capability at the existing owner. Expose only the narrow IPC, preload, UI, endpoint, and process branches that the retained feature needs. Do not turn on the broader integration profile to reuse one mature sub-feature.
+
 Workspace and lockfile membership are source-maintenance boundaries, not reliable product-policy boundaries. Product builds and artifacts can use focused existing commands without changing the full repository graph.
 
 Build profiles control compiled composition. They do not authorize CI events, cloud deployment, signing, notarization or publication; those require separate external-action gates.
 
-Keep build purpose, release channel, and compatibility identifier separate. A Product Build and an Integration Build answer who the build serves; Dev, Nightly, and Stable answer delivery maturity; inherited identifiers can stay unchanged when renaming them would increase upstream-sync cost. Do not use Nightly as a capability-unlock path.
+Keep build purpose, release channel, and compatibility identifier separate. A Product Build and an Integration Build answer who the build serves; Stable and Nightly answer delivery maturity; pull requests are rehearsals, not a release channel. Inherited identifiers can stay unchanged when renaming them would increase upstream-sync cost. Do not use Nightly as a capability-unlock path.
 
 Inspect every process and bundle boundary. A define that reaches the Electron main bundle can still be absent from an externalized preload dependency or a separately built child server. Prove the selected profile in each final entry artifact, not only in source configuration.
 
@@ -22,9 +24,20 @@ A capability can be inactive and still crash a packaged app when its top-level i
 
 Run packaged startup proof on a verified free port with an isolated data home. Do not accept a readiness response until the listening process belongs to the candidate; another installed build can make a broken candidate look healthy. Require the candidate process, its child server, the readiness contract, and the main-window milestone to remain healthy before stopping only the captured process.
 
+When a packaged Electron executable starts as a Node REPL in an agent harness, inspect and unset
+an inherited `ELECTRON_RUN_AS_NODE` before diagnosing the artifact. Then repeat the exact launch,
+capture the process session, confirm the candidate-owned listener and renderer response, and stop
+only that captured session.
+
 Do not invent a data-home marker when build profiles are intended to share established local data. A marker that rejects a non-empty home is a migration policy, not a capability boundary. Keep profile enforcement in existing composition owners, and use the established data-path owner unless the plan settles a separate migration, backup, and recovery contract.
 
 Do not remove a route source file merely to hide it when generated route types or links still depend on that file. Prefer the route's existing `beforeLoad`, navigation catalog, search catalog and composition owners so the route graph stays type-correct while user interaction remains unavailable.
+
+When a profile unlocks an existing connection path, complete its reverse states through the same
+access owner. The settings surface must show pairing links and every authenticated client type,
+identify the current session, revoke one non-current session, and clear all other sessions. Reuse
+the established access-change stream and revoke endpoints; do not add a profile-specific
+connection store.
 
 ## Preserve the established stack
 

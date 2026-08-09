@@ -8,6 +8,7 @@ import * as Layer from "effect/Layer";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import { productProfile } from "@t3tools/shared/productProfile";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopConfig from "../app/DesktopConfig.ts";
@@ -209,7 +210,7 @@ describe("DesktopServerExposure", () => {
     ),
   );
 
-  it.effect("persists tailscale serve preferences atomically and reports no-op updates", () =>
+  it.effect("keeps Tailscale Serve behind its separate profile capability", () =>
     withHarness(
       emptyNetworkInterfaces,
       Effect.gen(function* () {
@@ -223,9 +224,15 @@ describe("DesktopServerExposure", () => {
           enabled: true,
           port: 8443,
         });
-        assert.equal(changed.requiresRelaunch, true);
-        assert.equal(changed.state.tailscaleServeEnabled, true);
-        assert.equal(changed.state.tailscaleServePort, 8443);
+        assert.equal(changed.requiresRelaunch, productProfile.capabilities.tailscaleExposure);
+        assert.equal(
+          changed.state.tailscaleServeEnabled,
+          productProfile.capabilities.tailscaleExposure,
+        );
+        assert.equal(
+          changed.state.tailscaleServePort,
+          productProfile.capabilities.tailscaleExposure ? 8443 : 443,
+        );
 
         const unchanged = yield* serverExposure.setTailscaleServeEnabled({
           enabled: true,
@@ -234,8 +241,14 @@ describe("DesktopServerExposure", () => {
         assert.equal(unchanged.requiresRelaunch, false);
 
         const persisted = yield* settings.get;
-        assert.equal(persisted.tailscaleServeEnabled, true);
-        assert.equal(persisted.tailscaleServePort, 8443);
+        assert.equal(
+          persisted.tailscaleServeEnabled,
+          productProfile.capabilities.tailscaleExposure,
+        );
+        assert.equal(
+          persisted.tailscaleServePort,
+          productProfile.capabilities.tailscaleExposure ? 8443 : 443,
+        );
       }),
     ),
   );
@@ -283,23 +296,25 @@ describe("DesktopServerExposure", () => {
         );
         assert.notInclude(modeError.message, diskFailure.message);
 
-        const tailscaleError = yield* serverExposure
-          .setTailscaleServeEnabled({ enabled: true, port: 8443 })
-          .pipe(Effect.flip);
-        assert.instanceOf(
-          tailscaleError,
-          DesktopServerExposure.DesktopTailscaleServePersistenceError,
-        );
-        assert.isTrue(DesktopServerExposure.isDesktopServerExposureError(tailscaleError));
-        assert.equal(tailscaleError.enabled, true);
-        assert.equal(tailscaleError.port, 8443);
-        assert.strictEqual(tailscaleError.cause, settingsFailure);
-        assert.strictEqual(tailscaleError.cause.cause, diskFailure);
-        assert.equal(
-          tailscaleError.message,
-          "Failed to persist desktop Tailscale Serve settings (enabled: true, port: 8443).",
-        );
-        assert.notInclude(tailscaleError.message, diskFailure.message);
+        if (productProfile.capabilities.tailscaleExposure) {
+          const tailscaleError = yield* serverExposure
+            .setTailscaleServeEnabled({ enabled: true, port: 8443 })
+            .pipe(Effect.flip);
+          assert.instanceOf(
+            tailscaleError,
+            DesktopServerExposure.DesktopTailscaleServePersistenceError,
+          );
+          assert.isTrue(DesktopServerExposure.isDesktopServerExposureError(tailscaleError));
+          assert.equal(tailscaleError.enabled, true);
+          assert.equal(tailscaleError.port, 8443);
+          assert.strictEqual(tailscaleError.cause, settingsFailure);
+          assert.strictEqual(tailscaleError.cause.cause, diskFailure);
+          assert.equal(
+            tailscaleError.message,
+            "Failed to persist desktop Tailscale Serve settings (enabled: true, port: 8443).",
+          );
+          assert.notInclude(tailscaleError.message, diskFailure.message);
+        }
       }),
       {},
       undefined,
@@ -318,7 +333,9 @@ describe("DesktopServerExposure", () => {
         const endpoints = yield* serverExposure.getAdvertisedEndpoints;
         assert.deepEqual(
           endpoints.map((endpoint) => endpoint.httpBaseUrl),
-          ["http://127.0.0.1:4173/", "http://192.168.1.20:4173/", "http://100.90.1.2:4173/"],
+          productProfile.capabilities.tailscaleExposure
+            ? ["http://127.0.0.1:4173/", "http://192.168.1.20:4173/", "http://100.90.1.2:4173/"]
+            : ["http://127.0.0.1:4173/", "http://192.168.1.20:4173/"],
         );
       }),
     ),
@@ -359,7 +376,9 @@ describe("DesktopServerExposure", () => {
         const endpoints = yield* serverExposure.getAdvertisedEndpoints;
         assert.deepEqual(
           endpoints.map((endpoint) => endpoint.httpBaseUrl),
-          ["http://127.0.0.1:4173/", "http://10.0.0.7:4173/", "https://public.example.test/"],
+          productProfile.capabilities.tailscaleExposure
+            ? ["http://127.0.0.1:4173/", "http://10.0.0.7:4173/", "https://public.example.test/"]
+            : ["http://127.0.0.1:4173/", "http://10.0.0.7:4173/"],
         );
       }),
       {
@@ -378,6 +397,13 @@ describe("DesktopServerExposure", () => {
         yield* serverExposure.setMode("network-accessible");
 
         const endpoints = yield* serverExposure.getAdvertisedEndpoints;
+        if (!productProfile.capabilities.tailscaleExposure) {
+          assert.deepEqual(
+            endpoints.map((endpoint) => endpoint.httpBaseUrl),
+            ["http://127.0.0.1:3773/", "http://192.168.1.20:3773/"],
+          );
+          return;
+        }
         assert.deepEqual(endpoints, [
           {
             id: "desktop-loopback:3773",

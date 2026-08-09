@@ -47,8 +47,6 @@ node_modules/
 !.agents/skills/t3code-sync/
 !.agents/skills/t3code-sync/**
 
-# Track the reusable Atona delivery skill at its requested repository path.
-!.agents/skiils/
-.agents/skiils/*
-!.agents/skiils/deliver-atona-plan/
-!.agents/skiils/deliver-atona-plan/**
+# Track the reusable Atona delivery skill.
+!.agents/skills/deliver-atona-plan/
+!.agents/skills/deliver-atona-plan/**

@@ -12,7 +12,7 @@ The **SIGIDI Product Build** is the customer build. Its compatibility identifier
 
 The **Upstream Integration Build** is a maintainer-only build. Its compatibility identifier is `upstream-full`. It keeps inherited remote, relay, mobile, hosted-authentication, WSL, and deployment code testable for low-conflict T3 Code syncs. It is not a SIGIDI release and does not authorize an external write.
 
-Dev, Nightly, and Stable are channels for the SIGIDI Product Build. They show delivery maturity, not different capability sets. The delivery path is Dev → Nightly → Stable.
+Stable and Nightly are channels for the SIGIDI Product Build. They show delivery maturity, not different capability sets. Pull requests are rehearsals, not a release channel. Both Stable and Nightly compile `local-desktop`.
 
 Do not add a parallel local implementation when an existing owner can apply the profile. If the existing seam cannot express the required boundary, stop and use Atona to record the gap before adding a new owner.
 

@@ -325,7 +325,7 @@ export const resolveServerConfig = (
       ),
       () => Boolean(devUrl),
     );
-    const tailscaleServeEnabled = productProfile.capabilities.networkExposure
+    const tailscaleServeEnabled = productProfile.capabilities.tailscaleExposure
       ? Option.getOrElse(
           resolveOptionPrecedence(
             normalizedFlags.tailscaleServeEnabled,
@@ -344,14 +344,17 @@ export const resolveServerConfig = (
       () => 443,
     );
     const staticDir = devUrl ? undefined : yield* ServerConfig.resolveStaticDir();
-    const host = productProfile.capabilities.networkExposure
+    const host = productProfile.capabilities.lanMobilePairing
       ? Option.getOrElse(
           resolveOptionPrecedence(
             normalizedFlags.host,
             Option.fromUndefinedOr(env.host),
             Option.fromUndefinedOr(bootstrap?.host),
           ),
-          () => (mode === "desktop" ? "127.0.0.1" : undefined),
+          () =>
+            mode === "desktop" || !productProfile.capabilities.inheritedRemoteIntegrations
+              ? "127.0.0.1"
+              : undefined,
         )
       : "127.0.0.1";
     const logLevel = Option.getOrElse(cliLogLevel, () => env.logLevel);

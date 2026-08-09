@@ -1,6 +1,29 @@
-# Remote Access (source-only upstream reference)
+# Connections and Remote Access
 
-> This inherited guide does not describe the `local-desktop` SIGIDI product. Remote environments, relay, tunnels, Tailscale exposure, and remote UI are compiled out of that profile. Maintainers can use this document only when testing the explicit `upstream-full` source path; it grants no service or deployment authority.
+## SIGIDI Product Build: local-network mobile access
+
+The SIGIDI desktop app can accept direct connections from the inherited mobile app when both
+devices are on the same trusted Wi-Fi or local network:
+
+1. Open **Settings** → **Connections**.
+2. Enable local-network access. SIGIDI restarts its backend and shows a reachable LAN address.
+3. Select **Add connection**, then scan the QR code with the mobile app or use the shown pairing
+   link.
+
+The same page lists issued pairing links and authenticated client sessions. A session can be a
+desktop app, a web browser, or a mobile app. The list identifies the current session and shows the
+last connection state. Revoke one old pairing link or client session from its row. Select
+**Clear other connections** to revoke every session except the one that is managing the list.
+
+Local-network access is off by default. It does not enable Tailscale, relay, tunnels, SSH
+environments, hosted authentication, or a public hosted web service. Treat a pairing link like a
+password and use this feature only on a network that you trust.
+
+## Upstream Integration Build reference
+
+The remaining guide describes inherited remote capabilities in the maintainer-only
+`upstream-full` build. These capabilities are not available in the SIGIDI Product Build. This
+reference grants no service or deployment authority.
 
 Use this when you want to connect to a SIGIDI server from another device such as a phone, tablet, or separate desktop app.
 

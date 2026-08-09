@@ -32,8 +32,8 @@ jobs:
           set -euo pipefail
 
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            channel=dev
-            version="0.0.0-dev.$RUN_NUMBER"
+            channel=rehearsal
+            version="0.0.0-rehearsal.$RUN_NUMBER"
           elif [[ "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             channel=stable
             version="${BASH_REMATCH[1]}"

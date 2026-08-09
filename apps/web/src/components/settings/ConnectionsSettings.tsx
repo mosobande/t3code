@@ -19,9 +19,7 @@ import {
   AuthReviewWriteScope,
   AuthStandardClientScopes,
   AuthTerminalOperateScope,
-  type AuthClientSession,
   type AuthEnvironmentScope,
-  type AuthPairingLink,
   type AdvertisedEndpoint,
   type DesktopDiscoveredSshHost,
   type DesktopSshEnvironmentTarget,
@@ -34,7 +32,6 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
@@ -45,6 +42,10 @@ import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
   selectQrEndpointOption,
+  sortDesktopClientSessions,
+  sortDesktopPairingLinks,
+  toDesktopClientSessionRecord,
+  toDesktopPairingLinkRecord,
 } from "./ConnectionsSettings.logic";
 import {
   SettingsPageContainer,
@@ -383,44 +384,6 @@ function endpointRowClassName(presentation: AccessSectionPresentation, isAvailab
   }
 
   return cn(ENDPOINT_ROW_CLASSNAME, !isAvailable && "bg-muted/24");
-}
-
-function sortDesktopPairingLinks(links: ReadonlyArray<ServerPairingLinkRecord>) {
-  return [...links].toSorted(
-    (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-  );
-}
-
-function sortDesktopClientSessions(sessions: ReadonlyArray<ServerClientSessionRecord>) {
-  return [...sessions].toSorted((left, right) => {
-    if (left.current !== right.current) {
-      return left.current ? -1 : 1;
-    }
-    if (left.connected !== right.connected) {
-      return left.connected ? -1 : 1;
-    }
-    return new Date(right.issuedAt).getTime() - new Date(left.issuedAt).getTime();
-  });
-}
-
-function toDesktopPairingLinkRecord(pairingLink: AuthPairingLink): ServerPairingLinkRecord {
-  return {
-    ...pairingLink,
-    createdAt: DateTime.formatIso(pairingLink.createdAt),
-    expiresAt: DateTime.formatIso(pairingLink.expiresAt),
-  };
-}
-
-function toDesktopClientSessionRecord(clientSession: AuthClientSession): ServerClientSessionRecord {
-  return {
-    ...clientSession,
-    issuedAt: DateTime.formatIso(clientSession.issuedAt),
-    expiresAt: DateTime.formatIso(clientSession.expiresAt),
-    lastConnectedAt:
-      clientSession.lastConnectedAt === null
-        ? null
-        : DateTime.formatIso(clientSession.lastConnectedAt),
-  };
 }
 
 function selectPairingEndpoint(
@@ -1152,7 +1115,7 @@ type PairingClientsListProps = {
   onRevokeClientSession: (sessionId: ServerClientSessionRecord["sessionId"]) => void;
 };
 
-const PairingClientsList = memo(function PairingClientsList({
+export function PairingClientsList({
   endpointUrl,
   endpoints,
   defaultEndpointKey,
@@ -1197,7 +1160,7 @@ const PairingClientsList = memo(function PairingClientsList({
       ) : null}
     </>
   );
-});
+}
 
 type AdvertisedEndpointListRowProps = {
   endpoint: AdvertisedEndpoint;
@@ -1904,19 +1867,13 @@ export function ConnectionsSettings() {
   const desktopPairingLinks = useMemo(() => {
     const event = authAccessChanges.data;
     if (event?.type !== "snapshot") return [];
-    return sortDesktopPairingLinks(
-      event.payload.pairingLinks.map((pairingLink: AuthPairingLink) =>
-        toDesktopPairingLinkRecord(pairingLink),
-      ),
-    );
+    return sortDesktopPairingLinks(event.payload.pairingLinks.map(toDesktopPairingLinkRecord));
   }, [authAccessChanges.data]);
   const desktopClientSessions = useMemo(() => {
     const event = authAccessChanges.data;
     if (event?.type !== "snapshot") return [];
     return sortDesktopClientSessions(
-      event.payload.clientSessions.map((clientSession: AuthClientSession) =>
-        toDesktopClientSessionRecord(clientSession),
-      ),
+      event.payload.clientSessions.map(toDesktopClientSessionRecord),
     );
   }, [authAccessChanges.data]);
   const isLocalBackendNetworkAccessible = desktopBridge

@@ -58,7 +58,10 @@ const SETTINGS_SECTION_ICONS: Readonly<
 };
 
 const settingsNavPaths = (Object.keys(SETTINGS_SECTION_LABELS) as SettingsPath[]).filter(
-  (to) => productProfile.capabilities.remoteEnvironments || to !== "/settings/connections",
+  (to) =>
+    productProfile.capabilities.remoteEnvironments ||
+    productProfile.capabilities.lanMobilePairing ||
+    to !== "/settings/connections",
 );
 
 export const SETTINGS_NAV_ITEMS: ReadonlyArray<{

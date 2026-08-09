@@ -32,7 +32,7 @@ import * as DesktopWslBackend from "../wsl/DesktopWslBackend.ts";
 
 const DEFAULT_DESKTOP_BACKEND_PORT = 3773;
 const MAX_TCP_PORT = 65_535;
-const DESKTOP_BACKEND_PORT_PROBE_HOSTS = productProfile.capabilities.networkExposure
+const DESKTOP_BACKEND_PORT_PROBE_HOSTS = productProfile.capabilities.lanMobilePairing
   ? (["127.0.0.1", "0.0.0.0", "::"] as const)
   : (["127.0.0.1"] as const);
 
@@ -171,7 +171,7 @@ const bootstrap = Effect.gen(function* () {
 
   const settings = yield* desktopSettings.get;
   if (
-    productProfile.capabilities.networkExposure &&
+    productProfile.capabilities.lanMobilePairing &&
     settings.serverExposureMode !== environment.defaultDesktopSettings.serverExposureMode
   ) {
     yield* logBootstrapInfo("bootstrap restoring persisted server exposure mode", {
@@ -195,12 +195,12 @@ const bootstrap = Effect.gen(function* () {
   yield* logBootstrapInfo("bootstrap resolved backend endpoint", {
     baseUrl: backendConfig.httpBaseUrl.href,
   });
-  if (productProfile.capabilities.networkExposure && serverExposureState.endpointUrl) {
+  if (productProfile.capabilities.lanMobilePairing && serverExposureState.endpointUrl) {
     yield* logBootstrapInfo("bootstrap enabled network access", {
       endpointUrl: serverExposureState.endpointUrl,
     });
   } else if (
-    productProfile.capabilities.networkExposure &&
+    productProfile.capabilities.lanMobilePairing &&
     settings.serverExposureMode === "network-accessible"
   ) {
     yield* logBootstrapWarning(

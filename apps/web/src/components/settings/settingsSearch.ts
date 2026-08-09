@@ -228,7 +228,9 @@ export function searchSettings(
 
   return items.filter(
     (item) =>
-      (productProfile.capabilities.remoteEnvironments || item.to !== "/settings/connections") &&
+      (productProfile.capabilities.remoteEnvironments ||
+        productProfile.capabilities.lanMobilePairing ||
+        item.to !== "/settings/connections") &&
       normalizeSearchText(item.title).includes(normalizedQuery),
   );
 }

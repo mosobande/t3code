@@ -434,13 +434,13 @@ export const make = Effect.gen(function* () {
     function* ({ port }: { readonly port: number }) {
       yield* Effect.annotateCurrentSpan({ port });
       const settings = yield* desktopSettings.get;
-      const effectiveSettings = productProfile.capabilities.networkExposure
-        ? settings
-        : {
-            ...settings,
-            serverExposureMode: "local-only" as const,
-            tailscaleServeEnabled: false,
-          };
+      const effectiveSettings = {
+        ...settings,
+        ...(productProfile.capabilities.lanMobilePairing
+          ? {}
+          : { serverExposureMode: "local-only" as const }),
+        ...(productProfile.capabilities.tailscaleExposure ? {} : { tailscaleServeEnabled: false }),
+      };
       const currentNetworkInterfaces = yield* readNetworkInterfaces;
       const resolved = resolveRuntimeState({
         requestedMode: effectiveSettings.serverExposureMode,
@@ -459,7 +459,7 @@ export const make = Effect.gen(function* () {
   ) {
     yield* Effect.annotateCurrentSpan({ mode });
     const previous = yield* Ref.get(stateRef);
-    if (!productProfile.capabilities.networkExposure) {
+    if (!productProfile.capabilities.lanMobilePairing) {
       return {
         state: toContractState(previous),
         requiresRelaunch: false,
@@ -506,7 +506,7 @@ export const make = Effect.gen(function* () {
         enabled: input.enabled,
         ...(input.port === undefined ? {} : { port: input.port }),
       });
-      if (!productProfile.capabilities.networkExposure) {
+      if (!productProfile.capabilities.tailscaleExposure) {
         return {
           state: toContractState(yield* Ref.get(stateRef)),
           requiresRelaunch: false,
@@ -542,7 +542,7 @@ export const make = Effect.gen(function* () {
   );
 
   const getAdvertisedEndpoints = Effect.gen(function* () {
-    if (!productProfile.capabilities.networkExposure) {
+    if (!productProfile.capabilities.lanMobilePairing) {
       return [];
     }
     const state = yield* Ref.get(stateRef);
@@ -550,12 +550,20 @@ export const make = Effect.gen(function* () {
     const coreEndpoints = resolveDesktopCoreAdvertisedEndpoints({
       port: state.port,
       exposure: toResolvedExposure(state),
-      customHttpsEndpointUrls: config.desktopHttpsEndpointUrls,
+      customHttpsEndpointUrls: productProfile.capabilities.tailscaleExposure
+        ? config.desktopHttpsEndpointUrls
+        : [],
     });
 
-    // Don't spawn the Tailscale CLI when the user hasn't opted into any
-    // network exposure. The spawn itself triggers a macOS "Other apps"
+    // Do not spawn the Tailscale CLI when this product build cannot expose it.
+    // The spawn itself triggers a macOS "Other apps"
     // TCC prompt on Mac App Store Tailscale builds.
+    if (!productProfile.capabilities.tailscaleExposure) {
+      return coreEndpoints;
+    }
+
+    // Do not spawn the Tailscale CLI when the user has not opted into any
+    // Tailscale exposure.
     if (state.mode !== "network-accessible" && !state.tailscaleServeEnabled) {
       return coreEndpoints;
     }

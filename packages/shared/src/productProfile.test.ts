@@ -9,6 +9,8 @@ describe("productProfile", () => {
     assert.equal(profile.purpose, "product");
     assert.equal(profile.publishableAsSigidi, true);
     assert.equal(profile.capabilities.inheritedRemoteIntegrations, false);
+    assert.equal(profile.capabilities.lanMobilePairing, true);
+    assert.equal(profile.capabilities.tailscaleExposure, false);
   });
 
   it("enables inherited integrations only in the maintainer profile", () => {
@@ -16,6 +18,8 @@ describe("productProfile", () => {
     assert.equal(profile.purpose, "integration");
     assert.equal(profile.publishableAsSigidi, false);
     assert.equal(profile.capabilities.inheritedRemoteIntegrations, true);
+    assert.equal(profile.capabilities.lanMobilePairing, true);
+    assert.equal(profile.capabilities.tailscaleExposure, true);
     assert.equal(profile.capabilities.remoteEnvironments, true);
   });
 

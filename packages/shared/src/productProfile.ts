@@ -10,7 +10,10 @@ export type ProductBuildPurpose = (typeof PRODUCT_BUILD_PURPOSES)[number];
 export interface ProductCapabilities {
   readonly inheritedRemoteIntegrations: boolean;
   readonly hostedAuthentication: boolean;
-  readonly networkExposure: boolean;
+  /** Direct HTTP pairing between the desktop and a client on its local network. */
+  readonly lanMobilePairing: boolean;
+  /** Tailscale Serve and its advertised private-network endpoints. */
+  readonly tailscaleExposure: boolean;
   readonly remoteEnvironments: boolean;
   readonly wsl: boolean;
 }
@@ -29,7 +32,8 @@ const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
     capabilities: {
       inheritedRemoteIntegrations: false,
       hostedAuthentication: false,
-      networkExposure: false,
+      lanMobilePairing: true,
+      tailscaleExposure: false,
       remoteEnvironments: false,
       wsl: false,
     },
@@ -41,7 +45,8 @@ const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
     capabilities: {
       inheritedRemoteIntegrations: true,
       hostedAuthentication: true,
-      networkExposure: true,
+      lanMobilePairing: true,
+      tailscaleExposure: true,
       remoteEnvironments: true,
       wsl: true,
     },
