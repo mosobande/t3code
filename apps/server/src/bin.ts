@@ -48,25 +48,24 @@ export const makeCli = (
   options: { readonly remoteEnabled?: boolean; readonly cloudEnabled?: boolean } = {},
 ) => {
   const remoteEnabled =
-    options.remoteEnabled ??
-    (options.cloudEnabled === true || productProfile.capabilities.inheritedRemoteIntegrations);
+    productProfile.capabilities.inheritedRemoteIntegrations && options.remoteEnabled !== false;
   const cloudEnabled = options.cloudEnabled ?? (remoteEnabled && hasCloudPublicConfig);
+  const localCommands = [
+    startCommand,
+    serveCommand,
+    pairCommand,
+    authCommand,
+    projectCommand,
+    serviceCommand,
+    servicePreflightCommand,
+  ] as const;
   return Command.make("t3", { ...sharedServerCommandFlags }).pipe(
     Command.withDescription("Run the T3 Code server."),
     Command.withHandler((flags) => runServerCommand(flags)),
     Command.withSubcommands(
       remoteEnabled
-        ? [
-            startCommand,
-            serveCommand,
-            pairCommand,
-            authCommand,
-            projectCommand,
-            serviceCommand,
-            servicePreflightCommand,
-            cloudEnabled ? connectCommand : connectUnavailableCommand,
-          ]
-        : [startCommand, projectCommand],
+        ? [...localCommands, cloudEnabled ? connectCommand : connectUnavailableCommand]
+        : localCommands,
     ),
   );
 };

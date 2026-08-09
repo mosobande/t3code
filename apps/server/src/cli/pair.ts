@@ -15,6 +15,7 @@ import {
   PortSchema,
 } from "@t3tools/contracts";
 import { resolveWorktreeT3Home } from "@t3tools/shared/devHome";
+import { productProfile } from "@t3tools/shared/productProfile";
 import {
   buildTailscaleHttpsBaseUrl,
   DEFAULT_TAILSCALE_SERVE_PORT,
@@ -78,7 +79,9 @@ export class NoRunningServerError extends Schema.TaggedErrorClass<NoRunningServe
     return [
       "No running T3 Code server found.",
       ...this.checkedStatePaths.map((statePath) => `  checked ${statePath}`),
-      "Start one with `npx t3 serve`, or connect this machine with T3 Connect: `npx t3 connect`.",
+      productProfile.capabilities.inheritedRemoteIntegrations
+        ? "Start one with `npx t3 serve`, or connect this machine with T3 Connect: `npx t3 connect`."
+        : "Start one with `npx t3 serve`.",
     ].join("\n");
   }
 }
@@ -481,13 +484,21 @@ const tailscaleServePortFlag = Flag.integer("tailscale-serve-port").pipe(
   Flag.withDefault(DEFAULT_TAILSCALE_SERVE_PORT),
 );
 
-export const pairCommand = Command.make("pair", {
+const directPairFlags = {
   baseDir: baseDirFlag,
   ttl: ttlFlag,
   label: labelFlag,
-  tailscale: tailscaleFlag,
-  tailscaleServePort: tailscaleServePortFlag,
-}).pipe(
+} as const;
+
+const pairFlags = productProfile.capabilities.tailscaleExposure
+  ? {
+      ...directPairFlags,
+      tailscale: tailscaleFlag,
+      tailscaleServePort: tailscaleServePortFlag,
+    }
+  : directPairFlags;
+
+export const pairCommand = Command.make("pair", pairFlags).pipe(
   Command.withDescription(
     "Mint a pairing token for a running T3 Code server and print it as a QR code.",
   ),
@@ -502,7 +513,7 @@ export const pairCommand = Command.make("pair", {
 
       const notes: Array<string> = [];
       let pairingBaseUrl: string;
-      if (flags.tailscale) {
+      if ("tailscale" in flags && flags.tailscale) {
         const resolved = yield* resolveTailscalePairingBase({
           target,
           servePort: flags.tailscaleServePort,
@@ -513,7 +524,9 @@ export const pairCommand = Command.make("pair", {
         pairingBaseUrl = resolveDirectPairingBaseUrl(target.state);
         if (isLoopbackHost(new URL(pairingBaseUrl).hostname)) {
           notes.push(
-            "This URL is only reachable from this machine. Re-run with --tailscale, or restart the server with a reachable --host.",
+            productProfile.capabilities.tailscaleExposure
+              ? "This URL is only reachable from this machine. Re-run with --tailscale, or restart the server with a reachable --host."
+              : "This URL is only reachable from this machine. Restart the server with a reachable --host for LAN pairing.",
           );
         }
         if (target.variant === "dev" && target.state.devUrl === undefined) {
