@@ -98,6 +98,14 @@ function makeMemorySecretStore() {
 }
 
 describe.sequential("signRelayAgentActivityPublishProof", () => {
+  it.effect("is inert when managed relay integrations are excluded", () =>
+    Effect.gen(function* () {
+      const relay = yield* AgentAwarenessRelay.AgentAwarenessRelay;
+      yield* relay.start();
+      yield* relay.publishThread("thread-disabled" as ThreadId);
+    }).pipe(Effect.provide(AgentAwarenessRelay.disabledLayer)),
+  );
+
   it("distinguishes pending link credentials from disabled publication", () => {
     expect(
       AgentAwarenessRelay.resolveAgentActivityPublishingStartupState({

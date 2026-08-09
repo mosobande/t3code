@@ -16,6 +16,8 @@ import type { ConnectionTarget } from "./model.ts";
 export interface ConnectionLayerOptions {
   readonly allowsTarget?: (target: ConnectionTarget) => boolean;
   readonly remoteEnabled?: boolean;
+  /** Defaults to remoteEnabled to preserve the established full-remote composition. */
+  readonly relayDiscoveryEnabled?: boolean;
 }
 
 const allowAllConnectionTargets = () => true;
@@ -23,6 +25,7 @@ const allowAllConnectionTargets = () => true;
 const buildLayer = ({
   allowsTarget = allowAllConnectionTargets,
   remoteEnabled = true,
+  relayDiscoveryEnabled = remoteEnabled,
 }: ConnectionLayerOptions = {}) => {
   const resolverLayer = ConnectionResolver.layerWithTargetPolicy(allowsTarget).pipe(
     Layer.provide(RemoteEnvironmentAuthorization.layer),
@@ -42,7 +45,7 @@ const buildLayer = ({
 
   const connectionServicesLayer = Layer.mergeAll(
     registryLayer,
-    RelayEnvironmentDiscovery.layerWithOptions({ enabled: remoteEnabled }),
+    RelayEnvironmentDiscovery.layerWithOptions({ enabled: relayDiscoveryEnabled }),
     onboardingLayer,
   );
 

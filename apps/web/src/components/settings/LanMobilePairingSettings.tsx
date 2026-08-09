@@ -104,7 +104,7 @@ export function LanMobilePairingSettings() {
           desktopNetworkAccess.error
             ? desktopNetworkAccess.error
             : enabled
-              ? "Tailscale, relay, SSH, WSL, and hosted access remain unavailable in this build."
+              ? "Relay, hosted access, and managed mobile push remain unavailable in this build."
               : null
         }
         control={

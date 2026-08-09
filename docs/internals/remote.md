@@ -1,6 +1,8 @@
-# Remote Architecture (source-only upstream reference)
+# Remote Architecture
 
-> `local` cannot hydrate, register, start, or expose these capabilities. This document is retained for `upstream` maintenance and T3 Code sync only.
+> `local` supports primary, directly paired bearer, Tailscale, desktop-managed SSH, and WSL paths.
+> Managed Relay targets, hosted authentication, hosted pairing, and T3 Connect remain available
+> only in the maintainer `upstream` profile.
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
@@ -103,7 +105,7 @@ set, the server acquires a Tailscale serve mapping for its actual listening port
 Endpoint identifiers are synthesized in `apps/desktop/src/backend/tailscaleEndpointProvider.ts` with
 `private-network` reachability.
 
-### Hosted pairing request
+### Hosted pairing request (upstream only)
 
 A hosted pairing request is a bootstrap URL for the static web app, not a transport:
 
@@ -142,7 +144,7 @@ how the server got started or who manages the process.
 It works for desktop, mobile, and web with no client-side process management. Browser security rules
 are part of it: a hosted HTTPS client cannot connect to plain `ws://` or `http://` LAN backends.
 
-### Relay-tunneled access
+### Relay-tunneled access (upstream only)
 
 Managed T3 Connect relay tunnels use `RelayConnectionTarget` and are the answer when the host is
 behind NAT, inbound ports are unavailable, or mobile must reach a desktop-hosted environment. From
@@ -153,9 +155,10 @@ Worker itself. See [t3-connect.md](./t3-connect.md).
 
 ### Tailscale access
 
-A T3-managed `tailscale serve` mapping exposes the server on the tailnet over HTTPS, and the
+A host-managed `tailscale serve` mapping exposes the server on the tailnet over HTTPS, and the
 resulting private-network endpoints are advertised for pairing. Connection then follows the ordinary
-bearer path.
+bearer path. SIGIDI invokes the existing authenticated host client; it does not own tailnet
+credentials or a Tailscale control service.
 
 ### Desktop-managed SSH access
 
@@ -188,7 +191,7 @@ it separate from access.
   server, forwards a port, and the renderer connects normally. The saved environment records that it
   came from SSH launch for reconnect and lifecycle UX only; that metadata never changes the protocol
   or the identity model.
-- **Client-managed local publish.** A local server is published through the relay with
+- **Client-managed local publish (upstream only).** A local server is published through the relay with
   `t3 connect link`, exposing a desktop-hosted environment to mobile without router or firewall
   changes.
 

@@ -9,8 +9,11 @@ describe("productProfile", () => {
     assert.equal(profile.purpose, "product");
     assert.equal(profile.publishableAsSigidi, true);
     assert.equal(profile.capabilities.inheritedRemoteIntegrations, false);
+    assert.equal(profile.capabilities.hostedAuthentication, false);
     assert.equal(profile.capabilities.lanMobilePairing, true);
-    assert.equal(profile.capabilities.tailscaleExposure, false);
+    assert.equal(profile.capabilities.tailscaleExposure, true);
+    assert.equal(profile.capabilities.remoteEnvironments, true);
+    assert.equal(profile.capabilities.wsl, true);
   });
 
   it("enables inherited integrations only in the maintainer profile", () => {
@@ -21,6 +24,7 @@ describe("productProfile", () => {
     assert.equal(profile.capabilities.lanMobilePairing, true);
     assert.equal(profile.capabilities.tailscaleExposure, true);
     assert.equal(profile.capabilities.remoteEnvironments, true);
+    assert.equal(profile.capabilities.wsl, true);
   });
 
   it("fails closed for an unknown profile", () => {

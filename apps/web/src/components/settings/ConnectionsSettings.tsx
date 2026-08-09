@@ -28,6 +28,7 @@ import {
   type EnvironmentId,
 } from "@t3tools/contracts";
 import { connectionStatusText } from "@t3tools/client-runtime/connection";
+import { productProfile } from "@t3tools/shared/productProfile";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -1641,7 +1642,9 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
 }
 
 function CloudLinkRow({ canManageRelay }: { readonly canManageRelay: boolean }) {
-  return hasCloudPublicConfig() ? <ConfiguredCloudLinkRow canManageRelay={canManageRelay} /> : null;
+  return productProfile.capabilities.inheritedRemoteIntegrations && hasCloudPublicConfig() ? (
+    <ConfiguredCloudLinkRow canManageRelay={canManageRelay} />
+  ) : null;
 }
 
 function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
@@ -1669,7 +1672,7 @@ function CloudRemoteEnvironmentRows({
   readonly primaryEnvironmentId: EnvironmentId | null;
   readonly savedEnvironments: ReadonlyArray<EnvironmentPresentation>;
 }) {
-  return hasCloudPublicConfig() ? (
+  return productProfile.capabilities.inheritedRemoteIntegrations && hasCloudPublicConfig() ? (
     <CloudEnvironmentConnectRows
       primaryEnvironmentId={primaryEnvironmentId}
       savedEnvironments={savedEnvironments}

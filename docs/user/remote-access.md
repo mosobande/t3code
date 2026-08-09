@@ -1,6 +1,6 @@
 # Connections and Remote Access
 
-## Local profile: local-network mobile access
+## Local profile
 
 The SIGIDI desktop app can accept direct connections from the inherited mobile app when both
 devices are on the same trusted Wi-Fi or local network:
@@ -15,15 +15,13 @@ desktop app, a web browser, or a mobile app. The list identifies the current ses
 last connection state. Revoke one old pairing link or client session from its row. Select
 **Clear other connections** to revoke every session except the one that is managing the list.
 
-Local-network access is off by default. It does not enable Tailscale, relay, tunnels, SSH
-environments, hosted authentication, or a public hosted web service. Treat a pairing link like a
-password and use this feature only on a network that you trust.
+Local-network access is off by default. Tailscale HTTPS, SSH environments, and WSL are also off by
+default and have their own controls. Relay, managed tunnels, hosted authentication, mobile push,
+and a public hosted SIGIDI web service are not available in this profile. Treat a pairing link like
+a password and use local-network access only on a network that you trust.
 
-## Upstream profile reference
-
-The remaining guide describes inherited remote capabilities in the maintainer-only
-`upstream` build. These capabilities are not available in `local`. This
-reference grants no service or deployment authority.
+The rest of this guide describes the direct connection options that are available in `local`.
+Sections marked as upstream references describe compatibility code that is not a SIGIDI service.
 
 Use this when you want to connect to a SIGIDI server from another device such as a phone, tablet, or separate desktop app.
 
@@ -45,7 +43,8 @@ npx t3 pair --tailscale
 
 This publishes the server over Tailscale Serve HTTPS (configuring the mapping if needed — it persists until you run `tailscale serve --https=443 off`) and pairs through the `https://machine.tailnet.ts.net/` URL. Use `--tailscale-serve-port` for a different HTTPS port, `--ttl` to change the token lifetime, and `--base-dir` to target a specific data directory.
 
-If no server is running, `t3 pair` says so and points you at `npx t3 serve` or `npx t3 connect`.
+If no server is running, `t3 pair` says so and points you at `npx t3 serve`. The managed
+`t3 connect` command remains available only in the maintainer `upstream` profile.
 
 ## Recommended Setup
 
@@ -101,7 +100,16 @@ on the **Tailscale HTTPS** row in **Settings** → **Connections**. The desktop 
 backend with the same server-side behavior as `t3 serve --tailscale-serve`, then the server asks
 Tailscale Serve to proxy HTTPS traffic to the local backend. Turn the same switch off to stop it.
 
+SIGIDI uses the `tailscale` client and daemon that are already installed and signed in on the host.
+You provide and control the tailnet. SIGIDI does not host a tailnet or ask for a Tailscale API token,
+auth key, account password, or control-server address.
+
 The Tailscale support is an endpoint provider add-on. The core remote model still works without Tailscale: LAN HTTP endpoints, custom HTTPS endpoints, future tunnels, and SSH-launched environments all use the same saved environment and pairing flow.
+
+If you operate your own HTTPS reverse proxy, set `T3CODE_DESKTOP_HTTPS_ENDPOINTS` to one or more
+comma-separated HTTPS URLs before starting the desktop backend. SIGIDI advertises valid entries; it
+does not configure DNS, certificates, or the proxy. Change or unset the variable and restart the
+backend to remove an advertised endpoint.
 
 For `https://app.t3.codes`, prefer an HTTPS Tailnet or other HTTPS endpoint. A plain `http://100.x.y.z:3773` endpoint can still work from a desktop client or another browser page served over HTTP, but it will not work from the hosted HTTPS app because of browser mixed-content rules.
 
@@ -161,6 +169,14 @@ After setup, the renderer connects to a local forwarded HTTP/WebSocket endpoint.
 
 SSH launch is a desktop feature because it needs local process and SSH access. Once the environment is paired and saved, it uses the same environment list and connection model as direct LAN, Tailscale, HTTPS, or future tunnel-backed environments.
 
+### WSL Backends
+
+On Windows, **Settings** → **Connections** can start a backend in an installed WSL distribution.
+WSL is off by default. Select a distribution to run it beside the Windows backend, or enable
+**WSL only** to use it as the primary backend. Select **Off** to stop the secondary WSL backend.
+SIGIDI uses the existing local `wsl.exe` installation and does not require Relay or hosted
+authentication.
+
 #### SSH Launch Troubleshooting
 
 The desktop SSH launcher connects with a non-interactive `sh` session, writes a small launcher script under `~/.sigidi/ssh-launch/<host-key>/`, starts or reuses a remote T3 server, and forwards the remote loopback port back to your desktop.
@@ -217,7 +233,11 @@ Instead:
 
 After pairing, future access is session-based. You do not need to keep reusing the original token unless you are pairing a new device.
 
-## Hosted Web App Pairing
+## Hosted Web App Pairing (upstream reference)
+
+SIGIDI does not publish a hosted web application. The inherited maintainer profile retains this
+direct-browser pairing behavior for upstream compatibility; it does not proxy traffic or create a
+SIGIDI-managed connection service.
 
 The hosted web app at `https://app.t3.codes` can save a remote backend in browser local storage from a URL like:
 

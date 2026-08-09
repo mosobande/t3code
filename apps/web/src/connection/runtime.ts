@@ -18,14 +18,26 @@ const providedConnectionPlatformLayer = connectionPlatformLayer.pipe(
   Layer.provide(runtimeContextLayer),
 );
 
-const allowsTarget = (target: ConnectionTarget) =>
-  productProfile.capabilities.inheritedRemoteIntegrations ||
-  target._tag === "PrimaryConnectionTarget";
+export const allowsTarget = (target: ConnectionTarget) => {
+  switch (target._tag) {
+    case "PrimaryConnectionTarget":
+      return true;
+    case "BearerConnectionTarget":
+    case "SshConnectionTarget":
+      return productProfile.capabilities.remoteEnvironments;
+    case "RelayConnectionTarget":
+      return productProfile.capabilities.inheritedRemoteIntegrations;
+  }
+};
 
-const connectionRuntimeLayer: typeof Connection.layer = Connection.makeLayer({
+export const connectionRuntimeOptions = {
   allowsTarget,
   remoteEnabled: productProfile.capabilities.remoteEnvironments,
-});
+  relayDiscoveryEnabled: productProfile.capabilities.inheritedRemoteIntegrations,
+};
+
+const connectionRuntimeLayer: typeof Connection.layer =
+  Connection.makeLayer(connectionRuntimeOptions);
 
 const providedClientConnectionLayer = Layer.merge(connectionRuntimeLayer, snapshotLoaderLayer).pipe(
   Layer.provideMerge(

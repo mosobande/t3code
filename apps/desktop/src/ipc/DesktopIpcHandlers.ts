@@ -64,7 +64,7 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   if (productProfile.capabilities.tailscaleExposure) {
     yield* ipc.handle(setTailscaleServeEnabled);
   }
-  if (productProfile.capabilities.inheritedRemoteIntegrations) {
+  if (productProfile.capabilities.remoteEnvironments) {
     yield* ipc.handle(getConnectionCatalog);
     yield* ipc.handle(setConnectionCatalog);
     yield* ipc.handle(clearConnectionCatalog);
@@ -77,7 +77,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
     yield* ipc.handle(fetchSshSessionState);
     yield* ipc.handle(issueSshWebSocketTicket);
     yield* ipc.handle(resolveSshPasswordPrompt);
+  }
 
+  if (productProfile.capabilities.wsl) {
     yield* ipc.handle(getWslState);
     yield* ipc.handle(setWslBackendEnabled);
     yield* ipc.handle(setWslDistro);
