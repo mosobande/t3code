@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vite-plus/test";
+import { afterEach, describe, expect, it } from "vite-plus/test";
 
 import {
   applyProjectNotesLifecycleAction,
@@ -41,12 +41,14 @@ const anotherProject = {
 
 function context(
   current: typeof owner | typeof sibling | typeof anotherProject,
-  notesPanelOpen = false,
+  notesPanelActive = false,
 ): ProjectNotesLifecycleContext {
-  return { ...current, notesPanelOpen };
+  return { ...current, notesPanelActive };
 }
 
 describe("Project Notes lifecycle", () => {
+  afterEach(() => useRightPanelStore.setState({ byThreadKey: {} }));
+
   it("uses current panel state for consecutive toggle actions", () => {
     useRightPanelStore.setState({ byThreadKey: {} });
     const active = owner as unknown as ActiveProjectNotesContext;

@@ -34,7 +34,7 @@ interface UseProjectNotesLifecycleOptions {
 function toLifecycleContext(active: ActiveProjectNotesContext): ProjectNotesLifecycleContext {
   return {
     ...active,
-    notesPanelOpen:
+    notesPanelActive:
       selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, active.threadRef) ===
       "notes",
   };

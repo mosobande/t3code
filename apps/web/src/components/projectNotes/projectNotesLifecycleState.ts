@@ -12,7 +12,7 @@ export interface ProjectNotesLifecycleContext {
     readonly environmentId: string;
     readonly threadId: string;
   };
-  readonly notesPanelOpen: boolean;
+  readonly notesPanelActive: boolean;
 }
 
 interface ProjectNotesFloatingOwner {
@@ -87,7 +87,7 @@ function presentationFor(
   const ownerFloating = isFloatingOwner(state, context);
   return {
     floating: ownerFloating ? (state.floating?.project ?? null) : null,
-    panel: context.notesPanelOpen && !ownerFloating,
+    panel: context.notesPanelActive && !ownerFloating,
   };
 }
 
@@ -117,7 +117,7 @@ export function transitionProjectNotesLifecycle(
       return transitionProjectNotesLifecycle(
         state,
         context,
-        isFloatingOwner(state, context) || context.notesPanelOpen ? "close" : "open",
+        isFloatingOwner(state, context) || context.notesPanelActive ? "close" : "open",
       );
     case "close": {
       const nextState = withPin(
@@ -128,7 +128,7 @@ export function transitionProjectNotesLifecycle(
       return result(
         nextState,
         context,
-        context.notesPanelOpen ? [{ type: "close-panel", threadRef: context.threadRef }] : [],
+        context.notesPanelActive ? [{ type: "close-panel", threadRef: context.threadRef }] : [],
       );
     }
     case "pin":
@@ -147,7 +147,7 @@ export function transitionProjectNotesLifecycle(
       return result(
         nextState,
         context,
-        context.notesPanelOpen ? [{ type: "close-panel", threadRef: context.threadRef }] : [],
+        context.notesPanelActive ? [{ type: "close-panel", threadRef: context.threadRef }] : [],
       );
     }
     case "panel": {
