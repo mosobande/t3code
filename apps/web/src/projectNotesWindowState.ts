@@ -47,13 +47,6 @@ export function projectNotePendingDraftStorageKey(
   return `t3.project-notes.pending-draft.v1:${environmentId}:${projectId}`;
 }
 
-export function projectNotesTargetMatchesActiveProject(input: {
-  targetProjectKey: string | null;
-  activeProjectKey: string | null;
-}): boolean {
-  return input.targetProjectKey !== null && input.targetProjectKey === input.activeProjectKey;
-}
-
 export function clampProjectNotesWindowRect(
   rect: ProjectNotesWindowRect,
   viewport: { width: number; height: number },

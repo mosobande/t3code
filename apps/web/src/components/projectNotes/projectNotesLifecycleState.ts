@@ -17,7 +17,6 @@ export interface ProjectNotesLifecycleContext {
 
 interface ProjectNotesFloatingOwner {
   readonly ownerThreadKey: string;
-  readonly projectKey: string;
   readonly project: ProjectNotesLifecycleProject;
 }
 
@@ -142,7 +141,6 @@ export function transitionProjectNotesLifecycle(
         ...state,
         floating: {
           ownerThreadKey: context.threadKey,
-          projectKey: context.projectKey,
           project: context.project,
         },
       };
