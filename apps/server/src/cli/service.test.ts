@@ -1,4 +1,5 @@
 import { assert, it } from "@effect/vitest";
+import { productProfile, resolveCliPackageName } from "@t3tools/shared/productProfile";
 
 import { formatServiceStatus } from "./service.ts";
 
@@ -25,7 +26,7 @@ it("reports the installed service version and host paths", () => {
 it("gives a direct repair command for a stale service", () => {
   assert.include(
     formatServiceStatus({ ...status, current: false }, "0.0.29"),
-    "Next: Run `npx t3@latest service update`.",
+    `Next: Run \`npx ${resolveCliPackageName(productProfile)}@latest service update\`.`,
   );
 });
 

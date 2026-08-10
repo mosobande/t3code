@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect";
 
 import { HostProcessArguments } from "@t3tools/shared/hostProcess";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 
 import packageJson from "../../package.json" with { type: "json" };
 
@@ -37,20 +38,18 @@ export function detectCliRunner(entryPath: string): CliRunner | null {
 }
 
 /**
- * The `t3` package spec to suggest. The literal spec the user typed (e.g.
- * `t3@nightly`) is resolved away before our process starts, so re-derive it
- * from the running version: nightly builds re-suggest the nightly channel,
- * anything else suggests the bare package.
+ * The product-owned package spec to suggest. The literal spec the user typed is resolved away
+ * before our process starts, so re-derive it from the running version: nightly builds re-suggest
+ * the nightly channel, and anything else suggests the bare package.
  */
 export function suggestedPackageSpec(version: string): string {
-  return version.includes("-nightly.") ? "t3@nightly" : "t3";
+  return version.includes("-nightly.") ? `${cliPackageName}@nightly` : cliPackageName;
 }
 
 /**
  * Render a `t3 <subcommand>` suggestion that matches how this process was
- * launched, so copy/pasting it actually works: `npx t3 connect` suggests
- * `npx t3 serve`, a global install suggests `t3 serve`, and a nightly build
- * keeps the `@nightly` tag.
+ * launched, so copy/pasting it works. A package runner keeps the product-owned package name and
+ * nightly tag, while a global install suggests the compatibility `t3` command.
  */
 export function formatCliCommand(input: {
   readonly subcommand: string;

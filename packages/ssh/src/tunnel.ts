@@ -410,6 +410,27 @@ ensure_remote_node_path() {
 }
 `;
 
+const REMOTE_EXPLICIT_PACKAGE_RUNNER_SCRIPT = `if command -v npx >/dev/null 2>&1; then
+  exec npx --yes @@T3_PACKAGE_SPEC@@ "$@"
+fi
+if command -v npm >/dev/null 2>&1; then
+  exec npm exec --yes @@T3_PACKAGE_SPEC@@ -- "$@"
+fi
+printf 'Remote host could not install @@T3_PACKAGE_SPEC@@ because node/npm/npx are unavailable on PATH. Install Node or configure a supported version manager for non-interactive shells.\\n' >&2
+exit 1`;
+
+const REMOTE_COMPATIBILITY_RUNNER_SCRIPT = `if command -v t3 >/dev/null 2>&1; then
+  exec t3 "$@"
+fi
+if command -v npx >/dev/null 2>&1; then
+  exec npx --yes @@T3_PACKAGE_SPEC@@ "$@"
+fi
+if command -v npm >/dev/null 2>&1; then
+  exec npm exec --yes @@T3_PACKAGE_SPEC@@ -- "$@"
+fi
+printf 'Remote host is missing the t3 CLI and could not install @@T3_PACKAGE_SPEC@@ because node/npm/npx are unavailable on PATH. Install Node or configure a supported version manager for non-interactive shells.\\n' >&2
+exit 1`;
+
 export const REMOTE_RUNNER_SCRIPT = `#!/bin/sh
 set -eu
 @@T3_NODE_ENV_SCRIPT@@
@@ -422,17 +443,7 @@ if [ -n "$T3_NODE_SCRIPT_PATH" ]; then
   fi
   exec node "$T3_NODE_SCRIPT_PATH" "$@"
 fi
-if command -v t3 >/dev/null 2>&1; then
-  exec t3 "$@"
-fi
-if command -v npx >/dev/null 2>&1; then
-  exec npx --yes @@T3_PACKAGE_SPEC@@ "$@"
-fi
-if command -v npm >/dev/null 2>&1; then
-  exec npm exec --yes @@T3_PACKAGE_SPEC@@ -- "$@"
-fi
-printf 'Remote host is missing the t3 CLI and could not install @@T3_PACKAGE_SPEC@@ because node/npm/npx are unavailable on PATH. Install Node or configure a supported version manager for non-interactive shells.\\n' >&2
-exit 1
+@@T3_SELECTED_RUNNER_SCRIPT@@
 `;
 
 export const REMOTE_LAUNCH_SCRIPT = `set -eu
@@ -631,11 +642,20 @@ fi
 `;
 
 export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string {
-  const packageSpec = shellSingleQuote(input?.packageSpec?.trim() || "t3@latest");
+  const requestedPackageSpec = input?.packageSpec?.trim();
+  const packageSpec = shellSingleQuote(requestedPackageSpec || "t3@latest");
   const nodeScriptPath = input?.nodeScriptPath?.trim() || "";
+  const selectedRunner = applyScriptPlaceholders(
+    requestedPackageSpec
+      ? REMOTE_EXPLICIT_PACKAGE_RUNNER_SCRIPT
+      : REMOTE_COMPATIBILITY_RUNNER_SCRIPT,
+    {
+      T3_PACKAGE_SPEC: packageSpec,
+    },
+  );
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {
-      T3_PACKAGE_SPEC: packageSpec,
+      T3_SELECTED_RUNNER_SCRIPT: selectedRunner,
       T3_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),
       T3_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
     }),

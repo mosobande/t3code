@@ -10,10 +10,12 @@ import * as Path from "effect/Path";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 
 import { buildSshChildEnvironment, type SshAuthOptions } from "./auth.ts";
 import { SshCommandError, SshInvalidTargetError } from "./errors.ts";
 
+const PUBLISHABLE_CLI_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const DEFAULT_SSH_COMMAND_TIMEOUT_MS = 60_000;
 const MAX_SSH_ERROR_OUTPUT_LENGTH = 4_000;
 
@@ -364,12 +366,18 @@ export const resolveSshTarget = Effect.fn("ssh/command.resolveSshTarget")(functi
 });
 
 export function resolveRemoteT3CliPackageSpec(input: {
+  readonly appVersion: string;
   readonly updateChannel: DesktopUpdateChannel;
   readonly isDevelopment?: boolean;
 }): string {
-  if (input.isDevelopment) {
-    return "t3@nightly";
+  const appVersion = input.appVersion.trim();
+  if (!input.isDevelopment && PUBLISHABLE_CLI_VERSION_PATTERN.test(appVersion)) {
+    return `${cliPackageName}@${appVersion}`;
   }
 
-  return input.updateChannel === "nightly" ? "t3@nightly" : "t3@latest";
+  if (input.isDevelopment) {
+    return `${cliPackageName}@nightly`;
+  }
+
+  return `${cliPackageName}@${input.updateChannel === "nightly" ? "nightly" : "latest"}`;
 }

@@ -9,6 +9,7 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import { ChildProcessSpawner } from "effect/unstable/process";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 
 import {
   baseSshArgs,
@@ -99,33 +100,36 @@ describe("ssh command", () => {
     }),
   );
 
-  it.effect("resolves the remote t3 package spec from the desktop release channel", () =>
+  it.effect("resolves the exact SIGIDI CLI package for packaged desktop versions", () =>
     Effect.sync(() => {
       assert.equal(
         resolveRemoteT3CliPackageSpec({
+          appVersion: "0.0.33",
           updateChannel: "latest",
         }),
-        "t3@latest",
+        `${cliPackageName}@0.0.33`,
       );
       assert.equal(
         resolveRemoteT3CliPackageSpec({
+          appVersion: "0.0.34-nightly.20260810.3",
           updateChannel: "nightly",
         }),
-        "t3@nightly",
+        `${cliPackageName}@0.0.34-nightly.20260810.3`,
       );
       assert.equal(
         resolveRemoteT3CliPackageSpec({
+          appVersion: "0.0.0-dev",
           updateChannel: "nightly",
           isDevelopment: true,
         }),
-        "t3@nightly",
+        `${cliPackageName}@nightly`,
       );
       assert.equal(
         resolveRemoteT3CliPackageSpec({
+          appVersion: "not-publishable",
           updateChannel: "latest",
-          isDevelopment: true,
         }),
-        "t3@nightly",
+        `${cliPackageName}@latest`,
       );
     }),
   );

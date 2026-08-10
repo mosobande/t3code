@@ -1,4 +1,5 @@
 import * as NodeSqlite from "node:sqlite";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 
 import packageJson from "../../package.json" with { type: "json" };
 import { migrationManifest } from "../persistence/Migrations.ts";
@@ -18,7 +19,7 @@ export type ServicePreflightResult =
     };
 
 const localUpdateReason = (version: string) =>
-  `This version includes a database update and cannot be installed remotely. Run \`npx t3@${version} service update\` on the server machine.`;
+  `This version includes a database update and cannot be installed remotely. Run \`npx ${cliPackageName}@${version} service update\` on the server machine.`;
 
 const isMigrationRow = (
   value: unknown,

@@ -8,25 +8,25 @@ boots and keeps running after you log out.
 Install it with the latest T3 Code release:
 
 ```sh
-npx t3@latest service install
+npx @sigidi/cli@latest service install
 ```
 
 Check whether it is installed:
 
 ```sh
-npx t3@latest service status
+npx @sigidi/cli@latest service status
 ```
 
 Update or repair it:
 
 ```sh
-npx t3@latest service update
+npx @sigidi/cli@latest service update
 ```
 
 Stop it and remove it from startup:
 
 ```sh
-npx t3@latest service uninstall
+npx @sigidi/cli@latest service uninstall
 ```
 
 Updating restarts T3 Code briefly. Let active agent work and terminal commands finish first.

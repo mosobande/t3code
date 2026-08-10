@@ -2,9 +2,23 @@
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
-The active `.github/workflows/release.yml` path is a no-publish build for `local`. Pull requests are rehearsals. Tags in the form `vX.Y.Z` build Stable, and tags in the form `vX.Y.Z-nightly.YYYYMMDD.N` build Nightly. It builds unsigned macOS arm64 and x64 DMG/ZIP artifacts, inspects them in the job, and uploads nothing. When an operator requests a signed macOS artifact, the artifact builder also requires strict code-sign verification, the exact channel bundle identifier, and an Apple Team identity before it accepts the build.
+The active `.github/workflows/release.yml` path builds the `local` profile. Pull requests are
+no-publish rehearsals. Tags in the form `vX.Y.Z` select Stable, and tags in the form
+`vX.Y.Z-nightly.YYYYMMDD.N` select Nightly. Every run builds and inspects unsigned macOS arm64 and
+x64 DMG/ZIP artifacts without uploading them. It also builds the existing CLI resource monitor for
+the four supported CLI host keys. A tag run publishes the exact matching `@sigidi/cli` version with
+the `latest` or `nightly` npm dist-tag only after these builds pass.
 
-The workflow does not create a tag or GitHub Release, submit signing or notarization work, publish updater metadata, deploy a relay or hosted app, publish a CLI package, or announce a release. A maintainer creates and pushes the input tag. `upstream` is not publication authority.
+The workflow does not create a tag or GitHub Release, submit signing or notarization work, publish
+desktop updater metadata, deploy a relay or hosted app, or announce a release. A maintainer creates
+and pushes the input tag. `upstream` is not publication authority.
+
+The CLI publication uses the GitHub `npm` environment and OIDC trusted publishing. It has no npm
+token secret and receives no Relay, Clerk, Axiom, or Cloudflare configuration. The package keeps the
+`t3` executable name, but its public npm identity and repository are `@sigidi/cli` and
+`quantipixels/sigidi`. The first package version must be published once by an authenticated npm org
+owner. After that package exists, configure its npm Trusted Publisher for GitHub owner
+`quantipixels`, repository `sigidi`, workflow `release.yml`, and environment `npm`.
 
 Run the same focused proof locally:
 
@@ -15,9 +29,34 @@ SIGIDI_BUILD_PROFILE=local vp run dist:desktop:artifact --platform mac --target 
 vp run release:smoke
 ```
 
-Keep signing variables, updater repository variables, relay/Clerk/Axiom/Cloudflare configuration, tags, workflow dispatches, and publishing credentials out of rehearsal. A local artifact contains no public updater configuration. G3A must separately authorize the SIGIDI GitHub repository, signing/notarization, updater metadata, and release upload before those functions are enabled.
+Keep signing variables, updater repository variables, relay/Clerk/Axiom/Cloudflare configuration,
+tags, workflow dispatches, and publishing credentials out of pull-request rehearsal. A local desktop
+artifact contains no public updater configuration. G3A must separately authorize signing,
+notarization, updater metadata, and GitHub Release upload before those functions are enabled.
 
 Marketing and schema publication are a separate G3B operation. They require the exact SIGIDI domain, legal identity, hosting project, and deploy authority. Desktop publication must not depend on it.
+
+### SIGIDI CLI version invariant
+
+Packaged desktop SSH launch and manual remote-update guidance select
+`@sigidi/cli@<desktop-version>`. The `latest` and `nightly` dist-tags are fallbacks for direct CLI
+use and development, not the packaged compatibility contract. Do not publish a desktop version until
+the same exact CLI version exists on npm. The package exposes the existing `t3` command, so remote
+launcher scripts and background-service ownership do not change.
+
+For a no-publish local check, build the web and server packages, add the existing resource-monitor
+binaries under `apps/server/dist/resource-monitor/<host-key>/`, and run:
+
+```sh
+SIGIDI_BUILD_PROFILE=local node apps/server/scripts/cli.ts publish \
+  --tag nightly \
+  --app-version 0.0.0-rehearsal.1 \
+  --dry-run \
+  --verbose
+```
+
+The output must identify `@sigidi/cli`, and the script must restore `apps/server/package.json` and
+the icon assets after success or failure.
 
 ## Inherited upstream release template (disabled)
 

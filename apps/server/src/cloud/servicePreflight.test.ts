@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as NodeSqlite from "node:sqlite";
+import { productProfile, resolveCliPackageName } from "@t3tools/shared/productProfile";
 
 import { migrationManifest } from "../persistence/Migrations.ts";
 import { sigidiMigrationManifest } from "../persistence/SigidiMigrations.ts";
@@ -67,7 +68,9 @@ it.layer(NodeServices.layer)("service update preflight", (it) => {
       });
       expect(blocked.status).toBe("blocked");
       if (blocked.status === "blocked") {
-        expect(blocked.reason).toContain("npx t3@1.2.3 service update");
+        expect(blocked.reason).toContain(
+          `npx ${resolveCliPackageName(productProfile)}@1.2.3 service update`,
+        );
       }
 
       const missingSigidi = new NodeSqlite.DatabaseSync(databasePath);

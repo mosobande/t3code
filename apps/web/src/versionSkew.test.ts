@@ -1,4 +1,5 @@
 import { EnvironmentId } from "@t3tools/contracts";
+import { productProfile, resolveCliPackageName } from "@t3tools/shared/productProfile";
 import { describe, expect, it } from "vite-plus/test";
 
 import { APP_VERSION } from "./branding";
@@ -10,10 +11,17 @@ import {
   resolveServerConfigVersionMismatch,
   resolveServerSelfUpdateCapability,
   resolveVersionMismatch,
+  manualServerUpdateCommand,
   serverUpdateGuidance,
 } from "./versionSkew";
 
 describe("versionSkew", () => {
+  it("uses the product-owned CLI for manual server updates", () => {
+    expect(manualServerUpdateCommand("1.2.3")).toBe(
+      `npx ${resolveCliPackageName(productProfile)}@1.2.3`,
+    );
+  });
+
   it("does not warn when versions match", () => {
     expect(resolveVersionMismatch(APP_VERSION)).toBeNull();
   });

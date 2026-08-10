@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Terminal from "effect/Terminal";
 import { Command, GlobalFlag, Prompt } from "effect/unstable/cli";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as BootService from "../cloud/bootService.ts";
@@ -58,7 +59,7 @@ export function formatServiceStatus(
     `  Status: ${status.current ? `installed · t3@${cliVersion}` : "needs an update or repair"}`,
     `  Unit: ${status.unitPath}`,
     `  Logs: ${status.logPath}`,
-    ...(status.current ? [] : ["  Next: Run `npx t3@latest service update`."]),
+    ...(status.current ? [] : [`  Next: Run \`npx ${cliPackageName}@latest service update\`.`]),
   ].join("\n");
 }
 
@@ -94,7 +95,7 @@ const serviceInstallCommand = Command.make("install", projectLocationFlags).pipe
 
 const serviceUpdateCommand = Command.make("update", projectLocationFlags).pipe(
   Command.withDescription(
-    "Update or repair the background service using this CLI version. Use `npx t3@latest service update` for the latest release.",
+    `Update or repair the background service using this CLI version. Use \`npx ${cliPackageName}@latest service update\` for the latest release.`,
   ),
   Command.withHandler((flags) =>
     runServiceCommand(

@@ -1,8 +1,17 @@
 import { assert, describe, it } from "@effect/vitest";
 
-import { UnknownProductProfileError, resolveProductProfile } from "./productProfile.ts";
+import {
+  UnknownProductProfileError,
+  resolveCliPackageName,
+  resolveProductProfile,
+} from "./productProfile.ts";
 
 describe("productProfile", () => {
+  it("selects the npm CLI owner from the product profile", () => {
+    assert.equal(resolveCliPackageName(resolveProductProfile("local")), "@sigidi/cli");
+    assert.equal(resolveCliPackageName(resolveProductProfile("upstream")), "t3");
+  });
+
   it("defaults to the publishable local desktop profile", () => {
     const profile = resolveProductProfile(undefined);
     assert.equal(profile.name, "local");

@@ -25,6 +25,16 @@ export interface ProductProfile {
   readonly publishableAsSigidi: boolean;
 }
 
+export const SIGIDI_CLI_PACKAGE_NAME = "@sigidi/cli";
+export const UPSTREAM_CLI_PACKAGE_NAME = "t3";
+
+/** Select the public CLI package owned by the compiled product profile. */
+export function resolveCliPackageName(
+  profile: Pick<ProductProfile, "publishableAsSigidi">,
+): typeof SIGIDI_CLI_PACKAGE_NAME | typeof UPSTREAM_CLI_PACKAGE_NAME {
+  return profile.publishableAsSigidi ? SIGIDI_CLI_PACKAGE_NAME : UPSTREAM_CLI_PACKAGE_NAME;
+}
+
 const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
   local: {
     name: "local",
@@ -79,3 +89,5 @@ export function resolveProductProfile(value: unknown): ProductProfile {
 export const productProfile = resolveProductProfile(
   typeof __SIGIDI_BUILD_PROFILE__ === "undefined" ? undefined : __SIGIDI_BUILD_PROFILE__,
 );
+
+export const cliPackageName = resolveCliPackageName(productProfile);

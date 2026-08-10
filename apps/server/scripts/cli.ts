@@ -28,6 +28,7 @@ import {
   ServerCliPublishIconSourceMissingError,
   ServerCliPublishIconTargetMissingError,
 } from "./cliErrors.ts";
+import { createVpPmPublishArgs, resolveSigidiCliPublishMetadata } from "./cliPublish.ts";
 
 interface PackageJson {
   name: string;
@@ -179,31 +180,6 @@ const buildCmd = Command.make(
 // publish subcommand
 // ---------------------------------------------------------------------------
 
-interface PublishCommandConfig {
-  readonly access: string;
-  readonly tag: string;
-  readonly provenance: boolean;
-  readonly dryRun: boolean;
-}
-
-const createVpPmPublishArgs = (config: PublishCommandConfig): ReadonlyArray<string> => {
-  const args = [
-    "publish",
-    "--filter",
-    "t3",
-    "--access",
-    config.access,
-    "--tag",
-    config.tag,
-    "--no-git-checks",
-  ];
-
-  if (config.provenance) args.push("--provenance");
-  if (config.dryRun) args.push("--dry-run");
-
-  return args;
-};
-
 const publishCmd = Command.make(
   "publish",
   {
@@ -242,11 +218,8 @@ const publishCmd = Command.make(
           const workspaceCatalog = workspaceConfig.catalog ?? {};
           const workspaceOverrides = workspaceConfig.overrides ?? {};
           const pkg: PackageJson = {
-            name: serverPackageJson.name,
-            repository: serverPackageJson.repository,
-            bin: serverPackageJson.bin,
+            ...resolveSigidiCliPublishMetadata(serverPackageJson, version),
             type: serverPackageJson.type,
-            version,
             engines: serverPackageJson.engines,
             files: serverPackageJson.files,
             dependencies: resolveCatalogDependencies(

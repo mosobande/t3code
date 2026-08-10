@@ -35,9 +35,11 @@ describe("release workflow", () => {
     assert.include(rehearsalJob, "sigidi-${{ needs.release_metadata.outputs.channel }}");
   });
 
-  it("runs only an unsigned local macOS rehearsal", () => {
-    const rehearsalJob = workflowJob("rehearse", "check_changes");
+  it("keeps desktop publication disabled while isolating SIGIDI CLI publication", () => {
+    const rehearsalJob = workflowJob("rehearse", "build_cli_resource_monitors");
+    const cliResourceJob = workflowJob("build_cli_resource_monitors", "check_changes");
     const buildJob = workflowJob("build", "publish_cli");
+    const publishCliJob = workflowJob("publish_cli", "release");
 
     assert.notInclude(releaseWorkflow, "schedule:");
     assert.notInclude(releaseWorkflow, "workflow_dispatch:");
@@ -69,12 +71,34 @@ describe("release workflow", () => {
       "relay_public_config:\n    name: Resolve T3 Connect public config\n    needs: preflight\n    if: ${{ false }}",
     );
     assert.include(releaseWorkflow, "build_wsl_node_pty:\n    if: ${{ false }}");
-    assert.include(releaseWorkflow, "publish_cli:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "deploy_web:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "finalize:\n    if: ${{ false }}");
     assert.include(releaseWorkflow, "announce_discord:\n    if: ${{ false }}");
     assert.include(buildJob, "if: ${{ false }}");
     assert.include(buildJob, "needs: [preflight, relay_public_config]");
+    assert.include(cliResourceJob, "runner: macos-15");
+    assert.include(cliResourceJob, "runner: ubuntu-latest");
+    assert.include(cliResourceJob, "runner: windows-2025");
+    assert.include(cliResourceJob, "resource_key: darwin-arm64");
+    assert.include(cliResourceJob, "resource_key: darwin-x64");
+    assert.include(cliResourceJob, "resource_key: linux-x64");
+    assert.include(cliResourceJob, "resource_key: win32-x64");
+    assert.include(
+      publishCliJob,
+      "needs: [release_metadata, rehearse, build_cli_resource_monitors]",
+    );
+    assert.include(publishCliJob, "if: github.event_name == 'push'");
+    assert.include(publishCliJob, "runs-on: ubuntu-latest");
+    assert.include(publishCliJob, "name: npm");
+    assert.include(publishCliJob, "id-token: write");
+    assert.include(publishCliJob, "SIGIDI_BUILD_PROFILE: local");
+    assert.include(publishCliJob, "--filter=@t3tools/web...");
+    assert.include(publishCliJob, "--filter=t3...");
+    assert.include(publishCliJob, "apps/server/scripts/cli.ts publish");
+    assert.notInclude(publishCliJob, "relay_public_config");
+    assert.notInclude(publishCliJob, "T3CODE_CLERK");
+    assert.notInclude(publishCliJob, "T3CODE_RELAY");
+    assert.notInclude(publishCliJob, "AXIOM");
     assert.include(
       releaseWorkflow,
       "release:\n    name: Publish GitHub Release\n    needs: [preflight, build]\n    if: ${{ false }}",
