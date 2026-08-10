@@ -97,6 +97,21 @@ describe("Project Notes lifecycle", () => {
     expect(transition.effects).toEqual([{ type: "open-panel", threadRef: sibling.threadRef }]);
   });
 
+  it("closes a floating owner and clears its project pin", () => {
+    const floating = transitionProjectNotesLifecycle(
+      createProjectNotesLifecycleState(),
+      context(owner, true),
+      "float",
+    ).state;
+    const pinned = transitionProjectNotesLifecycle(floating, context(owner), "pin").state;
+
+    const transition = transitionProjectNotesLifecycle(pinned, context(owner), "close");
+
+    expect(transition.effects).toEqual([]);
+    expect(transition.presentation).toEqual({ panel: false, floating: null });
+    expect(transition.state).toEqual({ floating: null, pinnedProjectKeys: [] });
+  });
+
   it("closes active Notes by clearing only its project pin", () => {
     const firstPinned = transitionProjectNotesLifecycle(
       createProjectNotesLifecycleState(),
