@@ -12,7 +12,7 @@ Project Notes is available in the web and desktop apps. It is not currently avai
 
 The default Project Notes shortcut is `Mod+Shift+P`. You can change it in **Settings > Keybindings**.
 
-Use the window control to move the note between the side panel and a floating window. Pin the note to keep it open while you move between threads in the same project. Project Notes closes when you change projects.
+Use the window control to move the note between the side panel and a floating window. Each thread remembers its own Notes side-panel state, including when you work in another project. A floating note belongs to the thread that opened it and appears again when you return to that thread. Pin the note to open it in the side panel as you move between threads in the same project.
 
 ## Saving and conflicts
 
