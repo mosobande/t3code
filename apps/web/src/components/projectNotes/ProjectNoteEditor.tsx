@@ -10,7 +10,7 @@ import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { $convertFromMarkdownString, $convertToMarkdownString } from "@lexical/markdown";
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
-import { $isLinkNode, LinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link";
+import { LinkNode } from "@lexical/link";
 import {
   INSERT_CHECK_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
@@ -26,7 +26,6 @@ import {
   $isTextNode,
   COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
-  type LexicalNode,
   SELECTION_CHANGE_COMMAND,
   type EditorThemeClasses,
   type LexicalEditor,
@@ -37,10 +36,8 @@ import {
   CodeIcon,
   Heading2Icon,
   ItalicIcon,
-  LinkIcon,
   ListIcon,
   RemoveFormattingIcon,
-  UnlinkIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
@@ -111,21 +108,11 @@ function ToolbarButton({
   );
 }
 
-function nodeHasLinkAncestor(node: LexicalNode): boolean {
-  let current: LexicalNode | null = node;
-  while (current) {
-    if ($isLinkNode(current)) return true;
-    current = current.getParent();
-  }
-  return false;
-}
-
 function NotesToolbar() {
   const [editor] = useLexicalComposerContext();
   const [selectionActions, setSelectionActions] = useState(() =>
     resolveProjectNoteSelectionActions({
       hasExpandedSelection: false,
-      selectionContainsLink: false,
     }),
   );
   const updateSelectionActions = useCallback(() => {
@@ -134,8 +121,6 @@ function NotesToolbar() {
     setSelectionActions(
       resolveProjectNoteSelectionActions({
         hasExpandedSelection,
-        selectionContainsLink:
-          hasExpandedSelection && selection.getNodes().some(nodeHasLinkAncestor),
       }),
     );
   }, []);
@@ -166,15 +151,7 @@ function NotesToolbar() {
       }
     });
   };
-  const addLink = () => {
-    const url = window.prompt("Link URL")?.trim();
-    if (url && isSafeProjectNoteLinkUrl(url)) editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
-  };
-  const removeLink = () => {
-    editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
-  };
   const clearFormatting = () => {
-    editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
     editor.update(() => {
       const selection = $getSelection();
       if (!$isRangeSelection(selection) || selection.isCollapsed()) return;
@@ -216,16 +193,6 @@ function NotesToolbar() {
       </ToolbarButton>
       <ToolbarButton label="Code" onClick={() => format("code")}>
         <CodeIcon />
-      </ToolbarButton>
-      <ToolbarButton label="Link" onClick={addLink}>
-        <LinkIcon />
-      </ToolbarButton>
-      <ToolbarButton
-        label="Remove link"
-        disabled={!selectionActions.canRemoveLink}
-        onClick={removeLink}
-      >
-        <UnlinkIcon />
       </ToolbarButton>
       <ToolbarButton
         label="Clear formatting"

@@ -13,4 +13,13 @@ describe("ProjectNoteEditor", () => {
     expect(markup).toContain('aria-label="Note formatting"');
     expect(markup).not.toContain('role="toolbar"');
   });
+
+  it("does not expose link authoring actions", () => {
+    const markup = renderToStaticMarkup(
+      <ProjectNoteEditor initialMarkdown="" onChange={() => {}} />,
+    );
+
+    expect(markup).not.toContain('aria-label="Link"');
+    expect(markup).not.toContain('aria-label="Remove link"');
+  });
 });
