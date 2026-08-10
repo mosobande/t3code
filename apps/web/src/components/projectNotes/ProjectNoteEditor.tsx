@@ -20,10 +20,8 @@ import {
 import { $createHeadingNode, HeadingNode, QuoteNode } from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
 import {
-  $createParagraphNode,
   $getSelection,
   $isRangeSelection,
-  $isTextNode,
   COMMAND_PRIORITY_LOW,
   FORMAT_TEXT_COMMAND,
   SELECTION_CHANGE_COMMAND,
@@ -44,6 +42,7 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { PROJECT_NOTE_MARKDOWN_TRANSFORMERS } from "~/projectNoteMarkdown";
 import { isSafeProjectNoteLinkUrl } from "./projectNoteLinks";
+import { clearProjectNoteFormatting } from "./projectNoteEditorActions";
 import { resolveProjectNoteSelectionActions } from "./projectNoteToolbarState";
 
 interface ProjectNoteEditorProps {
@@ -151,19 +150,6 @@ function NotesToolbar() {
       }
     });
   };
-  const clearFormatting = () => {
-    editor.update(() => {
-      const selection = $getSelection();
-      if (!$isRangeSelection(selection) || selection.isCollapsed()) return;
-      $setBlocksType(selection, () => $createParagraphNode());
-      selection.extract().forEach((node) => {
-        if (!$isTextNode(node)) return;
-        node.setFormat(0);
-        node.setStyle("");
-      });
-    });
-  };
-
   return (
     <div
       className="flex shrink-0 items-center gap-0.5 border-b border-border/70 px-2 py-1"
@@ -197,7 +183,7 @@ function NotesToolbar() {
       <ToolbarButton
         label="Clear formatting"
         disabled={!selectionActions.canClearFormatting}
-        onClick={clearFormatting}
+        onClick={() => clearProjectNoteFormatting(editor)}
       >
         <RemoveFormattingIcon />
       </ToolbarButton>
