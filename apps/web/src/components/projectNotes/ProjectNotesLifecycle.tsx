@@ -11,7 +11,7 @@ import {
   type ProjectNotesLifecycleProject,
   type ProjectNotesLifecycleState,
 } from "./projectNotesLifecycleState";
-import { useRightPanelStore } from "~/rightPanelStore";
+import { selectActiveRightPanel, useRightPanelStore } from "~/rightPanelStore";
 
 const ProjectNotesSurface = lazy(() =>
   import("./ProjectNotesSurface").then((module) => ({ default: module.ProjectNotesSurface })),
@@ -25,7 +25,6 @@ export interface ActiveProjectNotesContext {
   };
   readonly threadKey: string;
   readonly threadRef: ScopedThreadRef;
-  readonly notesPanelOpen: boolean;
 }
 
 interface UseProjectNotesLifecycleOptions {
@@ -33,7 +32,12 @@ interface UseProjectNotesLifecycleOptions {
 }
 
 function toLifecycleContext(active: ActiveProjectNotesContext): ProjectNotesLifecycleContext {
-  return active;
+  return {
+    ...active,
+    notesPanelOpen:
+      selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, active.threadRef) ===
+      "notes",
+  };
 }
 
 function applyPanelEffects(
@@ -49,6 +53,16 @@ function applyPanelEffects(
   }
 }
 
+export function applyProjectNotesLifecycleAction(
+  state: ProjectNotesLifecycleState,
+  active: ActiveProjectNotesContext,
+  action: ProjectNotesLifecycleAction,
+): ProjectNotesLifecycleState {
+  const next = transitionProjectNotesLifecycle(state, toLifecycleContext(active), action);
+  applyPanelEffects(next.effects);
+  return next.state;
+}
+
 export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOptions) {
   const [state, setState] = useState<ProjectNotesLifecycleState>(createProjectNotesLifecycleState);
   const stateRef = useRef(state);
@@ -59,14 +73,9 @@ export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOpt
   const transition = useCallback((action: ProjectNotesLifecycleAction) => {
     const currentActive = activeRef.current;
     if (!currentActive) return;
-    const next = transitionProjectNotesLifecycle(
-      stateRef.current,
-      toLifecycleContext(currentActive),
-      action,
-    );
-    stateRef.current = next.state;
-    setState(next.state);
-    applyPanelEffects(next.effects);
+    const nextState = applyProjectNotesLifecycleAction(stateRef.current, currentActive, action);
+    stateRef.current = nextState;
+    setState(nextState);
   }, []);
 
   useEffect(() => {
@@ -95,10 +104,13 @@ export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOpt
     (nextPinned: boolean) => transition(nextPinned ? "pin" : "unpin"),
     [transition],
   );
+  const close = useCallback(() => transition("close"), [transition]);
+  const open = useCallback(() => transition("open"), [transition]);
+  const toggle = useCallback(() => transition("toggle"), [transition]);
 
   const surfaceProps = {
     keepOpenAcrossThreads: pinned,
-    onClose: () => transition("close"),
+    onClose: close,
     onKeepOpenAcrossThreadsChange: setPinned,
     onModeChange: changeMode,
   };
@@ -132,10 +144,10 @@ export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOpt
   return {
     floating,
     mode,
-    onPanelClosed: () => transition("close"),
-    open: () => transition("open"),
+    onPanelClosed: close,
+    open,
     panel,
     setPinned,
-    toggle: () => transition("toggle"),
+    toggle,
   };
 }

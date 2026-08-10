@@ -1651,7 +1651,6 @@ function ChatViewContent(props: ChatViewProps) {
             },
             threadKey: activeThreadKey,
             threadRef: activeThreadRef,
-            notesPanelOpen: activeRightPanelSurface?.kind === "notes",
           }
         : null,
   });
@@ -3393,7 +3392,7 @@ function ChatViewContent(props: ChatViewProps) {
       closePreview,
       closeTerminalMutation,
       dismissPlanSidebarForCurrentTurn,
-      projectNotes,
+      projectNotes.onPanelClosed,
       storeCloseTerminal,
     ],
   );

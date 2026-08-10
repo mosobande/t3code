@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  applyProjectNotesLifecycleAction,
+  type ActiveProjectNotesContext,
+} from "./ProjectNotesLifecycle";
+import {
   createProjectNotesLifecycleState,
   transitionProjectNotesLifecycle,
   type ProjectNotesLifecycleContext,
 } from "./projectNotesLifecycleState";
+import { selectActiveRightPanel, useRightPanelStore } from "~/rightPanelStore";
 
 const owner = {
   projectKey: "environment-a:project-a",
@@ -42,6 +47,25 @@ function context(
 }
 
 describe("Project Notes lifecycle", () => {
+  it("uses current panel state for consecutive toggle actions", () => {
+    useRightPanelStore.setState({ byThreadKey: {} });
+    const active = owner as unknown as ActiveProjectNotesContext;
+
+    const opened = applyProjectNotesLifecycleAction(
+      createProjectNotesLifecycleState(),
+      active,
+      "toggle",
+    );
+    expect(
+      selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, active.threadRef),
+    ).toBe("notes");
+
+    applyProjectNotesLifecycleAction(opened, active, "toggle");
+    expect(
+      selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, active.threadRef),
+    ).toBeNull();
+  });
+
   it("keeps an unpinned Notes panel local to its thread across navigation", () => {
     const state = createProjectNotesLifecycleState();
 
