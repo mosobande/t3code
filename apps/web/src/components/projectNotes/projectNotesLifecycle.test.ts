@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vite-plus/test";
 import {
   applyProjectNotesLifecycleAction,
   type ActiveProjectNotesContext,
-} from "./ProjectNotesLifecycle";
+} from "./projectNotesLifecycleController";
 import {
   createProjectNotesLifecycleState,
   transitionProjectNotesLifecycle,

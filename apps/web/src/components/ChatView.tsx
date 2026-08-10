@@ -1639,8 +1639,8 @@ function ChatViewContent(props: ChatViewProps) {
     startNewThreadForProject(activeProjectRef, handleNewThread);
   }, [activeProjectRef, handleNewThread]);
   const activeProjectNotesTargetKey = activeProjectRef ? scopedProjectKey(activeProjectRef) : null;
-  const projectNotes = useProjectNotesLifecycle({
-    active:
+  const activeProjectNotesContext = useMemo(
+    () =>
       activeThreadRef && activeProject && activeProjectNotesTargetKey && activeThreadKey
         ? {
             projectKey: activeProjectNotesTargetKey,
@@ -1653,6 +1653,10 @@ function ChatViewContent(props: ChatViewProps) {
             threadRef: activeThreadRef,
           }
         : null,
+    [activeProject, activeProjectNotesTargetKey, activeThreadKey, activeThreadRef],
+  );
+  const projectNotes = useProjectNotesLifecycle({
+    active: activeProjectNotesContext,
   });
   const activeEnvironmentShell = useEnvironmentQuery(
     activeThread ? environmentShell.stateAtom(activeThread.environmentId) : null,
