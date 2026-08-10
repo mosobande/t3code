@@ -2,7 +2,7 @@
 
 > For maintainers. Using T3 Code? See [docs/user](../user/).
 
-The active `.github/workflows/release.yml` path is a no-publish build for `local`. Pull requests are rehearsals. Tags in the form `vX.Y.Z` build Stable, and tags in the form `vX.Y.Z-nightly.YYYYMMDD.N` build Nightly. It builds unsigned macOS arm64 and x64 DMG/ZIP artifacts, inspects them in the job, and uploads nothing.
+The active `.github/workflows/release.yml` path is a no-publish build for `local`. Pull requests are rehearsals. Tags in the form `vX.Y.Z` build Stable, and tags in the form `vX.Y.Z-nightly.YYYYMMDD.N` build Nightly. It builds unsigned macOS arm64 and x64 DMG/ZIP artifacts, inspects them in the job, and uploads nothing. When an operator requests a signed macOS artifact, the artifact builder also requires strict code-sign verification, the exact channel bundle identifier, and an Apple Team identity before it accepts the build.
 
 The workflow does not create a tag or GitHub Release, submit signing or notarization work, publish updater metadata, deploy a relay or hosted app, publish a CLI package, or announce a release. A maintainer creates and pushes the input tag. `upstream` is not publication authority.
 

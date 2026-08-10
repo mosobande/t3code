@@ -60,6 +60,29 @@ export function isQrShareableEndpoint(endpoint: AdvertisedEndpoint): boolean {
   return endpoint.status !== "unavailable" && endpoint.reachability !== "loopback";
 }
 
+export function resolveTailscaleHttpsDescription(input: {
+  readonly endpoint: AdvertisedEndpoint | null;
+  readonly serveEnabled: boolean;
+}): string {
+  if (input.endpoint?.status === "available") {
+    return input.endpoint.httpBaseUrl;
+  }
+  if (input.serveEnabled) {
+    return "Tailscale HTTPS is enabled but unavailable. Allow SIGIDI to control Tailscale, then retry setup.";
+  }
+  if (input.endpoint) {
+    return "Use Tailscale Serve to expose this backend through a MagicDNS HTTPS URL.";
+  }
+  return "Start Tailscale to set up HTTPS access through MagicDNS.";
+}
+
+export function shouldShowTailscaleRetry(input: {
+  readonly endpoint: AdvertisedEndpoint | null;
+  readonly serveEnabled: boolean;
+}): boolean {
+  return input.serveEnabled && input.endpoint?.status !== "available";
+}
+
 export type QrEndpointOption = {
   /** Unique per endpoint instance (AdvertisedEndpoint.id); safe as a React key. */
   readonly id: string;

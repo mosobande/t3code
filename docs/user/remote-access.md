@@ -100,6 +100,10 @@ on the **Tailscale HTTPS** row in **Settings** → **Connections**. The desktop 
 backend with the same server-side behavior as `t3 serve --tailscale-serve`, then the server asks
 Tailscale Serve to proxy HTTPS traffic to the local backend. Turn the same switch off to stop it.
 
+On macOS, allow the signed SIGIDI app to control Tailscale if Tailscale asks. If activation does not
+produce the HTTPS endpoint, the row stays enabled, reports that the endpoint is unavailable, and
+offers **Retry**. You can also turn the switch off to return to the disabled state.
+
 SIGIDI uses the `tailscale` client and daemon that are already installed and signed in on the host.
 You provide and control the tailnet. SIGIDI does not host a tailnet or ask for a Tailscale API token,
 auth key, account password, or control-server address.
@@ -165,6 +169,15 @@ Use this when you want the desktop app to start or reuse SIGIDI on another machi
 4. Enter the SSH target, such as `user@example.com`.
 5. Confirm the launch. The desktop app probes the host, starts or reuses a remote T3 server, opens a local port forward, and saves the environment.
 
+The launcher uses an existing `t3` command on the remote host first. If the command is absent,
+Nightly runs `t3@nightly` from npm and Stable runs `t3@latest`. The npm package is maintained by
+the upstream T3 project. The remote host therefore needs Node.js and npm or npx, plus network access
+to npm for the first launch.
+
+SSH remains a direct SSH connection with a local port forward. It does not use or configure T3
+Connect, Relay, Clerk, or Cloudflare. The upstream npm package can contain dormant managed-service
+code. These paths stay inactive unless the remote operator configures or invokes them separately.
+
 After setup, the renderer connects to a local forwarded HTTP/WebSocket endpoint. The remote host still owns the actual T3 server, projects, files, git state, terminals, and provider sessions.
 
 SSH launch is a desktop feature because it needs local process and SSH access. Once the environment is paired and saved, it uses the same environment list and connection model as direct LAN, Tailscale, HTTPS, or future tunnel-backed environments.
@@ -206,14 +219,19 @@ nvm alias default 24
 
 With mise, asdf, fnm, or nodenv, make sure the tool's shim directory is installed and resolves to a Node version satisfying the range above without an interactive shell.
 
-If reconnecting after an app update fails, retry the SSH launch once. The launcher now compares its generated runner script, stops stale launcher-managed remote servers, clears the SSH launch PID/port state, and starts a fresh remote server. You should not normally need to delete `~/.sigidi/ssh-launch` or kill `t3` processes manually.
+If reconnecting after an app update fails, retry the SSH launch once. The launcher compares its
+generated runner script, stops stale launcher-managed remote servers, clears the SSH launch PID/port
+state, and starts a fresh remote server. The `nightly` and `latest` npm tags can move to newer upstream
+versions, so a later launch can download a different remote server. You should not normally need to
+delete `~/.sigidi/ssh-launch` or kill `t3` processes manually.
 
 ## Updating a Remote Server
 
 When the SIGIDI web or desktop app and a remote server use different versions, a warning appears in
-the conversation and in **Settings** → **Connections**. Follow the action shown there: SIGIDI may
-be able to update and reconnect the server for you, or it may ask you to update the desktop app or
-run a copied command on the server machine.
+the conversation and in **Settings** → **Connections**. A version difference is possible when SSH
+uses the upstream `t3@nightly` or `t3@latest` package. Follow the action shown there: SIGIDI may be
+able to update and reconnect the server for you, or it may ask you to update the desktop app or run a
+copied command on the server machine.
 
 Finish active work before updating because the server restarts briefly. For step-by-step guidance,
 see [Keeping SIGIDI in Sync](./updating.md).

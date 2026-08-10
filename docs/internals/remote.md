@@ -175,6 +175,14 @@ The desktop main process owns this because it can spawn SSH, manage prompts, wri
 and clean up forwards. The renderer connects through the forwarded URL like any other environment and
 needs no SSH-specific RPC path.
 
+Remote launch first uses an installed `t3` command. If it is absent, a packaged Nightly selects the
+upstream npm tag `t3@nightly`, and Stable selects `t3@latest`. This selection restores the established
+upstream bootstrap owner. It does not use Relay for SSH transport. The tradeoff is explicit: the
+floating npm tag can select a different server version, the remote runtime does not include
+SIGIDI-only behavior, and its package can contain dormant upstream managed-service code. The local
+client still rejects Relay targets and does not start Relay discovery. A remote operator can still
+activate an upstream managed path separately from the SSH flow.
+
 Failure handling is explicit: SSH auth failure surfaces before an environment is saved, remote launch
 failure includes launcher output where available, forwarded-port failure leaves the environment
 disconnected rather than falling back to an unrelated endpoint, and reconnect restores the SSH bridge

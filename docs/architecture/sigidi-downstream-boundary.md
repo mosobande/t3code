@@ -80,6 +80,11 @@ credential, service, database, or migration.
   network clients are read.
 - The user owns Tailscale authentication, SSH identity, custom HTTPS proxy/certificate operation,
   and the remote host. SIGIDI stores only its established pairing sessions and connection catalog.
+- Desktop-managed SSH first uses an installed remote `t3` command. If it is absent, SIGIDI Nightly
+  selects upstream `t3@nightly`, and Stable selects upstream `t3@latest`. This is an explicit boundary
+  exception: the remote npm runtime is not compiled with the SIGIDI local product profile, can omit
+  SIGIDI-only behavior, and can contain dormant upstream managed-service code. SSH does not configure
+  or use Relay, and the SIGIDI client still rejects Relay targets and Relay discovery.
 - Disable Tailscale Serve through the existing setting or CLI cleanup, remove or disconnect a saved
   remote environment through the existing connection UI, and disable WSL through its existing
   selector. Custom HTTPS entries are removed by changing `T3CODE_DESKTOP_HTTPS_ENDPOINTS` and
@@ -87,6 +92,8 @@ credential, service, database, or migration.
 - Focused proof lives in the product-profile, connection registry/resolver/runtime, Tailscale,
   desktop exposure, SSH, WSL, cloud HTTP, and Agent Awareness relay tests. The boundary was last
   verified against upstream base `a930ac145`.
+- Remove the npm-runtime exception when SIGIDI owns a compatible published CLI or an upstream-owned
+  remote transfer mechanism can run the bundled local-profile server.
 
 ## Fork-patch register
 

@@ -103,21 +103,18 @@ describe("ssh command", () => {
     Effect.sync(() => {
       assert.equal(
         resolveRemoteT3CliPackageSpec({
-          appVersion: "0.0.17",
           updateChannel: "latest",
         }),
-        "t3@0.0.17",
+        "t3@latest",
       );
       assert.equal(
         resolveRemoteT3CliPackageSpec({
-          appVersion: "0.0.17-nightly.20260415.44",
           updateChannel: "nightly",
         }),
-        "t3@0.0.17-nightly.20260415.44",
+        "t3@nightly",
       );
       assert.equal(
         resolveRemoteT3CliPackageSpec({
-          appVersion: "0.0.0-dev",
           updateChannel: "nightly",
           isDevelopment: true,
         }),
@@ -125,7 +122,6 @@ describe("ssh command", () => {
       );
       assert.equal(
         resolveRemoteT3CliPackageSpec({
-          appVersion: "0.0.0-dev",
           updateChannel: "latest",
           isDevelopment: true,
         }),
