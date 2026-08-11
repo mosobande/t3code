@@ -63,10 +63,10 @@ describe("Project Notes lifecycle store", () => {
 
     expect(
       selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, sibling.threadRef),
-    ).toBe("notes");
+    ).toBeNull();
     expect(getProjectNotesPresentation(store.getState().lifecycle, sibling)).toEqual({
-      floating: null,
-      panel: true,
+      floating: owner.project,
+      panel: false,
     });
   });
 

@@ -68,11 +68,25 @@ function withPin(
   };
 }
 
-function isFloatingOwner(
+function isSameProject(
+  left: ProjectNotesLifecycleProject,
+  right: ProjectNotesLifecycleProject,
+): boolean {
+  return left.environmentId === right.environmentId && left.projectId === right.projectId;
+}
+
+function floatingProjectFor(
   state: ProjectNotesLifecycleState,
   context: ProjectNotesLifecycleContext,
-): boolean {
-  return state.floatingByThreadKey[context.threadKey] !== undefined;
+): ProjectNotesLifecycleProject | null {
+  const owned = state.floatingByThreadKey[context.threadKey];
+  if (owned) return owned;
+  if (!isPinned(state, context.projectKey)) return null;
+  return (
+    Object.values(state.floatingByThreadKey).find((project) =>
+      isSameProject(project, context.project),
+    ) ?? null
+  );
 }
 
 function withoutFloatingOwner(
@@ -84,14 +98,28 @@ function withoutFloatingOwner(
   return { ...state, floatingByThreadKey };
 }
 
+function withoutFloatingProject(
+  state: ProjectNotesLifecycleState,
+  project: ProjectNotesLifecycleProject,
+): ProjectNotesLifecycleState {
+  const floatingByThreadKey = Object.fromEntries(
+    Object.entries(state.floatingByThreadKey).filter(
+      ([, floatingProject]) => !isSameProject(floatingProject, project),
+    ),
+  );
+  return Object.keys(floatingByThreadKey).length === Object.keys(state.floatingByThreadKey).length
+    ? state
+    : { ...state, floatingByThreadKey };
+}
+
 export function selectProjectNotesLifecyclePresentation(
   state: ProjectNotesLifecycleState,
   context: ProjectNotesLifecycleContext,
 ): ProjectNotesLifecyclePresentation {
-  const ownerFloating = isFloatingOwner(state, context);
+  const floating = floatingProjectFor(state, context);
   return {
-    floating: ownerFloating ? (state.floatingByThreadKey[context.threadKey] ?? null) : null,
-    panel: context.notesPanelActive && !ownerFloating,
+    floating,
+    panel: context.notesPanelActive && !floating,
   };
 }
 
@@ -114,18 +142,18 @@ export function transitionProjectNotesLifecycle(
 ): ProjectNotesLifecycleTransition {
   switch (action) {
     case "navigate":
-      if (isPinned(state, context.projectKey) && !isFloatingOwner(state, context)) {
+      if (isPinned(state, context.projectKey) && !floatingProjectFor(state, context)) {
         return result(state, context, [{ type: "open-panel", threadRef: context.threadRef }]);
       }
       return result(state, context);
     case "open":
-      if (isFloatingOwner(state, context)) return result(state, context);
+      if (floatingProjectFor(state, context)) return result(state, context);
       return result(state, context, [{ type: "open-panel", threadRef: context.threadRef }]);
     case "toggle":
       return transitionProjectNotesLifecycle(
         state,
         context,
-        isFloatingOwner(state, context) || context.notesPanelActive ? "close" : "open",
+        floatingProjectFor(state, context) || context.notesPanelActive ? "close" : "open",
       );
     case "close": {
       const nextState = withPin(
@@ -141,12 +169,16 @@ export function transitionProjectNotesLifecycle(
     }
     case "panel-closed":
       return result(withPin(state, context.projectKey, false), context);
-    case "pin":
-      return result(withPin(state, context.projectKey, true), context);
+    case "pin": {
+      const currentState = context.notesPanelActive
+        ? withoutFloatingProject(state, context.project)
+        : state;
+      return result(withPin(currentState, context.projectKey, true), context);
+    }
     case "unpin":
       return result(withPin(state, context.projectKey, false), context);
     case "float": {
-      if (isFloatingOwner(state, context)) return result(state, context);
+      if (floatingProjectFor(state, context)) return result(state, context);
       const nextState: ProjectNotesLifecycleState = {
         ...state,
         floatingByThreadKey: {
@@ -161,7 +193,9 @@ export function transitionProjectNotesLifecycle(
       );
     }
     case "panel": {
-      const nextState = withoutFloatingOwner(state, context.threadKey);
+      const nextState = isPinned(state, context.projectKey)
+        ? withoutFloatingProject(state, context.project)
+        : withoutFloatingOwner(state, context.threadKey);
       return result(nextState, context, [{ type: "open-panel", threadRef: context.threadRef }]);
     }
   }

@@ -23,7 +23,7 @@ describe("project notes window state", () => {
     });
   });
 
-  it("separates saved window geometry by environment and project", () => {
+  it("shares saved window geometry across threads of one environment and project", () => {
     expect(projectNotesWindowStorageKey("local", "project-a")).toBe(
       "t3.project-notes.window.v1:local:project-a",
     );

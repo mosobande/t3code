@@ -8,7 +8,7 @@ import {
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { PanelRightIcon, PictureInPicture2Icon, PinIcon, XIcon } from "lucide-react";
+import { PanelRightIcon, PictureInPicture2Icon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
@@ -17,8 +17,8 @@ import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
 import { Skeleton } from "../ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import { Toggle } from "../ui/toggle";
 import { ProjectNoteEditor } from "./ProjectNoteEditor";
+import { ProjectNotesPinToggle } from "./ProjectNotesPinToggle";
 import { ProjectNoteSaveFailure } from "./ProjectNoteSaveFailure";
 import { PROJECT_NOTES_SURFACE_ID, type ProjectNotesDisplayMode } from "./projectNotesConstants";
 import { projectNotePendingDraftStorageKey } from "~/projectNotesWindowState";
@@ -158,20 +158,10 @@ function ProjectNotesHeader({
         <Tooltip>
           <TooltipTrigger
             render={
-              <Toggle
-                type="button"
-                variant="ghost"
-                size="xs"
-                aria-label={
-                  keepOpenAcrossThreads
-                    ? "Stop keeping Notes open across threads"
-                    : "Keep Notes open across threads"
-                }
+              <ProjectNotesPinToggle
                 pressed={keepOpenAcrossThreads}
                 onPressedChange={onKeepOpenAcrossThreadsChange}
-              >
-                <PinIcon />
-              </Toggle>
+              />
             }
           />
           <TooltipPopup>

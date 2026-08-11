@@ -115,7 +115,7 @@ describe("Project Notes lifecycle", () => {
     expect(ownerNavigation.presentation).toEqual({ panel: false, floating: owner.project });
   });
 
-  it("shows floating Notes only on the owner thread and opens a pinned sibling in the panel", () => {
+  it("carries pinned floating Notes into a sibling thread", () => {
     const floating = transitionProjectNotesLifecycle(
       createProjectNotesLifecycleState(),
       context(owner, true),
@@ -125,8 +125,25 @@ describe("Project Notes lifecycle", () => {
 
     const transition = transitionProjectNotesLifecycle(pinned, context(sibling), "navigate");
 
-    expect(transition.presentation).toEqual({ panel: false, floating: null });
-    expect(transition.effects).toEqual([{ type: "open-panel", threadRef: sibling.threadRef }]);
+    expect(transition.presentation).toEqual({ panel: false, floating: owner.project });
+    expect(transition.effects).toEqual([]);
+  });
+
+  it("moves pinned floating Notes back to the panel for the whole project", () => {
+    const floating = transitionProjectNotesLifecycle(
+      createProjectNotesLifecycleState(),
+      context(owner, true),
+      "float",
+    ).state;
+    const pinned = transitionProjectNotesLifecycle(floating, context(owner), "pin").state;
+
+    const siblingPanel = transitionProjectNotesLifecycle(pinned, context(sibling), "panel");
+
+    expect(siblingPanel.effects).toEqual([{ type: "open-panel", threadRef: sibling.threadRef }]);
+    expect(siblingPanel.presentation).toEqual({ panel: false, floating: null });
+    expect(
+      transitionProjectNotesLifecycle(siblingPanel.state, context(owner), "navigate").effects,
+    ).toEqual([{ type: "open-panel", threadRef: owner.threadRef }]);
   });
 
   it("restores each thread's floating Notes after another thread floats the same project", () => {
