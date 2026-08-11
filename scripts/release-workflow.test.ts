@@ -46,6 +46,18 @@ const releaseWorkflowSource = NodeFS.readFileSync(
   NodePath.join(repoRoot, ".github/workflows/release.yml"),
   "utf8",
 );
+const mobileProductionWorkflowSource = NodeFS.readFileSync(
+  NodePath.join(repoRoot, ".github/workflows/mobile-eas-production.yml"),
+  "utf8",
+);
+const mobileFingerprintWorkflowSource = NodeFS.readFileSync(
+  NodePath.join(repoRoot, ".github/workflows/mobile-fingerprint-check.yml"),
+  "utf8",
+);
+const webPreviewWorkflowSource = NodeFS.readFileSync(
+  NodePath.join(repoRoot, ".github/workflows/web-preview.yml"),
+  "utf8",
+);
 const releaseWorkflow = Schema.decodeUnknownSync(fromYaml(ReleaseWorkflow))(releaseWorkflowSource);
 
 const workflowJob = (name: string) => {
@@ -105,6 +117,14 @@ describe("release workflow", () => {
     assert.isFalse(
       NodeFS.existsSync(NodePath.join(repoRoot, ".github/workflows/deploy-marketing.yml")),
     );
+  });
+
+  it("keeps inherited mobile and hosted-web workflows source-only", () => {
+    assert.include(mobileProductionWorkflowSource, "jobs:\n  production:\n");
+    assert.include(mobileProductionWorkflowSource, "    if: ${{ false }}\n");
+    assert.include(mobileFingerprintWorkflowSource, "jobs:\n  fingerprint:\n");
+    assert.include(mobileFingerprintWorkflowSource, "    if: ${{ false }}\n");
+    assert.include(webPreviewWorkflowSource, "    if: >-\n      false &&\n");
   });
 
   it("builds locked CLI resources and isolates npm publication", () => {

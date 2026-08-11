@@ -1,33 +1,33 @@
 ---
 name: t3code-sync
-description: Safely sync the latest pingdotgg/t3code main branch into the detected default branch of quantipixels/sigidi while preserving merged SIGIDI work, downstream ownership, fork-owned migration history, release policy, and every active worktree.
+description: Safely sync the latest pingdotgg/t3code main branch into an ori-based quantipixels/sigidi candidate, with optional draft-PR delivery. Use for upstream syncs that must preserve SIGIDI work, downstream ownership, migration history, release policy, active worktrees, and Stable or Nightly tag boundaries.
 ---
 
 # T3 Code Sync
 
-Sync upstream with a merge commit in an isolated worktree. Preserve SIGIDI history and keep every existing worktree unchanged. This skill does not rebase feature branches or publish unrelated work.
+Sync upstream with a merge commit on a named candidate branch in an isolated worktree. Preserve SIGIDI history and keep every existing worktree unchanged. This skill does not rebase feature branches, publish releases, or mirror upstream tags into SIGIDI.
 
 ## Repository contract
 
 Use these endpoints unless the repository proves that they changed:
 
 - upstream: `pingdotgg/t3code`, branch `main`, remote `upstream`
-- SIGIDI: `quantipixels/sigidi`, target detected from the GitHub default branch, remote `github-sigidi`
+- SIGIDI: `quantipixels/sigidi`, integration branch `ori`, remote `github-sigidi`
 - local upstream mirror: `t3code-main`, tracking `upstream/main`
 
-Resolve the target branch from GitHub on every run. Verify remote URLs. Do not infer either identity from stale local configuration. Read `AGENTS.md` and `docs/architecture/sigidi-downstream-boundary.md` before acting.
+Verify that GitHub still reports `ori` as the SIGIDI default branch on every run. Stop if it does not; do not silently integrate into another branch. Verify remote URLs. Do not infer either identity from stale local configuration. Read `AGENTS.md` and `docs/architecture/sigidi-downstream-boundary.md` before acting.
 
 ## Authority and safety rules
 
-- Treat an outline request as read-only. Push only when the user explicitly authorized updating the SIGIDI remote default branch.
+- Treat an outline request as read-only. Push a candidate branch or create a draft PR only with explicit PR-delivery authority. Update remote `ori` directly only with separate explicit authority.
 - Preserve dirty, untracked, and feature-branch work in every existing worktree.
-- Work in one temporary detached worktree created from the current SIGIDI remote default branch.
+- Create and check out one collision-free candidate branch in a temporary worktree from current `github-sigidi/ori`.
 - Fetch both endpoints before comparison. Merge `upstream/main`; do not rebase or squash merged SIGIDI work.
 - Keep `t3code-main` read-only. Keep no local branch named `main`.
-- Do not force-push. Fetch the SIGIDI target again immediately before push and rebuild if it moved.
+- Do not force-push. Fetch `ori` again immediately before push and rebuild if it moved.
 - Run focused proof. Do not run repository-wide checks unless the user asks.
 - Remove only the exact temporary worktree created by this run.
-- Never create a pull request or publish upstream unless the user explicitly authorizes it.
+- Never create, move, delete, or push a tag, dispatch a release workflow, publish upstream, or merge a PR unless the user separately authorizes that action.
 
 ## 1. Resolve and pin the candidate
 
@@ -43,16 +43,17 @@ original_worktrees=$(root_git worktree list --porcelain)
 
 root_git remote -v
 gh auth status
-target_branch=$(gh repo view quantipixels/sigidi --json defaultBranchRef --jq .defaultBranchRef.name)
-test -n "$target_branch"
-root_git fetch github-sigidi "$target_branch"
+integration_branch=ori
+default_branch=$(gh repo view quantipixels/sigidi --json defaultBranchRef --jq .defaultBranchRef.name)
+test "$default_branch" = "$integration_branch"
+root_git fetch github-sigidi "$integration_branch"
 root_git fetch upstream main
 root_git remote set-head github-sigidi -a
-target_before=$(root_git rev-parse "github-sigidi/$target_branch")
+target_before=$(root_git rev-parse "github-sigidi/$integration_branch")
 upstream_head=$(root_git rev-parse upstream/main)
 ```
 
-Record the full commits for `github-sigidi/$target_branch`, `upstream/main`, their merge base, and the left/right unique commit counts. Inspect unique commits and changed paths before merging. Verify both remote URLs match the repository contract.
+Record the full commits for `github-sigidi/ori`, `upstream/main`, their merge base, and the left/right unique commit counts. Inspect unique commits and changed paths before merging. Verify both remote URLs match the repository contract. Fast-forward the local `t3code-main` mirror to `upstream/main` only when it is not checked out in another worktree.
 
 ## 2. Inspect overlaps and ownership
 
@@ -68,16 +69,37 @@ Classify each overlap:
 
 Use the downstream-boundary document and fork-patch register as authority. A missing record does not prove upstream ownership. Update the register when a resolution adds or changes non-registration logic in an upstream-owned file.
 
-Preserve the current release policy: the release workflow publishes macOS desktop artifacts only. Keep Linux, Windows, CLI, hosted-web, finalization, and announcement publication paths disabled. Preserve the repository's existing marketing deployment mechanism without replacing or duplicating it. Expanding either surface requires an explicit maintainer decision.
+Preserve the current release policy: pull requests and accepted tags rehearse unsigned macOS desktop artifacts; accepted Stable and Nightly tags can also publish the SIGIDI-owned `@sigidi/cli` package. Keep Linux and Windows desktop, mobile distribution, hosted web, GitHub Release, finalization, and announcement publication paths disabled. Preserve the repository's existing marketing deployment mechanism without replacing or duplicating it. Expanding either surface requires an explicit maintainer decision.
 
-## 3. Create the isolated merge
+## 3. Reconcile Stable and Nightly state
 
-Create a temporary directory with `mktemp -d`. Add a detached worktree at the pinned `github-sigidi/$target_branch` commit. Canonicalize its path because macOS may resolve `/var` to `/private/var`.
+Inspect remote refs without importing one product's tags into the other product's namespace:
+
+```sh
+root_git ls-remote --heads github-sigidi
+root_git ls-remote --tags github-sigidi
+root_git ls-remote --heads upstream
+root_git ls-remote --tags upstream
+```
+
+Record the latest valid Stable tag (`vX.Y.Z`) and Nightly tag (`vX.Y.Z-nightly.YYYYMMDD.N`) on each remote, their target commits, and whether each commit is an ancestor of the pinned branch or candidate. Report missing, duplicate, moved, legacy, or non-triggering tag patterns such as `nightly-v*`. Stable and Nightly are SIGIDI `local` channels, not permission to copy T3 Code release refs.
+
+Never mirror an upstream tag to `github-sigidi`. A SIGIDI tag push can start artifact and npm publication, so tag creation, movement, deletion, push, and release-workflow dispatch require separate release authority. Ordinary sync reconciliation is read-only even when the user asks to sync channel state.
+
+## 4. Create the isolated merge
+
+Create a temporary directory with `mktemp -d`. Choose the user-requested candidate name or a collision-resistant `sync/t3code-main-<upstream-short-sha>` name. Stop if the branch exists locally or remotely. Add and check out that branch in a worktree at the pinned `github-sigidi/ori` commit. Canonicalize its path because macOS may resolve `/var` to `/private/var`.
 
 ```sh
 sync_parent=$(mktemp -d)
 sync_dir="$sync_parent/worktree"
-root_git worktree add --detach "$sync_dir" "github-sigidi/$target_branch"
+candidate_branch=${candidate_branch:-"sync/t3code-main-$(root_git rev-parse --short=9 upstream/main)"}
+if root_git show-ref --verify --quiet "refs/heads/$candidate_branch" ||
+  root_git ls-remote --exit-code --heads github-sigidi "$candidate_branch" >/dev/null 2>&1; then
+  echo "Candidate branch already exists: $candidate_branch" >&2
+  exit 1
+fi
+root_git worktree add -b "$candidate_branch" "$sync_dir" "github-sigidi/ori"
 sync_dir=$(git -C "$sync_dir" rev-parse --show-toplevel)
 sync_git() { git -C "$sync_dir" "$@"; }
 test "$(sync_git rev-parse --show-toplevel)" = "$sync_dir"
@@ -89,9 +111,7 @@ Confirm every original worktree still has the captured branch, HEAD, and status.
 sync_git merge --no-ff upstream/main -m "chore: sync latest T3 Code main"
 ```
 
-Keep this exact merge subject. The conditional `upstream` CI workflow uses it to run the full
-maintainer compatibility suite after the merge reaches the default branch. Ordinary SIGIDI
-commits do not spend those runner resources.
+Keep this exact merge subject. A draft PR uses the `ci:upstream` label for the full maintainer compatibility suite; after merge, the push workflow also recognizes this subject. Ordinary SIGIDI commits do not spend those runner resources.
 
 For every conflict, inspect all stages:
 
@@ -106,7 +126,7 @@ State the behavior owned by each side. Keep the smallest combined resolution and
 
 Preserve SIGIDI product names, bundle identifiers, artifact names, release channels, data namespaces, and SIGIDI-owned service decisions. Retain compatible upstream runtime improvements and tests.
 
-## 4. Enforce migration ownership
+## 5. Enforce migration ownership
 
 Treat these paths as two independent lanes:
 
@@ -129,34 +149,44 @@ If upstream history or the Effect identity changed, keep the merge unpushed. Upd
 
 Run the migration runner and compatibility tests under the required Node and Bun engines as documented in `AGENTS.md` and `docs/internals/sigidi-migrations.md`. Include the supported upstream fixture, concurrent startup, rollback, idempotency, capability failure, and both-ledger remote-preflight proof when the affected surfaces require them. Never use sleeps or polling.
 
-## 5. Verify and commit
+## 6. Verify and commit
 
 Check the candidate:
 
 ```sh
 sync_git status --short
 sync_git grep -n -E '^(<<<<<<<|=======|>>>>>>>)' -- . ':!pnpm-lock.yaml'
-sync_git diff --check
+sync_git diff --check -- . ':(exclude)patches/*.patch'
 ```
+
+Imported package patch payloads can contain whitespace that is significant to the target source and makes Git's generic whitespace checker noisy. Do not normalize those payloads only to satisfy `diff --check`; require the frozen install to apply and verify them instead.
 
 Install with `pnpm --dir "$sync_dir" install --frozen-lockfile` only when focused proof needs dependencies. Run focused tests for every conflict and affected boundary. Commit only after applicable proof passes. Rerun focused tests if hooks change files.
 
-## 6. Push without overwriting new work
+## 7. Deliver without overwriting new work
 
-Fetch the target branch again and confirm it still equals the commit pinned before the merge. If it moved, rebuild from the new remote commit.
+Fetch `ori` again and confirm it still equals the commit pinned before the merge. If it moved, rebuild from the new remote commit. Never retarget a candidate onto the moved branch with a rebase.
 
 ```sh
-root_git fetch github-sigidi "$target_branch"
-test "$(root_git rev-parse "github-sigidi/$target_branch")" = "$target_before"
-sync_git push github-sigidi "HEAD:$target_branch"
+root_git fetch github-sigidi ori
+test "$(root_git rev-parse github-sigidi/ori)" = "$target_before"
 ```
 
-Let Git reject a moved target. Never bypass rejection with force. After push, fetch the target and confirm the remote commit equals the candidate.
+When the user authorized PR delivery, prepare a PR body in a temporary file and set `pr_body` to that path. Push only the candidate branch, verify its remote SHA, open one draft PR to `ori`, and apply `ci:upstream`:
 
-Remove only the worktree created by this run. Confirm every original worktree still has its captured branch, HEAD, and status. Do not prune unrelated worktrees.
+```sh
+sync_git push -u github-sigidi "HEAD:refs/heads/$candidate_branch"
+test "$(root_git ls-remote github-sigidi "refs/heads/$candidate_branch" | cut -f1)" = "$(sync_git rev-parse HEAD)"
+pr_url=$(gh pr create --repo quantipixels/sigidi --draft --base ori --head "$candidate_branch" --title "chore: sync latest T3 Code main" --body-file "$pr_body")
+gh pr edit --repo quantipixels/sigidi "$pr_url" --add-label ci:upstream
+```
+
+When the user separately authorized a direct `ori` update, push `HEAD:ori` only after the same moved-base check. Let Git reject a moved branch. Never bypass rejection with force. Fetch and verify the exact remote candidate after either route. Do not merge the PR as part of sync delivery.
+
+Remove only the worktree created by this run after the candidate is committed and delivered or retained safely. Keep the named local branch. Confirm every original worktree still has its captured branch, HEAD, and status. Do not prune unrelated worktrees.
 
 ## Report
 
-Report the target branch; old and new target commits; imported upstream range and count; merge commit and link; overlap and conflict resolutions; fork-patch register changes; migration compatibility identity; focused tests; residual gaps; original-worktree equality proof; push state; and CI state.
+Report `ori`; old and candidate commits; imported upstream range and count; merge commit; candidate branch and PR link; Stable and Nightly ref reconciliation; overlap and conflict resolutions; fork-patch register changes; migration compatibility identity; focused tests; residual gaps; original-worktree equality proof; push state; and CI state.
 
 When asked only for an outline, group upstream commits by product area, separate imported work from SIGIDI-specific resolutions, and state that no Git or remote mutation occurred.

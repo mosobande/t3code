@@ -1,5 +1,5 @@
 {
-  "sourceRevision": "a483337a02d4ac641db0219517816c300a33be6b",
+  "sourceRevision": "2db08457f2f4eaaa713a067b2ea480ca2b583025",
   "upstreamManifest": [
     [1, "OrchestrationEvents"],
     [2, "OrchestrationCommandReceipts"],
@@ -36,13 +36,17 @@
     [33, "ProjectionThreadsSettled"],
     [34, "ProjectionThreadsSnoozed"],
     [35, "ProjectionThreadTitleRegeneration"],
-    [36, "ProjectionThreadsPinned"]
+    [36, "ProjectionThreadsPinned"],
+    [37, "ProjectionTurnsKeysetIndex"],
+    [38, "ProjectionThreadsPinOrderKey"],
+    [39, "ProjectionProjectsDefaultThreadEnvMode"],
+    [40, "ProjectionProjectFaviconPath"]
   ],
   "sigidiManifest": [],
   "effectEngine": {
     "version": "4.0.0-beta.103",
-    "patchHash": "a18f963109656ddbeb2a99ca45f942ecf54830986259eb01ce6a970421c9c6a9"
+    "patchHash": "af36b7948b6f9c56623074662b51dade5699880c1a7c71245de73e13c3185fb6"
   },
-  "fixtureSha256": "b7cb7cf346e3a7df362856f6c66215ec5ed887438a9de64a49bf40359987f516",
+  "fixtureSha256": "f90d80b852de63a420707616799d4a19b96513609e6d3969b629e1119c71aad0",
   "representativeDataCases": ["orchestration event survives SIGIDI migration startup"]
 }
