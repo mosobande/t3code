@@ -1,15 +1,80 @@
-import type {
-  AdvertisedEndpoint,
-  AuthClientSession,
-  AuthPairingLink,
-  DesktopBridge,
-  DesktopWslState,
+import {
+  AuthAccessReadScope,
+  AuthAccessWriteScope,
+  AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
+  AuthRelayReadScope,
+  AuthRelayWriteScope,
+  AuthReviewWriteScope,
+  AuthTerminalOperateScope,
+  type AdvertisedEndpoint,
+  type AuthClientSession,
+  type AuthEnvironmentScope,
+  type AuthPairingLink,
+  type DesktopBridge,
+  type DesktopWslState,
 } from "@t3tools/contracts";
+import { resolveProductAdministrativeScopes } from "@t3tools/shared/productAuthScopes";
+import type { ProductProfile } from "@t3tools/shared/productProfile";
 import * as DateTime from "effect/DateTime";
 
 import type { ServerClientSessionRecord, ServerPairingLinkRecord } from "~/environments/primary";
 
 type WslEnableBridge = Pick<DesktopBridge, "setWslBackendEnabled" | "setWslDistro" | "setWslOnly">;
+
+const ALL_PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
+  readonly scope: AuthEnvironmentScope;
+  readonly title: string;
+  readonly description: string;
+}> = [
+  {
+    scope: AuthOrchestrationReadScope,
+    title: "View environment",
+    description: "Read threads, status, diffs, and configuration.",
+  },
+  {
+    scope: AuthOrchestrationOperateScope,
+    title: "Operate tasks",
+    description: "Start tasks and perform changes in the environment.",
+  },
+  {
+    scope: AuthTerminalOperateScope,
+    title: "Use terminals",
+    description: "Create terminals and send input to running shells.",
+  },
+  {
+    scope: AuthReviewWriteScope,
+    title: "Write reviews",
+    description: "Create comments while reviewing changes.",
+  },
+  {
+    scope: AuthAccessReadScope,
+    title: "View access",
+    description: "Inspect pairing links and authorized clients.",
+  },
+  {
+    scope: AuthAccessWriteScope,
+    title: "Manage access",
+    description: "Issue and revoke credentials for other clients.",
+  },
+  {
+    scope: AuthRelayReadScope,
+    title: "View relay",
+    description: "Inspect managed relay connectivity.",
+  },
+  {
+    scope: AuthRelayWriteScope,
+    title: "Manage relay",
+    description: "Change managed tunnel connectivity.",
+  },
+];
+
+export function resolvePairingScopeOptions(
+  profile: Pick<ProductProfile, "capabilities">,
+): ReadonlyArray<(typeof ALL_PAIRING_SCOPE_OPTIONS)[number]> {
+  const allowedScopes = new Set(resolveProductAdministrativeScopes(profile));
+  return ALL_PAIRING_SCOPE_OPTIONS.filter(({ scope }) => allowedScopes.has(scope));
+}
 
 export function sortDesktopPairingLinks(links: ReadonlyArray<ServerPairingLinkRecord>) {
   return [...links].toSorted(

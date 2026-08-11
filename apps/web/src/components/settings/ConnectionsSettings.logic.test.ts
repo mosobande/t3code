@@ -1,12 +1,44 @@
 import type { AdvertisedEndpoint, DesktopWslState } from "@t3tools/contracts";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
+  resolvePairingScopeOptions,
   resolveTailscaleHttpsDescription,
   shouldShowTailscaleRetry,
   selectQrEndpointOption,
 } from "./ConnectionsSettings.logic";
+
+describe("resolvePairingScopeOptions", () => {
+  it("omits inherited relay permissions from the local pairing dialog", () => {
+    expect(
+      resolvePairingScopeOptions(resolveProductProfile("local")).map(({ scope }) => scope),
+    ).toEqual([
+      "orchestration:read",
+      "orchestration:operate",
+      "terminal:operate",
+      "review:write",
+      "access:read",
+      "access:write",
+    ]);
+  });
+
+  it("keeps inherited relay permissions in the upstream compatibility profile", () => {
+    expect(
+      resolvePairingScopeOptions(resolveProductProfile("upstream")).map(({ scope }) => scope),
+    ).toEqual([
+      "orchestration:read",
+      "orchestration:operate",
+      "terminal:operate",
+      "review:write",
+      "access:read",
+      "access:write",
+      "relay:read",
+      "relay:write",
+    ]);
+  });
+});
 
 const baseWslState: DesktopWslState = {
   enabled: false,

@@ -9,14 +9,9 @@ import {
 import { useAtomValue } from "@effect/atom-react";
 import { type ReactNode, memo, useCallback, useId, useMemo, useState } from "react";
 import {
-  AuthAccessReadScope,
   AuthAccessWriteScope,
-  AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  AuthRelayReadScope,
   AuthRelayWriteScope,
-  AuthReviewWriteScope,
-  AuthTerminalOperateScope,
   type AuthEnvironmentScope,
   type AdvertisedEndpoint,
   type DesktopDiscoveredSshHost,
@@ -45,6 +40,7 @@ import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls
 import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
+  resolvePairingScopeOptions,
   resolveTailscaleHttpsDescription,
   shouldShowTailscaleRetry,
   selectQrEndpointOption,
@@ -162,56 +158,7 @@ function formatAccessTimestamp(value: string): string {
   return accessTimestampFormatter.format(parsed);
 }
 
-const ALL_PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
-  readonly scope: AuthEnvironmentScope;
-  readonly title: string;
-  readonly description: string;
-}> = [
-  {
-    scope: AuthOrchestrationReadScope,
-    title: "View environment",
-    description: "Read threads, status, diffs, and configuration.",
-  },
-  {
-    scope: AuthOrchestrationOperateScope,
-    title: "Operate tasks",
-    description: "Start tasks and perform changes in the environment.",
-  },
-  {
-    scope: AuthTerminalOperateScope,
-    title: "Use terminals",
-    description: "Create terminals and send input to running shells.",
-  },
-  {
-    scope: AuthReviewWriteScope,
-    title: "Write reviews",
-    description: "Create comments while reviewing changes.",
-  },
-  {
-    scope: AuthAccessReadScope,
-    title: "View access",
-    description: "Inspect pairing links and authorized clients.",
-  },
-  {
-    scope: AuthAccessWriteScope,
-    title: "Manage access",
-    description: "Issue and revoke credentials for other clients.",
-  },
-  {
-    scope: AuthRelayReadScope,
-    title: "View relay",
-    description: "Inspect managed relay connectivity.",
-  },
-  {
-    scope: AuthRelayWriteScope,
-    title: "Manage relay",
-    description: "Change managed tunnel connectivity.",
-  },
-];
-const productAdministrativeScopeSet = new Set(productAdministrativeScopes);
-const PAIRING_SCOPE_OPTIONS = ALL_PAIRING_SCOPE_OPTIONS.filter(({ scope }) =>
-  productAdministrativeScopeSet.has(scope),
-);
+const PAIRING_SCOPE_OPTIONS = resolvePairingScopeOptions(productProfile);
 
 function AccessScopeSummary({
   scopes,
