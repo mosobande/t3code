@@ -1,21 +1,20 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect } from "react";
+import { useStore } from "zustand";
 
-import type { ProjectNotesDisplayMode } from "./projectNotesConstants";
-import { subscribeProjectNotesAction } from "./projectNotesActionBus";
+import type { ProjectNotesDisplayMode } from "~/components/projectNotes/projectNotesConstants";
+import { subscribeProjectNotesAction } from "~/components/projectNotes/projectNotesActionBus";
 import {
-  createProjectNotesLifecycleState,
-  transitionProjectNotesLifecycle,
-  type ProjectNotesLifecycleAction,
-  type ProjectNotesLifecycleState,
-} from "./projectNotesLifecycleState";
-import {
-  applyProjectNotesLifecycleAction,
+  projectNotesLifecycleStore,
   toProjectNotesLifecycleContext,
   type ActiveProjectNotesContext,
-} from "./projectNotesLifecycleController";
+} from "./projectNotesLifecycleStore";
+import { selectProjectNotesLifecyclePresentation } from "./projectNotesLifecycleState";
+import { selectActiveRightPanel, useRightPanelStore } from "~/rightPanelStore";
 
 const ProjectNotesSurface = lazy(() =>
-  import("./ProjectNotesSurface").then((module) => ({ default: module.ProjectNotesSurface })),
+  import("~/components/projectNotes/ProjectNotesSurface").then((module) => ({
+    default: module.ProjectNotesSurface,
+  })),
 );
 
 interface UseProjectNotesLifecycleOptions {
@@ -23,18 +22,17 @@ interface UseProjectNotesLifecycleOptions {
 }
 
 export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOptions) {
-  const [state, setState] = useState<ProjectNotesLifecycleState>(createProjectNotesLifecycleState);
-  const stateRef = useRef(state);
+  const state = useStore(projectNotesLifecycleStore, (store) => store.lifecycle);
+  const apply = useStore(projectNotesLifecycleStore, (store) => store.apply);
+  const notesPanelActive = useRightPanelStore((store) =>
+    active ? selectActiveRightPanel(store.byThreadKey, active.threadRef) === "notes" : false,
+  );
 
   const transition = useCallback(
-    (action: ProjectNotesLifecycleAction) => {
-      if (!active) return;
-      const currentState = stateRef.current;
-      const nextState = applyProjectNotesLifecycleAction(currentState, active, action);
-      stateRef.current = nextState;
-      if (nextState !== currentState) setState(nextState);
+    (action: Parameters<typeof apply>[1]) => {
+      if (active) apply(active, action);
     },
-    [active],
+    [active, apply],
   );
 
   useEffect(() => {
@@ -44,15 +42,11 @@ export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOpt
 
   useEffect(() => subscribeProjectNotesAction(() => transition("toggle")), [transition]);
 
-  const presentation = useMemo(() => {
-    if (!active) return { floating: null, panel: false };
-    return transitionProjectNotesLifecycle(
-      state,
-      toProjectNotesLifecycleContext(active),
-      "navigate",
-    ).presentation;
-  }, [active, state]);
-  const pinned = active ? state.pinnedProjectKeys.includes(active.projectKey) : false;
+  const context = active ? toProjectNotesLifecycleContext(active, notesPanelActive) : null;
+  const presentation = context
+    ? selectProjectNotesLifecyclePresentation(state, context)
+    : { floating: null, panel: false };
+  const pinned = context ? state.pinnedProjectKeys.includes(context.projectKey) : false;
   const mode: ProjectNotesDisplayMode | null = presentation.floating
     ? "floating"
     : presentation.panel
@@ -69,6 +63,7 @@ export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOpt
   const close = useCallback(() => transition("close"), [transition]);
   const open = useCallback(() => transition("open"), [transition]);
   const toggle = useCallback(() => transition("toggle"), [transition]);
+  const onPanelClosed = useCallback(() => transition("panel-closed"), [transition]);
 
   const surfaceProps = {
     keepOpenAcrossThreads: pinned,
@@ -106,7 +101,7 @@ export function useProjectNotesLifecycle({ active }: UseProjectNotesLifecycleOpt
   return {
     floating,
     mode,
-    onPanelClosed: close,
+    onPanelClosed,
     open,
     panel,
     setPinned,

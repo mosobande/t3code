@@ -29,7 +29,6 @@ import {
 import { effectiveSettled, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import {
   parseScopedThreadKey,
-  scopedProjectKey,
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
@@ -241,7 +240,7 @@ import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
-import { useProjectNotesLifecycle } from "./projectNotes/ProjectNotesLifecycle";
+import { useProjectNotesLifecycle } from "~/sigidi/projectNotes/ProjectNotesLifecycle";
 import { PanelLayoutControls, RightPanelMaximizeControl } from "./chat/PanelLayoutControls";
 import { type ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { NoActiveThreadState } from "./NoActiveThreadState";
@@ -1638,22 +1637,19 @@ function ChatViewContent(props: ChatViewProps) {
   const handleNewThreadInActiveProject = useCallback(() => {
     startNewThreadForProject(activeProjectRef, handleNewThread);
   }, [activeProjectRef, handleNewThread]);
-  const activeProjectNotesTargetKey = activeProjectRef ? scopedProjectKey(activeProjectRef) : null;
   const activeProjectNotesContext = useMemo(
     () =>
-      activeThreadRef && activeProject && activeProjectNotesTargetKey && activeThreadKey
+      activeThreadRef && activeProject
         ? {
-            projectKey: activeProjectNotesTargetKey,
             project: {
               environmentId: activeProject.environmentId,
               projectId: activeProject.id,
               projectName: activeProject.title,
             },
-            threadKey: activeThreadKey,
             threadRef: activeThreadRef,
           }
         : null,
-    [activeProject, activeProjectNotesTargetKey, activeThreadKey, activeThreadRef],
+    [activeProject, activeThreadRef],
   );
   const projectNotes = useProjectNotesLifecycle({
     active: activeProjectNotesContext,

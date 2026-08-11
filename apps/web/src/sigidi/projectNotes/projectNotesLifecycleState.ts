@@ -1,6 +1,8 @@
+import type { EnvironmentId, ProjectId, ScopedThreadRef } from "@t3tools/contracts";
+
 export interface ProjectNotesLifecycleProject {
-  readonly environmentId: string;
-  readonly projectId: string;
+  readonly environmentId: EnvironmentId;
+  readonly projectId: ProjectId;
   readonly projectName: string;
 }
 
@@ -8,20 +10,12 @@ export interface ProjectNotesLifecycleContext {
   readonly projectKey: string;
   readonly project: ProjectNotesLifecycleProject;
   readonly threadKey: string;
-  readonly threadRef: {
-    readonly environmentId: string;
-    readonly threadId: string;
-  };
+  readonly threadRef: ScopedThreadRef;
   readonly notesPanelActive: boolean;
 }
 
-interface ProjectNotesFloatingOwner {
-  readonly ownerThreadKey: string;
-  readonly project: ProjectNotesLifecycleProject;
-}
-
 export interface ProjectNotesLifecycleState {
-  readonly floating: ProjectNotesFloatingOwner | null;
+  readonly floatingByThreadKey: Readonly<Record<string, ProjectNotesLifecycleProject>>;
   readonly pinnedProjectKeys: readonly string[];
 }
 
@@ -31,13 +25,14 @@ export type ProjectNotesLifecycleAction =
   | "navigate"
   | "open"
   | "panel"
+  | "panel-closed"
   | "pin"
   | "toggle"
   | "unpin";
 
 export type ProjectNotesLifecycleEffect =
-  | { readonly type: "close-panel"; readonly threadRef: ProjectNotesLifecycleContext["threadRef"] }
-  | { readonly type: "open-panel"; readonly threadRef: ProjectNotesLifecycleContext["threadRef"] };
+  | { readonly type: "close-panel"; readonly threadRef: ScopedThreadRef }
+  | { readonly type: "open-panel"; readonly threadRef: ScopedThreadRef };
 
 export interface ProjectNotesLifecyclePresentation {
   readonly floating: ProjectNotesLifecycleProject | null;
@@ -51,7 +46,7 @@ export interface ProjectNotesLifecycleTransition {
 }
 
 export function createProjectNotesLifecycleState(): ProjectNotesLifecycleState {
-  return { floating: null, pinnedProjectKeys: [] };
+  return { floatingByThreadKey: {}, pinnedProjectKeys: [] };
 }
 
 function isPinned(state: ProjectNotesLifecycleState, projectKey: string): boolean {
@@ -77,16 +72,25 @@ function isFloatingOwner(
   state: ProjectNotesLifecycleState,
   context: ProjectNotesLifecycleContext,
 ): boolean {
-  return state.floating?.ownerThreadKey === context.threadKey;
+  return state.floatingByThreadKey[context.threadKey] !== undefined;
 }
 
-function presentationFor(
+function withoutFloatingOwner(
+  state: ProjectNotesLifecycleState,
+  threadKey: string,
+): ProjectNotesLifecycleState {
+  if (state.floatingByThreadKey[threadKey] === undefined) return state;
+  const { [threadKey]: _removed, ...floatingByThreadKey } = state.floatingByThreadKey;
+  return { ...state, floatingByThreadKey };
+}
+
+export function selectProjectNotesLifecyclePresentation(
   state: ProjectNotesLifecycleState,
   context: ProjectNotesLifecycleContext,
 ): ProjectNotesLifecyclePresentation {
   const ownerFloating = isFloatingOwner(state, context);
   return {
-    floating: ownerFloating ? (state.floating?.project ?? null) : null,
+    floating: ownerFloating ? (state.floatingByThreadKey[context.threadKey] ?? null) : null,
     panel: context.notesPanelActive && !ownerFloating,
   };
 }
@@ -96,7 +100,11 @@ function result(
   context: ProjectNotesLifecycleContext,
   effects: readonly ProjectNotesLifecycleEffect[] = [],
 ): ProjectNotesLifecycleTransition {
-  return { state, effects, presentation: presentationFor(state, context) };
+  return {
+    state,
+    effects,
+    presentation: selectProjectNotesLifecyclePresentation(state, context),
+  };
 }
 
 export function transitionProjectNotesLifecycle(
@@ -121,7 +129,7 @@ export function transitionProjectNotesLifecycle(
       );
     case "close": {
       const nextState = withPin(
-        isFloatingOwner(state, context) ? { ...state, floating: null } : state,
+        withoutFloatingOwner(state, context.threadKey),
         context.projectKey,
         false,
       );
@@ -131,6 +139,8 @@ export function transitionProjectNotesLifecycle(
         context.notesPanelActive ? [{ type: "close-panel", threadRef: context.threadRef }] : [],
       );
     }
+    case "panel-closed":
+      return result(withPin(state, context.projectKey, false), context);
     case "pin":
       return result(withPin(state, context.projectKey, true), context);
     case "unpin":
@@ -139,9 +149,9 @@ export function transitionProjectNotesLifecycle(
       if (isFloatingOwner(state, context)) return result(state, context);
       const nextState: ProjectNotesLifecycleState = {
         ...state,
-        floating: {
-          ownerThreadKey: context.threadKey,
-          project: context.project,
+        floatingByThreadKey: {
+          ...state.floatingByThreadKey,
+          [context.threadKey]: context.project,
         },
       };
       return result(
@@ -151,7 +161,7 @@ export function transitionProjectNotesLifecycle(
       );
     }
     case "panel": {
-      const nextState = isFloatingOwner(state, context) ? { ...state, floating: null } : state;
+      const nextState = withoutFloatingOwner(state, context.threadKey);
       return result(nextState, context, [{ type: "open-panel", threadRef: context.threadRef }]);
     }
   }

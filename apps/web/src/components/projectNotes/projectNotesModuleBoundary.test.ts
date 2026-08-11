@@ -5,7 +5,7 @@ import commandPaletteSource from "../CommandPalette.tsx?raw";
 import chatHeaderSource from "../chat/ChatHeader.tsx?raw";
 import chatRouteSource from "../../routes/_chat.tsx?raw";
 import projectNoteEditorSource from "./ProjectNoteEditor.tsx?raw";
-import projectNotesLifecycleSource from "./ProjectNotesLifecycle.tsx?raw";
+import projectNotesLifecycleSource from "../../sigidi/projectNotes/ProjectNotesLifecycle.tsx?raw";
 import projectNotesSurfaceSource from "./ProjectNotesSurface.tsx?raw";
 
 describe("project notes module boundary", () => {

@@ -1,46 +1,52 @@
 import { afterEach, describe, expect, it } from "vite-plus/test";
+import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 
 import {
-  applyProjectNotesLifecycleAction,
+  createProjectNotesLifecycleStore,
   type ActiveProjectNotesContext,
-} from "./projectNotesLifecycleController";
+} from "~/sigidi/projectNotes/projectNotesLifecycleStore";
 import {
   createProjectNotesLifecycleState,
   transitionProjectNotesLifecycle,
   type ProjectNotesLifecycleContext,
-} from "./projectNotesLifecycleState";
+} from "~/sigidi/projectNotes/projectNotesLifecycleState";
 import { selectActiveRightPanel, useRightPanelStore } from "~/rightPanelStore";
 
-const owner = {
+type LifecycleContextInput = Omit<ProjectNotesLifecycleContext, "notesPanelActive">;
+
+const environmentId = EnvironmentId.make("environment-a");
+const projectAId = ProjectId.make("project-a");
+const projectBId = ProjectId.make("project-b");
+
+const owner: LifecycleContextInput = {
   projectKey: "environment-a:project-a",
   project: {
-    environmentId: "environment-a",
-    projectId: "project-a",
+    ...scopeProjectRef(environmentId, projectAId),
     projectName: "Project A",
   },
   threadKey: "environment-a:thread-owner",
-  threadRef: { environmentId: "environment-a", threadId: "thread-owner" },
+  threadRef: scopeThreadRef(environmentId, ThreadId.make("thread-owner")),
 } as const;
 
-const sibling = {
+const sibling: LifecycleContextInput = {
   ...owner,
   threadKey: "environment-a:thread-sibling",
-  threadRef: { environmentId: "environment-a", threadId: "thread-sibling" },
+  threadRef: scopeThreadRef(environmentId, ThreadId.make("thread-sibling")),
 } as const;
 
-const anotherProject = {
+const anotherProject: LifecycleContextInput = {
   projectKey: "environment-a:project-b",
   project: {
-    environmentId: "environment-a",
-    projectId: "project-b",
+    ...scopeProjectRef(environmentId, projectBId),
     projectName: "Project B",
   },
   threadKey: "environment-a:thread-other-project",
-  threadRef: { environmentId: "environment-a", threadId: "thread-other-project" },
+  threadRef: scopeThreadRef(environmentId, ThreadId.make("thread-other-project")),
 } as const;
 
 function context(
-  current: typeof owner | typeof sibling | typeof anotherProject,
+  current: LifecycleContextInput,
   notesPanelActive = false,
 ): ProjectNotesLifecycleContext {
   return { ...current, notesPanelActive };
@@ -51,18 +57,18 @@ describe("Project Notes lifecycle", () => {
 
   it("uses current panel state for consecutive toggle actions", () => {
     useRightPanelStore.setState({ byThreadKey: {} });
-    const active = owner as unknown as ActiveProjectNotesContext;
+    const active: ActiveProjectNotesContext = {
+      project: owner.project,
+      threadRef: owner.threadRef,
+    };
+    const store = createProjectNotesLifecycleStore();
 
-    const opened = applyProjectNotesLifecycleAction(
-      createProjectNotesLifecycleState(),
-      active,
-      "toggle",
-    );
+    store.getState().apply(active, "toggle");
     expect(
       selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, active.threadRef),
     ).toBe("notes");
 
-    applyProjectNotesLifecycleAction(opened, active, "toggle");
+    store.getState().apply(active, "toggle");
     expect(
       selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, active.threadRef),
     ).toBeNull();
@@ -123,6 +129,26 @@ describe("Project Notes lifecycle", () => {
     expect(transition.effects).toEqual([{ type: "open-panel", threadRef: sibling.threadRef }]);
   });
 
+  it("restores each thread's floating Notes after another thread floats the same project", () => {
+    const ownerFloating = transitionProjectNotesLifecycle(
+      createProjectNotesLifecycleState(),
+      context(owner),
+      "float",
+    ).state;
+    const bothFloating = transitionProjectNotesLifecycle(
+      ownerFloating,
+      context(sibling),
+      "float",
+    ).state;
+
+    expect(
+      transitionProjectNotesLifecycle(bothFloating, context(owner), "navigate").presentation,
+    ).toEqual({ panel: false, floating: owner.project });
+    expect(
+      transitionProjectNotesLifecycle(bothFloating, context(sibling), "navigate").presentation,
+    ).toEqual({ panel: false, floating: sibling.project });
+  });
+
   it("closes a floating owner and clears its project pin", () => {
     const floating = transitionProjectNotesLifecycle(
       createProjectNotesLifecycleState(),
@@ -135,7 +161,7 @@ describe("Project Notes lifecycle", () => {
 
     expect(transition.effects).toEqual([]);
     expect(transition.presentation).toEqual({ panel: false, floating: null });
-    expect(transition.state).toEqual({ floating: null, pinnedProjectKeys: [] });
+    expect(transition.state).toEqual({ floatingByThreadKey: {}, pinnedProjectKeys: [] });
   });
 
   it("closes active Notes by clearing only its project pin", () => {
