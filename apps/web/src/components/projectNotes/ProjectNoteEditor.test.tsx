@@ -11,6 +11,7 @@ describe("ProjectNoteEditor", () => {
 
     expect(markup).toContain('role="group"');
     expect(markup).toContain('aria-label="Note formatting"');
+    expect(markup).toContain('aria-label="More formatting"');
     expect(markup).not.toContain('role="toolbar"');
   });
 

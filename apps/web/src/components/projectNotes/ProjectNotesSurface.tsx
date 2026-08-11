@@ -8,14 +8,16 @@ import {
 import * as Cause from "effect/Cause";
 import * as Option from "effect/Option";
 import { AsyncResult } from "effect/unstable/reactivity";
-import { Maximize2Icon, Minimize2Icon, PinIcon, PinOffIcon, XIcon } from "lucide-react";
+import { PanelRightIcon, PictureInPicture2Icon, PinIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 
+import { cn } from "~/lib/utils";
 import { projectEnvironment } from "~/state/projects";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { Button } from "../ui/button";
 import { Skeleton } from "../ui/skeleton";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Toggle } from "../ui/toggle";
 import { ProjectNoteEditor } from "./ProjectNoteEditor";
 import { ProjectNoteSaveFailure } from "./ProjectNoteSaveFailure";
 import { PROJECT_NOTES_SURFACE_ID, type ProjectNotesDisplayMode } from "./projectNotesConstants";
@@ -88,9 +90,6 @@ interface ProjectNotesHeaderProps {
   readonly mode: ProjectNotesDisplayMode;
   readonly saveStatus: SaveStatus;
   readonly statusText: string;
-  readonly hasConflict: boolean;
-  readonly onReloadConflict: () => void;
-  readonly onKeepLocalDraft: () => void;
   readonly onModeChange: (mode: ProjectNotesDisplayMode) => void;
   readonly onClose: () => void;
   readonly keepOpenAcrossThreads: boolean;
@@ -107,9 +106,6 @@ function ProjectNotesHeader({
   mode,
   saveStatus,
   statusText,
-  hasConflict,
-  onReloadConflict,
-  onKeepLocalDraft,
   onModeChange,
   onClose,
   keepOpenAcrossThreads,
@@ -127,11 +123,11 @@ function ProjectNotesHeader({
   return (
     <>
       <div
-        className={
-          mode === "floating"
-            ? "flex cursor-move touch-none items-center gap-2 border-b border-border px-3 py-2"
-            : "flex items-center gap-2 border-b border-border px-3 py-2"
-        }
+        className={cn(
+          "surface-subheader gap-1 px-2",
+          mode === "floating" && "cursor-move touch-none",
+        )}
+        data-surface-subheader
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -142,44 +138,40 @@ function ProjectNotesHeader({
         aria-label={mode === "floating" ? "Move or resize Project Notes window" : undefined}
         aria-describedby={mode === "floating" ? PROJECT_NOTES_KEYBOARD_HELP_ID : undefined}
       >
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-semibold">Project Notes - {projectName}</h2>
+        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+          <h2 className="shrink-0 text-sm font-medium">Project Notes</h2>
+          <span className="truncate text-xs text-muted-foreground" title={projectName}>
+            {projectName}
+          </span>
         </div>
-        <span
-          className={
-            saveStatus === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"
-          }
-          aria-live="polite"
-        >
-          {statusText}
-        </span>
-        {hasConflict ? (
-          <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" size="xs" onClick={onReloadConflict}>
-              Reload
-            </Button>
-            <Button type="button" variant="secondary" size="xs" onClick={onKeepLocalDraft}>
-              Keep mine
-            </Button>
-          </div>
+        {statusText ? (
+          <span
+            className={cn(
+              "whitespace-nowrap text-xs text-muted-foreground",
+              saveStatus === "error" && "text-destructive",
+            )}
+            aria-live="polite"
+          >
+            {statusText}
+          </span>
         ) : null}
         <Tooltip>
           <TooltipTrigger
             render={
-              <Button
+              <Toggle
                 type="button"
-                variant={keepOpenAcrossThreads ? "secondary" : "ghost"}
-                size="icon-sm"
+                variant="ghost"
+                size="xs"
                 aria-label={
                   keepOpenAcrossThreads
                     ? "Stop keeping Notes open across threads"
                     : "Keep Notes open across threads"
                 }
-                aria-pressed={keepOpenAcrossThreads}
-                onClick={() => onKeepOpenAcrossThreadsChange(!keepOpenAcrossThreads)}
+                pressed={keepOpenAcrossThreads}
+                onPressedChange={onKeepOpenAcrossThreadsChange}
               >
-                {keepOpenAcrossThreads ? <PinIcon /> : <PinOffIcon />}
-              </Button>
+                <PinIcon />
+              </Toggle>
             }
           />
           <TooltipPopup>
@@ -194,32 +186,34 @@ function ProjectNotesHeader({
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-sm"
+                size="icon-xs"
                 aria-label={modeAction.label}
                 onClick={() => onModeChange(modeAction.next)}
               >
-                {mode === "panel" ? <Maximize2Icon /> : <Minimize2Icon />}
+                {mode === "panel" ? <PictureInPicture2Icon /> : <PanelRightIcon />}
               </Button>
             }
           />
           <TooltipPopup>{modeAction.label}</TooltipPopup>
         </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Close project notes"
-                onClick={onClose}
-              >
-                <XIcon />
-              </Button>
-            }
-          />
-          <TooltipPopup>Close project notes</TooltipPopup>
-        </Tooltip>
+        {mode === "floating" ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Close project notes"
+                  onClick={onClose}
+                >
+                  <XIcon />
+                </Button>
+              }
+            />
+            <TooltipPopup>Close project notes</TooltipPopup>
+          </Tooltip>
+        ) : null}
       </div>
       {mode === "floating" ? (
         <p id={PROJECT_NOTES_KEYBOARD_HELP_ID} className="sr-only">
@@ -228,6 +222,31 @@ function ProjectNotesHeader({
         </p>
       ) : null}
     </>
+  );
+}
+
+function ProjectNoteConflictNotice({
+  onReload,
+  onKeepMine,
+}: {
+  readonly onReload: () => void;
+  readonly onKeepMine: () => void;
+}) {
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 border-b border-warning/20 bg-warning/5 px-3 py-2 text-xs"
+      role="alert"
+    >
+      <p className="min-w-48 flex-1 text-warning">This note changed elsewhere.</p>
+      <div className="flex items-center gap-1">
+        <Button type="button" variant="ghost" size="xs" onClick={onReload}>
+          Reload
+        </Button>
+        <Button type="button" variant="secondary" size="xs" onClick={onKeepMine}>
+          Keep mine
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -464,9 +483,7 @@ export function ProjectNotesSurface({
         ? "Saved"
         : saveStatus === "error"
           ? "Save failed"
-          : saveStatus === "conflict"
-            ? "Changed elsewhere"
-            : "";
+          : "";
   const queryError = query._tag === "Failure" ? errorMessage(query.cause) : null;
 
   const surface = (
@@ -497,9 +514,6 @@ export function ProjectNotesSurface({
           mode={mode}
           saveStatus={saveStatus}
           statusText={statusText}
-          hasConflict={conflict !== null}
-          onReloadConflict={reloadConflict}
-          onKeepLocalDraft={keepLocalDraft}
           onModeChange={(nextMode) => void changeMode(nextMode)}
           onClose={onClose}
           keepOpenAcrossThreads={keepOpenAcrossThreads}
@@ -510,6 +524,9 @@ export function ProjectNotesSurface({
           onPointerCancel={endDrag}
           onKeyDown={handleWindowKeyDown}
         />
+        {conflict !== null ? (
+          <ProjectNoteConflictNotice onReload={reloadConflict} onKeepMine={keepLocalDraft} />
+        ) : null}
         {saveStatus === "error" ? (
           <ProjectNoteSaveFailure
             error={saveError ?? "Could not save this note."}

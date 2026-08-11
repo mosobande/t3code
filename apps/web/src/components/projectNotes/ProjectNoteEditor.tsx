@@ -12,14 +12,23 @@ import { $convertFromMarkdownString, $convertToMarkdownString } from "@lexical/m
 import { CodeHighlightNode, CodeNode } from "@lexical/code";
 import { LinkNode } from "@lexical/link";
 import {
+  $isListNode,
   INSERT_CHECK_LIST_COMMAND,
+  INSERT_ORDERED_LIST_COMMAND,
   INSERT_UNORDERED_LIST_COMMAND,
   ListItemNode,
   ListNode,
 } from "@lexical/list";
-import { $createHeadingNode, HeadingNode, QuoteNode } from "@lexical/rich-text";
+import {
+  $createHeadingNode,
+  $createQuoteNode,
+  $isHeadingNode,
+  HeadingNode,
+  QuoteNode,
+} from "@lexical/rich-text";
 import { $setBlocksType } from "@lexical/selection";
 import {
+  $createParagraphNode,
   $getSelection,
   $isRangeSelection,
   COMMAND_PRIORITY_LOW,
@@ -32,18 +41,26 @@ import {
   BoldIcon,
   CheckSquareIcon,
   CodeIcon,
+  EllipsisIcon,
   Heading2Icon,
   ItalicIcon,
   ListIcon,
+  ListOrderedIcon,
+  QuoteIcon,
   RemoveFormattingIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button";
+import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "../ui/menu";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { Toggle } from "../ui/toggle";
 import { PROJECT_NOTE_MARKDOWN_TRANSFORMERS } from "~/projectNoteMarkdown";
 import { isSafeProjectNoteLinkUrl } from "./projectNoteLinks";
 import { clearProjectNoteFormatting } from "./projectNoteEditorActions";
-import { resolveProjectNoteSelectionActions } from "./projectNoteToolbarState";
+import {
+  type ProjectNoteBlockKind,
+  resolveProjectNoteSelectionActions,
+} from "./projectNoteToolbarState";
 
 interface ProjectNoteEditorProps {
   readonly initialMarkdown: string;
@@ -75,31 +92,34 @@ const editorTheme: EditorThemeClasses = {
   },
 };
 
-function ToolbarButton({
+function ToolbarToggle({
   label,
+  pressed,
   disabled = false,
-  onClick,
+  onPressedChange,
   children,
 }: {
   readonly label: string;
+  readonly pressed: boolean;
   readonly disabled?: boolean;
-  readonly onClick: () => void;
+  readonly onPressedChange: (pressed: boolean) => void;
   readonly children: React.ReactNode;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger
         render={
-          <Button
+          <Toggle
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size="xs"
             aria-label={label}
+            pressed={pressed}
             disabled={disabled}
-            onClick={onClick}
+            onPressedChange={onPressedChange}
           >
             {children}
-          </Button>
+          </Toggle>
         }
       />
       <TooltipPopup>{label}</TooltipPopup>
@@ -111,15 +131,40 @@ function NotesToolbar() {
   const [editor] = useLexicalComposerContext();
   const [selectionActions, setSelectionActions] = useState(() =>
     resolveProjectNoteSelectionActions({
+      hasRangeSelection: false,
       hasExpandedSelection: false,
+      blockKind: "paragraph",
+      bold: false,
+      italic: false,
+      inlineCode: false,
     }),
   );
   const updateSelectionActions = useCallback(() => {
     const selection = $getSelection();
-    const hasExpandedSelection = $isRangeSelection(selection) && !selection.isCollapsed();
+    const hasRangeSelection = $isRangeSelection(selection);
+    const topLevel = hasRangeSelection ? selection.anchor.getNode().getTopLevelElement() : null;
+    let blockKind: ProjectNoteBlockKind = "paragraph";
+    if ($isHeadingNode(topLevel) && topLevel.getTag() === "h2") {
+      blockKind = "heading-2";
+    } else if ($isListNode(topLevel)) {
+      const listType = topLevel.getListType();
+      blockKind =
+        listType === "check"
+          ? "check-list"
+          : listType === "number"
+            ? "numbered-list"
+            : "bullet-list";
+    } else if (topLevel?.getType() === "quote") {
+      blockKind = "quote";
+    }
     setSelectionActions(
       resolveProjectNoteSelectionActions({
-        hasExpandedSelection,
+        hasRangeSelection,
+        hasExpandedSelection: hasRangeSelection && !selection.isCollapsed(),
+        blockKind,
+        bold: hasRangeSelection && selection.hasFormat("bold"),
+        italic: hasRangeSelection && selection.hasFormat("italic"),
+        inlineCode: hasRangeSelection && selection.hasFormat("code"),
       }),
     );
   }, []);
@@ -142,11 +187,17 @@ function NotesToolbar() {
   }, [editor, updateSelectionActions]);
   const format = (kind: "bold" | "italic" | "code") =>
     editor.dispatchCommand(FORMAT_TEXT_COMMAND, kind);
-  const heading = () => {
+  const setBlock = (kind: "paragraph" | "heading-2" | "quote") => {
     editor.update(() => {
       const selection = $getSelection();
       if ($isRangeSelection(selection)) {
-        $setBlocksType(selection, () => $createHeadingNode("h2"));
+        $setBlocksType(selection, () =>
+          kind === "heading-2"
+            ? $createHeadingNode("h2")
+            : kind === "quote"
+              ? $createQuoteNode()
+              : $createParagraphNode(),
+        );
       }
     });
   };
@@ -156,37 +207,96 @@ function NotesToolbar() {
       aria-label="Note formatting"
       role="group"
     >
-      <ToolbarButton label="Heading" onClick={heading}>
+      <ToolbarToggle
+        label="Heading 2"
+        pressed={selectionActions.heading2Active}
+        disabled={!selectionActions.canFormat}
+        onPressedChange={(pressed) => setBlock(pressed ? "heading-2" : "paragraph")}
+      >
         <Heading2Icon />
-      </ToolbarButton>
-      <ToolbarButton label="Bold" onClick={() => format("bold")}>
+      </ToolbarToggle>
+      <ToolbarToggle
+        label="Bold"
+        pressed={selectionActions.boldActive}
+        disabled={!selectionActions.canFormat}
+        onPressedChange={() => format("bold")}
+      >
         <BoldIcon />
-      </ToolbarButton>
-      <ToolbarButton label="Italic" onClick={() => format("italic")}>
+      </ToolbarToggle>
+      <ToolbarToggle
+        label="Italic"
+        pressed={selectionActions.italicActive}
+        disabled={!selectionActions.canFormat}
+        onPressedChange={() => format("italic")}
+      >
         <ItalicIcon />
-      </ToolbarButton>
-      <ToolbarButton
+      </ToolbarToggle>
+      <ToolbarToggle
         label="Bullet list"
-        onClick={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}
+        pressed={selectionActions.bulletListActive}
+        disabled={!selectionActions.canFormat}
+        onPressedChange={() => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined)}
       >
         <ListIcon />
-      </ToolbarButton>
-      <ToolbarButton
+      </ToolbarToggle>
+      <ToolbarToggle
         label="Checklist"
-        onClick={() => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined)}
+        pressed={selectionActions.checklistActive}
+        disabled={!selectionActions.canFormat}
+        onPressedChange={() => editor.dispatchCommand(INSERT_CHECK_LIST_COMMAND, undefined)}
       >
         <CheckSquareIcon />
-      </ToolbarButton>
-      <ToolbarButton label="Code" onClick={() => format("code")}>
-        <CodeIcon />
-      </ToolbarButton>
-      <ToolbarButton
-        label="Clear formatting"
-        disabled={!selectionActions.canClearFormatting}
-        onClick={() => clearProjectNoteFormatting(editor)}
+      </ToolbarToggle>
+      <ToolbarToggle
+        label="Inline code"
+        pressed={selectionActions.inlineCodeActive}
+        disabled={!selectionActions.canFormat}
+        onPressedChange={() => format("code")}
       >
-        <RemoveFormattingIcon />
-      </ToolbarButton>
+        <CodeIcon />
+      </ToolbarToggle>
+      <Menu>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <MenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label="More formatting"
+                  />
+                }
+              />
+            }
+          >
+            <EllipsisIcon />
+          </TooltipTrigger>
+          <TooltipPopup>More formatting</TooltipPopup>
+        </Tooltip>
+        <MenuPopup align="start">
+          <MenuItem
+            disabled={!selectionActions.canFormat}
+            onClick={() => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined)}
+          >
+            <ListOrderedIcon />
+            Numbered list
+          </MenuItem>
+          <MenuItem disabled={!selectionActions.canFormat} onClick={() => setBlock("quote")}>
+            <QuoteIcon />
+            Quote
+          </MenuItem>
+          <MenuSeparator />
+          <MenuItem
+            disabled={!selectionActions.canClearFormatting}
+            onClick={() => clearProjectNoteFormatting(editor)}
+          >
+            <RemoveFormattingIcon />
+            Clear formatting
+          </MenuItem>
+        </MenuPopup>
+      </Menu>
     </div>
   );
 }
