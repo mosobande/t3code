@@ -13,6 +13,7 @@ import {
   ThreadId,
 } from "@t3tools/contracts";
 import * as NetService from "@t3tools/shared/Net";
+import { productAdministrativeScopes } from "@t3tools/shared/productAuthScopes";
 import { productProfile } from "@t3tools/shared/productProfile";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -227,7 +228,7 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
     Effect.gen(function* () {
       const { output } = yield* captureStdout(runCli(["service", "--help"], noConnectCli));
 
-      assert.include(output, "Manage the T3 Code background service.");
+      assert.include(output, `Manage the ${productProfile.productName} background service.`);
       assert.include(output, "install");
       assert.include(output, "uninstall");
       assert.include(output, "update");
@@ -407,28 +408,10 @@ it.layer(NodeServices.layer)("bin cli parsing", (it) => {
 
       assert.equal(typeof issued.sessionId, "string");
       assert.equal(typeof issued.token, "string");
-      assert.deepEqual(issued.scopes, [
-        "orchestration:read",
-        "orchestration:operate",
-        "terminal:operate",
-        "review:write",
-        "relay:read",
-        "access:read",
-        "access:write",
-        "relay:write",
-      ]);
+      assert.deepEqual(issued.scopes, productAdministrativeScopes);
       assert.equal(listed.length, 1);
       assert.equal(listed[0]?.sessionId, issued.sessionId);
-      assert.deepEqual(listed[0]?.scopes, [
-        "orchestration:read",
-        "orchestration:operate",
-        "terminal:operate",
-        "review:write",
-        "relay:read",
-        "access:read",
-        "access:write",
-        "relay:write",
-      ]);
+      assert.deepEqual(listed[0]?.scopes, productAdministrativeScopes);
       assert.equal("token" in (listed[0] ?? {}), false);
     }),
   );
