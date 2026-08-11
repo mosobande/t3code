@@ -448,6 +448,20 @@ export class DesktopBuildDistDirectoryMissingError extends Schema.TaggedErrorCla
   }
 }
 
+export class MacCodeSignatureVerificationError extends Schema.TaggedErrorClass<MacCodeSignatureVerificationError>()(
+  "MacCodeSignatureVerificationError",
+  {
+    appPath: Schema.String,
+    expectedIdentifier: Schema.String,
+    actualIdentifier: Schema.optionalKey(Schema.String),
+    teamIdentifier: Schema.optionalKey(Schema.String),
+  },
+) {
+  override get message(): string {
+    return `Signed macOS build did not contain a trusted Apple team signature: ${this.appPath}`;
+  }
+}
+
 export class DesktopBuildNoArtifactsProducedError extends Schema.TaggedErrorClass<DesktopBuildNoArtifactsProducedError>()(
   "DesktopBuildNoArtifactsProducedError",
   {
@@ -1213,6 +1227,37 @@ const runCommand = Effect.fn("runCommand")(function* (
       ...(stderr.trim() ? { stderrTail: stderr } : {}),
     });
   }
+  return { stdout, stderr };
+});
+
+export function resolveMacPackagedDirectoryName(arch: typeof BuildArch.Type): string {
+  if (arch === "arm64") return "mac-arm64";
+  if (arch === "universal") return "mac-universal";
+  return "mac";
+}
+
+const verifySignedMacApp = Effect.fn("verifySignedMacApp")(function* (input: {
+  readonly appPath: string;
+  readonly expectedIdentifier: string;
+  readonly verbose: boolean;
+}) {
+  yield* runCommand(
+    ChildProcess.make({})`/usr/bin/codesign --verify --deep --strict ${input.appPath}`,
+    { label: `codesign --verify --deep --strict ${input.appPath}`, verbose: input.verbose },
+  );
+  const detailsOutput = yield* runCommand(
+    ChildProcess.make({})`/usr/bin/codesign --display --verbose=4 ${input.appPath}`,
+    { label: `codesign --display --verbose=4 ${input.appPath}`, verbose: input.verbose },
+  );
+  const details = parseMacCodeSignatureDetails(`${detailsOutput.stdout}\n${detailsOutput.stderr}`);
+  if (!isTrustedMacCodeSignature(details, input.expectedIdentifier)) {
+    return yield* new MacCodeSignatureVerificationError({
+      appPath: input.appPath,
+      expectedIdentifier: input.expectedIdentifier,
+      ...(details.identifier ? { actualIdentifier: details.identifier } : {}),
+      ...(details.teamIdentifier ? { teamIdentifier: details.teamIdentifier } : {}),
+    });
+  }
 });
 
 const stageResourceMonitor = Effect.fn("stageResourceMonitor")(function* (input: {
@@ -1589,6 +1634,46 @@ export function resolveDesktopProductName(version: string): string {
 
 export function resolveDesktopAppId(version: string): string {
   return resolveDesktopIdentity(resolveDesktopUpdateChannel(version)).appId;
+}
+
+export interface MacCodeSignatureDetails {
+  readonly identifier: string | undefined;
+  readonly signature: "adhoc" | "signed" | "unknown";
+  readonly teamIdentifier: string | undefined;
+}
+
+export function parseMacCodeSignatureDetails(output: string): MacCodeSignatureDetails {
+  const values = new Map(
+    output
+      .split(/\r?\n/u)
+      .map((line) => line.match(/^([^=]+)=(.*)$/u))
+      .filter((match): match is RegExpMatchArray => match !== null)
+      .map((match) => [match[1]?.trim() ?? "", match[2]?.trim() ?? ""]),
+  );
+  const teamIdentifier = values.get("TeamIdentifier");
+  return {
+    identifier: values.get("Identifier"),
+    signature:
+      values.get("Signature") === "adhoc"
+        ? "adhoc"
+        : values.has("Signature size") || values.has("Authority")
+          ? "signed"
+          : "unknown",
+    teamIdentifier:
+      teamIdentifier === undefined || teamIdentifier === "not set" ? undefined : teamIdentifier,
+  };
+}
+
+export function isTrustedMacCodeSignature(
+  details: MacCodeSignatureDetails,
+  expectedIdentifier: string,
+): boolean {
+  return (
+    details.signature === "signed" &&
+    details.identifier === expectedIdentifier &&
+    details.teamIdentifier !== undefined &&
+    APPLE_TEAM_ID_PATTERN.test(details.teamIdentifier)
+  );
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2154,6 +2239,19 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
       distPath: stageDistDir,
       platform: options.platform,
       arch: options.arch,
+    });
+  }
+
+  if (options.platform === "mac" && options.signed) {
+    const appPath = path.join(
+      stageDistDir,
+      resolveMacPackagedDirectoryName(options.arch),
+      `${resolveDesktopProductName(appVersion)}.app`,
+    );
+    yield* verifySignedMacApp({
+      appPath,
+      expectedIdentifier: resolveDesktopAppId(appVersion),
+      verbose: options.verbose,
     });
   }
 

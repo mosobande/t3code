@@ -26,13 +26,13 @@ import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/enviro
 import { managedRelayAccountChanges, managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
 import { EnvironmentRpcRequestObserver } from "@t3tools/client-runtime/rpc";
 import {
-  AuthStandardClientScopes,
   type DesktopBridge,
   type DesktopEnvironmentBootstrap,
   type DesktopSshEnvironmentTarget,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
 } from "@t3tools/contracts";
 import { productProfile } from "@t3tools/shared/productProfile";
+import { productStandardClientScopes } from "@t3tools/shared/productAuthScopes";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -179,7 +179,7 @@ const capabilitiesLayer = Layer.effectContext(
   Effect.sync(() => {
     const presentation = ClientPresentation.of({
       metadata: clientMetadata(),
-      scopes: AuthStandardClientScopes,
+      scopes: productStandardClientScopes,
     });
     const cloudSession = CloudSession.of({
       clerkToken: Effect.gen(function* () {
@@ -329,7 +329,7 @@ const loadSecondaryConnectionRegistration = Effect.fn(
   const access = yield* bootstrapRemoteBearerSession({
     httpBaseUrl,
     credential: entry.bootstrapToken,
-    scopes: AuthStandardClientScopes,
+    scopes: productStandardClientScopes,
     clientMetadata: clientMetadata(),
   }).pipe(Effect.mapError(mapRemoteEnvironmentError));
   // Keep the desktop pool's stable backend id in the connection id. The

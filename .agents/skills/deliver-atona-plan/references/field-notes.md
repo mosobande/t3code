@@ -16,6 +16,16 @@ Keep build purpose, release channel, and compatibility identifier separate. A Pr
 
 Inspect every process and bundle boundary. A define that reaches the Electron main bundle can still be absent from an externalized preload dependency or a separately built child server. Prove the selected profile in each final entry artifact, not only in source configuration.
 
+Treat the packaged caller identity as an operational dependency. Shell success does not prove that an app can control the same daemon: code signing, bundle identifier, team identity, entitlements, sandbox policy, or operating-system authorization can differ. Verify the exact installed artifact before diagnosing the external tool.
+
+Separate admission, configuration, activation, and reachability in evidence. A visible setting and a persisted `true` value prove only admission and intent. Require the authoritative external postcondition and a user-visible failure or retry path when activation can fail without stopping the app.
+
+For remote bootstrap, inspect the exact command produced by the final artifact. Run that fallback on a clean supported host with no preinstalled executable, warm package cache, or private registry override. Prove that its exact package version is published and retrievable. A mock, local package, or channel tag does not prove exact-version fallback.
+
+Before choosing publication as the fix, verify the registry namespace maintainers and trusted-publisher repository. Implementation authority does not grant write authority to an upstream-owned package. If the product does not own the selected package identity, reopen the ownership decision before enabling a workflow or changing the package spec.
+
+Name the authoritative external postcondition for each integration. For a proxy feature, process startup or a valid signature is not enough: prove that the exact installed app creates the expected mapping and that a request succeeds through the advertised endpoint. Keep live mutations behind operator authority and leave the phase pending when that authority is absent.
+
 Apply the profile to staged production dependencies as well as compiled entry points. A dormant integration can pull optional native packages into `app.asar.unpacked` through the stage manifest even when no local code activates it. Keep the dependency in the richer profile and omit it from the narrow artifact through the existing packaging owner.
 
 When an artifact builder generates a reduced production manifest, pin every retained direct dependency to the exact version in the repository lockfile. Installing a ranged generated manifest without the root lockfile can silently select a newer native or platform package, make the build non-reproducible, and fail for reasons unrelated to the candidate.

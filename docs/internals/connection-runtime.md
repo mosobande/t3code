@@ -39,6 +39,19 @@ effects with that supervisor provided.
 session scope. React components do not create connections, transports, retry
 loops, or RPC clients.
 
+### Product profile composition
+
+The `local` web composition enables direct onboarding and admits exactly
+`PrimaryConnectionTarget`, `BearerConnectionTarget`, and `SshConnectionTarget`. It rejects
+`RelayConnectionTarget` before registry hydration, registration, persistence, and resolver access.
+A rejected persisted Relay record stays in platform storage, but it does not get a supervisor or
+make a managed-service request.
+
+Direct onboarding and Relay discovery use separate layer options. `remoteEnabled` controls the
+established bearer and SSH onboarding methods. `relayDiscoveryEnabled` controls only managed Relay
+discovery and follows `inheritedRemoteIntegrations`. The `upstream` profile enables both. This split
+prevents direct local access from activating Relay through ambient credentials or old records.
+
 ## Connection State
 
 The supervisor is the only retry owner.

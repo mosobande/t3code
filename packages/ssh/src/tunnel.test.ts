@@ -115,6 +115,16 @@ describe("ssh tunnel scripts", () => {
     assert.notInclude(script, "ensure $NVM_DIR/nvm.sh is available");
   });
 
+  it("prefers an explicit package spec over an installed compatibility command", () => {
+    const script = buildRemoteT3RunnerScript({
+      packageSpec: "@sigidi/cli@1.2.3",
+      nodeEngineRange: TEST_NODE_ENGINE_RANGE,
+    });
+
+    assert.include(script, "exec npx --yes '@sigidi/cli@1.2.3'");
+    assert.notInclude(script, 'exec t3 "$@"');
+  });
+
   it("does not hard-code a remote node engine range", () => {
     const script = buildRemoteT3RunnerScript();
 

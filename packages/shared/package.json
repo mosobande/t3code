@@ -15,6 +15,10 @@
       "types": "./src/productProfile.ts",
       "import": "./src/productProfile.ts"
     },
+    "./productAuthScopes": {
+      "types": "./src/productAuthScopes.ts",
+      "import": "./src/productAuthScopes.ts"
+    },
     "./model": {
       "types": "./src/model.ts",
       "import": "./src/model.ts"

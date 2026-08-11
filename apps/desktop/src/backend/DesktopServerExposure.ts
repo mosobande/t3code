@@ -536,7 +536,9 @@ export const make = Effect.gen(function* () {
 
       return {
         state: toContractState(nextState),
-        requiresRelaunch: result.changed,
+        // Enabling again is the user-visible retry path when Tailscale Serve
+        // is desired but its endpoint is still unavailable.
+        requiresRelaunch: result.changed || input.enabled,
       };
     },
   );

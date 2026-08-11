@@ -1,4 +1,5 @@
 import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
+import { productProfile, type ProductProfile } from "@t3tools/shared/productProfile";
 
 import { getPairingTokenFromUrl, setPairingTokenOnUrl } from "./pairingUrl";
 
@@ -64,11 +65,17 @@ export function hasHostedPairingRequest(url: URL = new URL(window.location.href)
   return readHostedPairingRequest(url) !== null;
 }
 
-export function buildHostedPairingUrl(input: {
-  readonly host: string;
-  readonly token: string;
-  readonly label?: string | null;
-}): string {
+export function buildHostedPairingUrl(
+  input: {
+    readonly host: string;
+    readonly token: string;
+    readonly label?: string | null;
+  },
+  profile: Pick<ProductProfile, "capabilities"> = productProfile,
+): string | null {
+  if (!profile.capabilities.hostedAuthentication) {
+    return null;
+  }
   const url = new URL("/pair", configuredHostedAppUrl());
   url.searchParams.set("host", input.host);
 

@@ -1,4 +1,5 @@
 import { assert, it } from "@effect/vitest";
+import { productProfile, resolveCliPackageName } from "@t3tools/shared/productProfile";
 
 import { detectCliRunner, formatCliCommand, suggestedPackageSpec } from "./invocation.ts";
 
@@ -42,8 +43,9 @@ it("treats stable installs as direct invocations", () => {
 });
 
 it("re-suggests the nightly channel only for nightly builds", () => {
-  assert.equal(suggestedPackageSpec("0.0.31-nightly.20260729"), "t3@nightly");
-  assert.equal(suggestedPackageSpec("0.0.31"), "t3");
+  const packageName = resolveCliPackageName(productProfile);
+  assert.equal(suggestedPackageSpec("0.0.31-nightly.20260729"), `${packageName}@nightly`);
+  assert.equal(suggestedPackageSpec("0.0.31"), packageName);
 });
 
 it("formats serve suggestions to match the launching command", () => {
@@ -53,7 +55,7 @@ it("formats serve suggestions to match the launching command", () => {
       entryPath: "/home/theo/.npm/_npx/abc/node_modules/t3/dist/bin.mjs",
       version: "0.0.31-nightly.20260729",
     }),
-    "npx t3@nightly serve",
+    `npx ${resolveCliPackageName(productProfile)}@nightly serve`,
   );
   assert.equal(
     formatCliCommand({
@@ -61,7 +63,7 @@ it("formats serve suggestions to match the launching command", () => {
       entryPath: "/tmp/bunx-1000-t3@latest/node_modules/t3/dist/bin.mjs",
       version: "0.0.31",
     }),
-    "bunx t3 serve",
+    `bunx ${resolveCliPackageName(productProfile)} serve`,
   );
   assert.equal(
     formatCliCommand({

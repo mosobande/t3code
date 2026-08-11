@@ -1,10 +1,10 @@
 import {
-  AuthStandardClientScopes,
   EnvironmentId,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
   type DesktopBridge,
   type DesktopSshEnvironmentTarget,
 } from "@t3tools/contracts";
+import { productStandardClientScopes } from "@t3tools/shared/productAuthScopes";
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
@@ -65,7 +65,7 @@ function makeBridge(
         issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
         token_type: "Bearer",
         expires_in: 3_600,
-        scope: AuthStandardClientScopes.join(" "),
+        scope: productStandardClientScopes.join(" "),
       };
     },
   } as unknown as DesktopBridge;

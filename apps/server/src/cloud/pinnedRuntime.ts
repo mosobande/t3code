@@ -1,4 +1,5 @@
 import * as Duration from "effect/Duration";
+import type { CliPackageName } from "@t3tools/shared/productProfile";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -9,8 +10,8 @@ import * as Semaphore from "effect/Semaphore";
 import * as ProcessRunner from "../processRunner.ts";
 
 /**
- * A pinned runtime is an exact `t3@<version>` npm-installed into
- * <baseDir>/runtime/versions/<version>. The boot service points its systemd
+ * A pinned runtime is an exact profile-owned CLI package npm-installed into
+ * <baseDir>/runtime/npm/<package>/versions/<version>. The boot service points its systemd
  * unit here, and server self-update installs the target version here before
  * switching over, never `npx t3`, whose cache is ephemeral and whose
  * registry fetch at boot would make startup depend on the network.
@@ -31,15 +32,27 @@ export interface PinnedRuntimePaths {
 export function pinnedRuntimePaths(
   path: Path.Path,
   baseDir: string,
+  packageName: CliPackageName,
   version: string,
 ): PinnedRuntimePaths {
-  const versionDir = path.join(baseDir, PINNED_RUNTIME_DIR, "versions", version);
+  const packageSegments = packageName.split("/");
+  const versionDir = path.join(
+    baseDir,
+    PINNED_RUNTIME_DIR,
+    "npm",
+    ...packageSegments,
+    "versions",
+    version,
+  );
   return {
     versionDir,
-    entryPath: path.join(versionDir, "node_modules", "t3", "dist", "bin.mjs"),
+    entryPath: path.join(versionDir, "node_modules", ...packageSegments, "dist", "bin.mjs"),
     sentinelPath: path.join(versionDir, ".install-complete"),
   };
 }
+
+const pinnedRuntimeIdentity = (packageName: CliPackageName, version: string): string =>
+  `${packageName}@${version}`;
 
 export class PinnedRuntimeInstallError extends Schema.TaggedErrorClass<PinnedRuntimeInstallError>()(
   "PinnedRuntimeInstallError",
@@ -71,7 +84,7 @@ export class PinnedRuntimePreflightBlockedError extends Schema.TaggedErrorClass<
 }
 
 /**
- * Installs `t3@<version>` into the pinned runtime directory unless a complete
+ * Installs the exact profile-owned CLI package into the pinned runtime directory unless a complete
  * install is already there, and returns its paths. The sentinel is written
  * only after npm exits 0; checking the entry file alone is not enough. npm
  * extracts files before running native builds (node-pty), so a killed
@@ -79,6 +92,7 @@ export class PinnedRuntimePreflightBlockedError extends Schema.TaggedErrorClass<
  */
 interface PinnedRuntimeInstallInput {
   readonly baseDir: string;
+  readonly packageName: CliPackageName;
   readonly version: string;
   readonly fs: FileSystem.FileSystem;
   readonly path: Path.Path;
@@ -92,7 +106,8 @@ const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(
   input: PinnedRuntimeInstallInput,
 ) {
   const { fs, runner } = input;
-  const paths = pinnedRuntimePaths(input.path, input.baseDir, input.version);
+  const paths = pinnedRuntimePaths(input.path, input.baseDir, input.packageName, input.version);
+  const runtimeIdentity = pinnedRuntimeIdentity(input.packageName, input.version);
   const [versionDirExists, entryExists, sentinel] = yield* Effect.all([
     fs.exists(paths.versionDir),
     fs.exists(paths.entryPath),
@@ -103,7 +118,7 @@ const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(
     ),
   );
   const alreadyPinned =
-    entryExists && Option.isSome(sentinel) && sentinel.value.trim() === input.version;
+    entryExists && Option.isSome(sentinel) && sentinel.value.trim() === runtimeIdentity;
   if (alreadyPinned) {
     yield* input.validate(paths);
     return paths;
@@ -146,16 +161,22 @@ const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(
     );
   const stagingPaths: PinnedRuntimePaths = {
     versionDir: stagingDir,
-    entryPath: input.path.join(stagingDir, "node_modules", "t3", "dist", "bin.mjs"),
+    entryPath: input.path.join(
+      stagingDir,
+      "node_modules",
+      ...input.packageName.split("/"),
+      "dist",
+      "bin.mjs",
+    ),
     sentinelPath: input.path.join(stagingDir, ".install-complete"),
   };
 
   return yield* Effect.gen(function* () {
-    const installStep = "installing the pinned t3 runtime (this can take a few minutes)";
+    const installStep = "installing the pinned CLI runtime (this can take a few minutes)";
     yield* runner
       .run({
         command: "npm",
-        args: ["install", "--prefix", stagingDir, "--no-fund", "--no-audit", `t3@${input.version}`],
+        args: ["install", "--prefix", stagingDir, "--no-fund", "--no-audit", runtimeIdentity],
         // Native dependencies may compile from source on slower machines.
         timeout: PINNED_RUNTIME_INSTALL_TIMEOUT,
       })
@@ -175,7 +196,7 @@ const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(
 
     yield* input.validate(stagingPaths);
     yield* fs
-      .writeFileString(stagingPaths.sentinelPath, `${input.version}\n`)
+      .writeFileString(stagingPaths.sentinelPath, `${runtimeIdentity}\n`)
       .pipe(
         Effect.mapError(
           (cause) =>
@@ -199,7 +220,7 @@ const installPinnedRuntime = Effect.fn("cloud.pinned_runtime.ensure_installed")(
           Effect.flatMap(([publishedEntryExists, publishedSentinel]) =>
             publishedEntryExists &&
             Option.isSome(publishedSentinel) &&
-            publishedSentinel.value.trim() === input.version
+            publishedSentinel.value.trim() === runtimeIdentity
               ? Effect.succeed(false)
               : Effect.fail(
                   new PinnedRuntimeInstallError({

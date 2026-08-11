@@ -238,7 +238,11 @@ const ReactorLayerLive = Layer.empty.pipe(
   Layer.provideMerge(ProviderCommandReactorLive),
   Layer.provideMerge(CheckpointReactorLive),
   Layer.provideMerge(ThreadDeletionReactorLive),
-  Layer.provideMerge(AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))),
+  Layer.provideMerge(
+    productProfile.capabilities.inheritedRemoteIntegrations
+      ? AgentAwarenessRelay.layer.pipe(Layer.provide(ServerSecretStore.layer))
+      : AgentAwarenessRelay.disabledLayer,
+  ),
   Layer.provideMerge(RuntimeReceiptBusLive),
 );
 

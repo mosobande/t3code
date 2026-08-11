@@ -1,7 +1,8 @@
 import type { ServerSelfUpdateOutcome } from "@t3tools/contracts";
+import { isCliPackageName, type CliPackageName } from "@t3tools/shared/productProfile";
 
-/** Protocol 2 snapshots SQLite before trials so migrations can be rolled back safely. */
-export const SERVICE_LAUNCHER_PROTOCOL = 2 as const;
+/** Protocol 3 binds every service transition to one profile-owned npm runtime package. */
+export const SERVICE_LAUNCHER_PROTOCOL = 3 as const;
 export const SERVICE_LAUNCHER_CONTEXT_ENV = "T3_SERVICE_LAUNCHER_CONTEXT";
 export const SERVICE_LAUNCHER_FILE = "service-launcher.mjs";
 export const SERVICE_STATE_FILE = "service-state.json";
@@ -18,6 +19,7 @@ export type ServiceUpdateRecord = PendingServiceUpdate | ServerSelfUpdateOutcome
 
 export interface ServiceState {
   readonly protocol: typeof SERVICE_LAUNCHER_PROTOCOL;
+  readonly runtimePackageName: CliPackageName;
   readonly activeVersion: string;
   readonly update?: ServiceUpdateRecord;
 }
@@ -143,6 +145,7 @@ export function decodeServiceState(value: unknown): ServiceState | undefined {
   const update = value.update === undefined ? undefined : decodeServiceUpdate(value.update);
   if (
     value.protocol !== SERVICE_LAUNCHER_PROTOCOL ||
+    !isCliPackageName(value.runtimePackageName) ||
     typeof value.activeVersion !== "string" ||
     !isExactServiceVersion(value.activeVersion) ||
     (value.update !== undefined && update === undefined) ||
@@ -157,6 +160,7 @@ export function decodeServiceState(value: unknown): ServiceState | undefined {
   }
   return {
     protocol: SERVICE_LAUNCHER_PROTOCOL,
+    runtimePackageName: value.runtimePackageName,
     activeVersion: value.activeVersion,
     ...(update === undefined ? {} : { update }),
   };

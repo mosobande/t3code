@@ -1,10 +1,12 @@
 import {
-  AuthAdministrativeScopes,
-  AuthStandardClientScopes,
   type AuthEnvironmentScope,
   type AuthPairingLink,
   type ServerAuthBootstrapMethod,
 } from "@t3tools/contracts";
+import {
+  productAdministrativeScopes,
+  productStandardClientScopes,
+} from "@t3tools/shared/productAuthScopes";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -315,7 +317,7 @@ export const make = Effect.gen(function* () {
     const now = yield* DateTime.now;
     yield* seedGrant(config.desktopBootstrapToken, {
       method: "desktop-bootstrap",
-      scopes: AuthAdministrativeScopes,
+      scopes: productAdministrativeScopes,
       subject: "desktop-bootstrap",
       expiresAt: DateTime.add(now, {
         milliseconds: Duration.toMillis(DESKTOP_BOOTSTRAP_TTL_HOURS),
@@ -404,7 +406,7 @@ export const make = Effect.gen(function* () {
         id,
         credential,
         method: "one-time-token",
-        scopes: input?.scopes ?? AuthStandardClientScopes,
+        scopes: input?.scopes ?? productStandardClientScopes,
         subject,
         label: input?.label ?? null,
         proofKeyThumbprint: input?.proofKeyThumbprint ?? null,
@@ -425,7 +427,7 @@ export const make = Effect.gen(function* () {
     yield* emitUpsert({
       id,
       credential,
-      scopes: input?.scopes ?? AuthStandardClientScopes,
+      scopes: input?.scopes ?? productStandardClientScopes,
       subject: input?.subject ?? "one-time-token",
       ...(input?.label ? { label: input.label } : {}),
       createdAt: now,

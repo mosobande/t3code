@@ -16,8 +16,6 @@ import * as Electron from "electron";
 
 import * as NetService from "@t3tools/shared/Net";
 import { HostProcessArchitecture, HostProcessPlatform } from "@t3tools/shared/hostProcess";
-import { resolveRemoteT3CliPackageSpec } from "@t3tools/ssh/command";
-import type { RemoteT3RunnerOptions } from "@t3tools/ssh/tunnel";
 import serverPackageJson from "../../server/package.json" with { type: "json" };
 
 import * as DesktopIpc from "./ipc/DesktopIpc.ts";
@@ -54,6 +52,7 @@ import * as DesktopPreReadyPlatform from "./app/DesktopPreReadyPlatform.ts";
 import * as DesktopShellEnvironment from "./shell/DesktopShellEnvironment.ts";
 import * as DesktopSshEnvironment from "./ssh/DesktopSshEnvironment.ts";
 import * as DesktopSshPasswordPrompts from "./ssh/DesktopSshPasswordPrompts.ts";
+import { resolveDesktopSshCliRunner } from "./ssh/DesktopSshCliRunner.ts";
 import * as DesktopState from "./app/DesktopState.ts";
 import * as DesktopTelemetryPublisher from "./telemetry/DesktopTelemetryPublisher.ts";
 import * as DesktopUpdates from "./updates/DesktopUpdates.ts";
@@ -80,25 +79,18 @@ const desktopEnvironmentLayer = Layer.unwrap(
   }),
 );
 
-const resolveDesktopSshCliRunner = (
+const desktopSshCliRunner = (
   environment: DesktopEnvironment.DesktopEnvironment["Service"],
   settings: DesktopAppSettings.DesktopSettings,
-): RemoteT3RunnerOptions => {
+) => {
   const devRemoteEntryPath = Option.getOrUndefined(environment.devRemoteT3ServerEntryPath);
-  if (environment.isDevelopment && devRemoteEntryPath !== undefined) {
-    return {
-      nodeScriptPath: devRemoteEntryPath,
-      nodeEngineRange: serverPackageJson.engines.node,
-    };
-  }
-  return {
-    packageSpec: resolveRemoteT3CliPackageSpec({
-      appVersion: environment.appVersion,
-      updateChannel: settings.updateChannel,
-      isDevelopment: environment.isDevelopment,
-    }),
+  return resolveDesktopSshCliRunner({
+    appVersion: environment.appVersion,
+    updateChannel: settings.updateChannel,
+    isDevelopment: environment.isDevelopment,
+    ...(devRemoteEntryPath === undefined ? {} : { devRemoteEntryPath }),
     nodeEngineRange: serverPackageJson.engines.node,
-  };
+  });
 };
 
 const desktopSshEnvironmentLayer = Layer.unwrap(
@@ -107,7 +99,7 @@ const desktopSshEnvironmentLayer = Layer.unwrap(
     const settings = yield* DesktopAppSettings.DesktopAppSettings;
     return DesktopSshEnvironment.layer({
       resolveCliRunner: settings.get.pipe(
-        Effect.map((currentSettings) => resolveDesktopSshCliRunner(environment, currentSettings)),
+        Effect.map((currentSettings) => desktopSshCliRunner(environment, currentSettings)),
       ),
     });
   }),

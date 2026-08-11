@@ -56,6 +56,10 @@ A compiled product profile is not deployment authority. GitHub events, EAS submi
 
 For each retained feature, identify all applicable entry points, clients, providers, contracts, reverse actions, persistence, and host integrations. Use focused repository-native tests at the nearest behavior seam. Then run the smallest real integrated app pass allowed by repository instructions.
 
+Trace operational dependency closure through the final artifact: platform support, executable or daemon, caller authorization, signing and entitlements, network reachability, remote runtime or registry availability, and cleanup. Record four separate states: admitted, configured, activated, and reachable. A persisted toggle proves intent only.
+
+Build a platform-prerequisite matrix for every retained feature. Prove the positive path on an applicable host and the truthful unavailable path elsewhere. For remote bootstrap, prove that the exact package or executable selected by the packaged app exists and is retrievable from a clean target.
+
 Compilation is not acceptance. A phase exits only when its user outcome works, negative cases fail safely, hidden integrations remain unreachable, and restart or replay preserves required state.
 
 ## Review and converge
@@ -63,6 +67,7 @@ Compilation is not acceptance. A phase exits only when its user outcome works, n
 1. Keep the live plan current after each phase and after every failed proof that changes the delivery route.
 2. Update this skill only when a new transferable guardrail or proof pattern is learned. Do not turn it into a project changelog.
 3. Run maintainability review on stable candidates, then run the required broad code review on the exact final candidate.
-4. Mark implementation `Complete` only when all in-scope features work, documentation is reconciled, no blocking proof gap remains, and the final review recommends acceptance.
+4. Treat missing core user-outcome or external-dependency proof as blocking. If operator authority is missing, report `Implemented — operational proof pending`; do not report `Complete`.
+5. Mark implementation `Complete` only when all in-scope features work, documentation is reconciled, no blocking proof gap remains, and the final review recommends acceptance.
 
 Report the exact candidate, completed phases, commands and results, integrated app evidence, disabled-integration evidence, remaining external gates, and rollback limits.

@@ -1,4 +1,5 @@
 import { HostProcessExecutablePath, HostProcessPlatform } from "@t3tools/shared/hostProcess";
+import { cliPackageName, productProfile } from "@t3tools/shared/productProfile";
 import * as Config from "effect/Config";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -54,7 +55,7 @@ export function renderBootServiceUnit(plan: BootServicePlan): string {
   // The user manager has no reliable network-online target; server networking retries itself.
   return [
     "[Unit]",
-    "Description=T3 Code server",
+    `Description=${productProfile.productName} server`,
     "StartLimitIntervalSec=300",
     "StartLimitBurst=5",
     "",
@@ -107,7 +108,7 @@ export class BootServiceInstallError extends Schema.TaggedErrorClass<BootService
   { cause: Schema.Defect() },
 ) {
   override get message(): string {
-    return "Could not set up the T3 Code background service.";
+    return `Could not set up the ${productProfile.productName} background service.`;
   }
 }
 
@@ -167,7 +168,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
   const logPath = path.join(input.logsDir, "boot-service.log");
   const launcherPath = path.join(input.baseDir, "runtime", SERVICE_LAUNCHER_FILE);
   const statePath = path.join(input.baseDir, "runtime", SERVICE_STATE_FILE);
-  const runtimePaths = pinnedRuntimePaths(path, input.baseDir, input.cliVersion);
+  const runtimePaths = pinnedRuntimePaths(path, input.baseDir, cliPackageName, input.cliVersion);
   const launcherSourcePath =
     host.launcherSourcePath ??
     path.join(path.dirname(runtimePaths.entryPath), SERVICE_LAUNCHER_FILE);
@@ -237,6 +238,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
     // Prepare every immutable artifact before stopping the installed unit.
     yield* ensurePinnedRuntimeInstalled({
       baseDir: input.baseDir,
+      packageName: cliPackageName,
       version: input.cliVersion,
       fs,
       path,
@@ -252,7 +254,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
             Effect.mapError(
               (cause) =>
                 new PinnedRuntimeInstallError({
-                  step: "verifying the pinned t3 runtime",
+                  step: "verifying the pinned CLI runtime",
                   cause,
                 }),
             ),
@@ -262,7 +264,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
                 ? Effect.void
                 : Effect.fail(
                     new PinnedRuntimeInstallError({
-                      step: "verifying the pinned t3 runtime",
+                      step: "verifying the pinned CLI runtime",
                       exitCode: Number(result.code),
                       stdoutLength: result.stdout.length,
                       stderrLength: result.stderr.length,
@@ -318,6 +320,7 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
         `${JSON.stringify(
           {
             protocol: SERVICE_LAUNCHER_PROTOCOL,
+            runtimePackageName: cliPackageName,
             activeVersion: input.cliVersion,
           } satisfies ServiceState,
           null,
@@ -398,7 +401,8 @@ export const make = Effect.fn("cloud.boot_service.make")(function* (input: {
         launcherExists &&
         runtimeEntryExists &&
         Option.isSome(runtimeSentinel) &&
-        runtimeSentinel.value.trim() === input.cliVersion &&
+        runtimeSentinel.value.trim() === `${cliPackageName}@${input.cliVersion}` &&
+        state?.runtimePackageName === cliPackageName &&
         state?.activeVersion === input.cliVersion &&
         state?.update?.status !== "pending",
       unitPath,

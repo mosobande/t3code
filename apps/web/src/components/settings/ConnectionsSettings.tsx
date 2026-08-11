@@ -9,16 +9,9 @@ import {
 import { useAtomValue } from "@effect/atom-react";
 import { type ReactNode, memo, useCallback, useId, useMemo, useState } from "react";
 import {
-  AuthAccessReadScope,
   AuthAccessWriteScope,
-  AuthAdministrativeScopes,
-  AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
-  AuthRelayReadScope,
   AuthRelayWriteScope,
-  AuthReviewWriteScope,
-  AuthStandardClientScopes,
-  AuthTerminalOperateScope,
   type AuthEnvironmentScope,
   type AdvertisedEndpoint,
   type DesktopDiscoveredSshHost,
@@ -28,6 +21,12 @@ import {
   type EnvironmentId,
 } from "@t3tools/contracts";
 import { connectionStatusText } from "@t3tools/client-runtime/connection";
+import { productProfile } from "@t3tools/shared/productProfile";
+import {
+  productAdministrativeScopes,
+  productStandardClientScopes,
+  resolveProductAuthScopes,
+} from "@t3tools/shared/productAuthScopes";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -41,6 +40,9 @@ import { resolveDesktopPairingUrl, resolveHostedPairingUrl } from "./pairingUrls
 import {
   applyWslEnableSelection,
   isQrShareableEndpoint,
+  resolvePairingScopeOptions,
+  resolveTailscaleHttpsDescription,
+  shouldShowTailscaleRetry,
   selectQrEndpointOption,
   sortDesktopClientSessions,
   sortDesktopPairingLinks,
@@ -156,52 +158,7 @@ function formatAccessTimestamp(value: string): string {
   return accessTimestampFormatter.format(parsed);
 }
 
-const PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
-  readonly scope: AuthEnvironmentScope;
-  readonly title: string;
-  readonly description: string;
-}> = [
-  {
-    scope: AuthOrchestrationReadScope,
-    title: "View environment",
-    description: "Read threads, status, diffs, and configuration.",
-  },
-  {
-    scope: AuthOrchestrationOperateScope,
-    title: "Operate tasks",
-    description: "Start tasks and perform changes in the environment.",
-  },
-  {
-    scope: AuthTerminalOperateScope,
-    title: "Use terminals",
-    description: "Create terminals and send input to running shells.",
-  },
-  {
-    scope: AuthReviewWriteScope,
-    title: "Write reviews",
-    description: "Create comments while reviewing changes.",
-  },
-  {
-    scope: AuthAccessReadScope,
-    title: "View access",
-    description: "Inspect pairing links and authorized clients.",
-  },
-  {
-    scope: AuthAccessWriteScope,
-    title: "Manage access",
-    description: "Issue and revoke credentials for other clients.",
-  },
-  {
-    scope: AuthRelayReadScope,
-    title: "View relay",
-    description: "Inspect managed relay connectivity.",
-  },
-  {
-    scope: AuthRelayWriteScope,
-    title: "Manage relay",
-    description: "Change managed tunnel connectivity.",
-  },
-];
+const PAIRING_SCOPE_OPTIONS = resolvePairingScopeOptions(productProfile);
 
 function AccessScopeSummary({
   scopes,
@@ -210,7 +167,8 @@ function AccessScopeSummary({
   readonly scopes: ReadonlyArray<AuthEnvironmentScope>;
   readonly label: string;
 }) {
-  const scopeCountLabel = `${scopes.length} ${scopes.length === 1 ? "scope" : "scopes"}`;
+  const productScopes = resolveProductAuthScopes(scopes);
+  const scopeCountLabel = `${productScopes.length} ${productScopes.length === 1 ? "scope" : "scopes"}`;
 
   return (
     <Popover>
@@ -236,7 +194,7 @@ function AccessScopeSummary({
       >
         <p className="mb-1 font-medium">Granted scopes</p>
         <div className="flex flex-col gap-0.5">
-          {scopes.map((scope) => (
+          {productScopes.map((scope) => (
             <code key={scope} className="font-mono text-foreground/85">
               {scope}
             </code>
@@ -941,7 +899,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pairingLabel, setPairingLabel] = useState("");
   const [pairingScopes, setPairingScopes] = useState<ReadonlyArray<AuthEnvironmentScope>>([
-    ...AuthStandardClientScopes,
+    ...productStandardClientScopes,
   ]);
   const [isCreatingPairingLink, setIsCreatingPairingLink] = useState(false);
 
@@ -950,7 +908,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
     try {
       await createServerPairingCredential({ label: pairingLabel, scopes: pairingScopes });
       setPairingLabel("");
-      setPairingScopes([...AuthStandardClientScopes]);
+      setPairingScopes([...productStandardClientScopes]);
       setDialogOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create pairing URL.";
@@ -990,7 +948,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
           setDialogOpen(open);
           if (!open) {
             setPairingLabel("");
-            setPairingScopes([...AuthStandardClientScopes]);
+            setPairingScopes([...productStandardClientScopes]);
           }
         }}
       >
@@ -1044,7 +1002,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
                     size="xs"
                     variant="outline"
                     disabled={isCreatingPairingLink}
-                    onClick={() => setPairingScopes([...AuthStandardClientScopes])}
+                    onClick={() => setPairingScopes([...productStandardClientScopes])}
                   >
                     Standard
                   </Button>
@@ -1641,7 +1599,9 @@ function ConfiguredCloudLinkRow({ canManageRelay }: { readonly canManageRelay: b
 }
 
 function CloudLinkRow({ canManageRelay }: { readonly canManageRelay: boolean }) {
-  return hasCloudPublicConfig() ? <ConfiguredCloudLinkRow canManageRelay={canManageRelay} /> : null;
+  return productProfile.capabilities.inheritedRemoteIntegrations && hasCloudPublicConfig() ? (
+    <ConfiguredCloudLinkRow canManageRelay={canManageRelay} />
+  ) : null;
 }
 
 function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnabled?: boolean }) {
@@ -1669,7 +1629,7 @@ function CloudRemoteEnvironmentRows({
   readonly primaryEnvironmentId: EnvironmentId | null;
   readonly savedEnvironments: ReadonlyArray<EnvironmentPresentation>;
 }) {
-  return hasCloudPublicConfig() ? (
+  return productProfile.capabilities.inheritedRemoteIntegrations && hasCloudPublicConfig() ? (
     <CloudEnvironmentConnectRows
       primaryEnvironmentId={primaryEnvironmentId}
       savedEnvironments={savedEnvironments}
@@ -1693,7 +1653,7 @@ export function ConnectionsSettings() {
   const primaryEnvironmentId = primaryEnvironment?.environmentId ?? null;
   const primarySessionState = usePrimarySessionState();
   const currentSessionScopes = desktopBridge
-    ? AuthAdministrativeScopes
+    ? productAdministrativeScopes
     : primarySessionState.data?.authenticated
       ? (primarySessionState.data.scopes ?? null)
       : null;
@@ -1796,6 +1756,7 @@ export function ConnectionsSettings() {
   const isWslConfirmDialogOpen = pendingWslChange !== null;
   const [pendingTailscaleServeEndpoint, setPendingTailscaleServeEndpoint] =
     useState<AdvertisedEndpoint | null>(null);
+  const [isTailscaleServeSetupOpen, setIsTailscaleServeSetupOpen] = useState(false);
   const [disableTailscaleServeDialogOpen, setDisableTailscaleServeDialogOpen] = useState(false);
   const [tailscaleServePortInput, setTailscaleServePortInput] = useState(
     String(DEFAULT_TAILSCALE_SERVE_PORT),
@@ -1947,6 +1908,7 @@ export function ConnectionsSettings() {
         port: parsedTailscaleServePort,
       });
       refreshDesktopNetworkAccessState();
+      setIsTailscaleServeSetupOpen(false);
       setPendingTailscaleServeEndpoint(null);
     } catch (error) {
       const message =
@@ -1965,11 +1927,12 @@ export function ConnectionsSettings() {
   }, [desktopBridge, isTailscaleServePortValid, parsedTailscaleServePort]);
 
   const handleStartTailscaleServeSetup = useCallback(
-    (endpoint: AdvertisedEndpoint) => {
+    (endpoint: AdvertisedEndpoint | null) => {
       setTailscaleServePortInput(
         String(desktopServerExposureState?.tailscaleServePort ?? DEFAULT_TAILSCALE_SERVE_PORT),
       );
       setPendingTailscaleServeEndpoint(endpoint);
+      setIsTailscaleServeSetupOpen(true);
     },
     [desktopServerExposureState?.tailscaleServePort],
   );
@@ -2000,7 +1963,7 @@ export function ConnectionsSettings() {
     }
   }, [desktopBridge, desktopServerExposureState?.tailscaleServePort]);
 
-  const handleStartTailscaleServeDisable = useCallback((_endpoint: AdvertisedEndpoint) => {
+  const handleStartTailscaleServeDisable = useCallback(() => {
     setDisableTailscaleServeDialogOpen(true);
   }, []);
 
@@ -2263,6 +2226,7 @@ export function ConnectionsSettings() {
     () => desktopAdvertisedEndpoints.find(isTailscaleHttpsEndpoint) ?? null,
     [desktopAdvertisedEndpoints],
   );
+  const tailscaleServeEnabled = desktopServerExposureState?.tailscaleServeEnabled === true;
   const visibleDesktopNetworkAdvertisedEndpoints = useMemo(
     () =>
       isLocalBackendNetworkAccessible
@@ -2834,27 +2798,42 @@ export function ConnectionsSettings() {
   const renderTailscaleRow = () => (
     <SettingsRow
       title="Tailscale HTTPS"
-      description={
-        tailscaleHttpsEndpoint
-          ? tailscaleHttpsEndpoint.status === "available"
-            ? tailscaleHttpsEndpoint.httpBaseUrl
-            : "Use Tailscale Serve to expose this backend through a MagicDNS HTTPS URL."
-          : "Start Tailscale to set up HTTPS access through MagicDNS."
-      }
+      description={resolveTailscaleHttpsDescription({
+        endpoint: tailscaleHttpsEndpoint,
+        serveEnabled: tailscaleServeEnabled,
+      })}
       control={
-        tailscaleHttpsEndpoint ? (
-          <Switch
-            checked={tailscaleHttpsEndpoint.status === "available"}
-            disabled={isUpdatingTailscaleServe}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                handleStartTailscaleServeSetup(tailscaleHttpsEndpoint);
-                return;
-              }
-              handleStartTailscaleServeDisable(tailscaleHttpsEndpoint);
-            }}
-            aria-label="Enable Tailscale HTTPS"
-          />
+        tailscaleHttpsEndpoint || tailscaleServeEnabled ? (
+          <div className="flex items-center gap-2">
+            {shouldShowTailscaleRetry({
+              endpoint: tailscaleHttpsEndpoint,
+              serveEnabled: tailscaleServeEnabled,
+            }) ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isUpdatingTailscaleServe}
+                onClick={() => handleStartTailscaleServeSetup(tailscaleHttpsEndpoint)}
+              >
+                Retry
+              </Button>
+            ) : null}
+            <Switch
+              checked={tailscaleServeEnabled}
+              disabled={isUpdatingTailscaleServe}
+              onCheckedChange={(checked) => {
+                if (checked && tailscaleHttpsEndpoint) {
+                  handleStartTailscaleServeSetup(tailscaleHttpsEndpoint);
+                  return;
+                }
+                if (!checked) {
+                  handleStartTailscaleServeDisable();
+                }
+              }}
+              aria-label="Enable Tailscale HTTPS"
+            />
+          </div>
         ) : null
       }
     />
@@ -3225,9 +3204,10 @@ export function ConnectionsSettings() {
             </AlertDialogPopup>
           </AlertDialog>
           <Dialog
-            open={pendingTailscaleServeEndpoint !== null}
+            open={isTailscaleServeSetupOpen}
             onOpenChange={(open) => {
               if (isUpdatingTailscaleServe) return;
+              setIsTailscaleServeSetupOpen(open);
               if (!open) setPendingTailscaleServeEndpoint(null);
             }}
           >

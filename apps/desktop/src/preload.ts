@@ -54,7 +54,7 @@ function unwrapEnsureSshEnvironmentResult(result: unknown) {
   return result as Awaited<ReturnType<DesktopBridge["ensureSshEnvironment"]>>;
 }
 
-const remoteDesktopBridge = {
+const remoteEnvironmentDesktopBridge = {
   getConnectionCatalog: () => ipcRenderer.invoke(IpcChannels.GET_CONNECTION_CATALOG_CHANNEL),
   setConnectionCatalog: (catalog) =>
     ipcRenderer.invoke(IpcChannels.SET_CONNECTION_CATALOG_CHANNEL, catalog),
@@ -91,8 +91,14 @@ const remoteDesktopBridge = {
   },
   resolveSshPasswordPrompt: (requestId, password) =>
     ipcRenderer.invoke(IpcChannels.RESOLVE_SSH_PASSWORD_PROMPT_CHANNEL, { requestId, password }),
+} satisfies Partial<DesktopBridge>;
+
+const tailscaleDesktopBridge = {
   setTailscaleServeEnabled: (input) =>
     ipcRenderer.invoke(IpcChannels.SET_TAILSCALE_SERVE_ENABLED_CHANNEL, input),
+} satisfies Partial<DesktopBridge>;
+
+const wslDesktopBridge = {
   getWslState: () => ipcRenderer.invoke(IpcChannels.GET_WSL_STATE_CHANNEL),
   setWslBackendEnabled: (enabled) =>
     ipcRenderer.invoke(IpcChannels.SET_WSL_BACKEND_ENABLED_CHANNEL, enabled),
@@ -109,7 +115,9 @@ const lanMobilePairingDesktopBridge = {
 
 contextBridge.exposeInMainWorld("desktopBridge", {
   ...(productProfile.capabilities.lanMobilePairing ? lanMobilePairingDesktopBridge : {}),
-  ...(productProfile.capabilities.inheritedRemoteIntegrations ? remoteDesktopBridge : {}),
+  ...(productProfile.capabilities.remoteEnvironments ? remoteEnvironmentDesktopBridge : {}),
+  ...(productProfile.capabilities.tailscaleExposure ? tailscaleDesktopBridge : {}),
+  ...(productProfile.capabilities.wsl ? wslDesktopBridge : {}),
   getAppBranding: () => {
     const result = ipcRenderer.sendSync(IpcChannels.GET_APP_BRANDING_CHANNEL);
     if (typeof result !== "object" || result === null) {

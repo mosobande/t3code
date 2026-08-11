@@ -142,10 +142,10 @@ function RootRouteView() {
           <>
             <RelayClientInstallDialog />
             <ConnectOnboardingDialog />
-            <SshPasswordPromptDialog />
             <HostedStaticEnvironmentBootstrap />
           </>
         ) : null}
+        {productProfile.capabilities.remoteEnvironments ? <SshPasswordPromptDialog /> : null}
         <SlowRpcRequestToastCoordinator />
         {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
         {primaryEnvironmentAuthenticated ? <ProviderUpdateLaunchNotification /> : null}

@@ -54,6 +54,14 @@ export class AgentAwarenessRelay extends Context.Service<
   }
 >()("t3/relay/AgentAwarenessRelay") {}
 
+export const disabledLayer = Layer.succeed(
+  AgentAwarenessRelay,
+  AgentAwarenessRelay.of({
+    publishThread: () => Effect.void,
+    start: () => Effect.void,
+  }),
+);
+
 export function eventThreadId(event: OrchestrationEvent): ThreadId | null {
   const payload = event.payload as { readonly threadId?: unknown };
   if (typeof payload.threadId === "string") {

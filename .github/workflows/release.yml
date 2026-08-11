@@ -104,6 +104,64 @@ jobs:
           ! find "$output_dir" -maxdepth 1 -type f \
             \( -name '*.exe' -o -name '*.AppImage' -o -name '*.blockmap' -o -name '*.yml' \) | grep -q .
 
+  build_cli_resource_monitors:
+    name: Build CLI resource monitor (${{ matrix.resource_key }})
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            rust_target: aarch64-apple-darwin
+            resource_key: darwin-arm64
+            binary_name: t3-resource-monitor
+          - runner: macos-15
+            rust_target: x86_64-apple-darwin
+            resource_key: darwin-x64
+            binary_name: t3-resource-monitor
+          - runner: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            resource_key: linux-x64
+            binary_name: t3-resource-monitor
+          - runner: windows-2025
+            rust_target: x86_64-pc-windows-msvc
+            resource_key: win32-x64
+            binary_name: t3-resource-monitor.exe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            native/resource-monitor
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Build resource monitor
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build \
+            --locked \
+            --manifest-path native/resource-monitor/Cargo.toml \
+            --release \
+            --target "${{ matrix.rust_target }}"
+          mkdir -p resource-monitor-publish
+          cp \
+            "native/resource-monitor/target/${{ matrix.rust_target }}/release/${{ matrix.binary_name }}" \
+            resource-monitor-publish/
+
+      - name: Upload resource monitor
+        uses: actions/upload-artifact@v7
+        with:
+          name: sigidi-cli-resource-monitor-${{ matrix.resource_key }}
+          path: resource-monitor-publish/${{ matrix.binary_name }}
+          if-no-files-found: error
+
   # Retained upstream automation is source-only. A product profile is not
   # publication authority, so no event can run these jobs.
   check_changes:
@@ -751,25 +809,23 @@ jobs:
           if-no-files-found: error
 
   publish_cli:
-    if: ${{ false }}
-    # Re-enable with: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build.result == 'success' }}
-    name: Publish CLI to npm
-    needs: [preflight, relay_public_config, build]
-    runs-on: blacksmith-4vcpu-ubuntu-2404 # blacksmith-8vcpu-ubuntu-2404
-    timeout-minutes: 10
+    name: Publish SIGIDI CLI to npm
+    needs: [release_metadata, rehearse, build_cli_resource_monitors]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: npm
     permissions:
       contents: read
       id-token: write
     env:
-      T3CODE_CLERK_PUBLISHABLE_KEY: ${{ needs.relay_public_config.outputs.clerk_publishable_key }}
-      T3CODE_CLERK_JWT_TEMPLATE: ${{ needs.relay_public_config.outputs.clerk_jwt_template }}
-      T3CODE_CLERK_CLI_OAUTH_CLIENT_ID: ${{ needs.relay_public_config.outputs.clerk_cli_oauth_client_id }}
-      T3CODE_RELAY_URL: ${{ needs.relay_public_config.outputs.relay_url }}
+      SIGIDI_BUILD_PROFILE: local
+      CLI_DIST_TAG: ${{ needs.release_metadata.outputs.channel == 'nightly' && 'nightly' || 'latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ needs.preflight.outputs.ref }}
           sparse-checkout: |
             /*
             !/.repos/
@@ -786,22 +842,8 @@ jobs:
               - --filter=@t3tools/web...
               - --filter=@t3tools/scripts...
 
-      - name: Download relay client tracing config
-        uses: actions/download-artifact@v8
-        with:
-          name: relay-client-tracing-config
-          path: ${{ runner.temp }}/relay-client-tracing
-
-      - name: Load relay client tracing config
-        shell: bash
-        run: |
-          config_path="$RUNNER_TEMP/relay-client-tracing/relay-client-tracing.env"
-          tracing_token="$(sed -n 's/^T3CODE_RELAY_CLIENT_OTLP_TRACES_TOKEN=//p' "$config_path")"
-          echo "::add-mask::$tracing_token"
-          cat "$config_path" >> "$GITHUB_ENV"
-
       - name: Align package versions to release version
-        run: node scripts/update-release-package-versions.ts "${{ needs.preflight.outputs.version }}"
+        run: node scripts/update-release-package-versions.ts "${{ needs.release_metadata.outputs.version }}"
 
       - name: Build web package
         run: vp run --filter @t3tools/web build
@@ -812,15 +854,15 @@ jobs:
       - name: Download resource monitors
         uses: actions/download-artifact@v8
         with:
-          pattern: resource-monitor-*
+          pattern: sigidi-cli-resource-monitor-*
           path: ${{ runner.temp }}/resource-monitors
 
       - name: Bundle resource monitors into CLI package
         shell: bash
         run: |
           set -euo pipefail
-          for artifact_dir in "$RUNNER_TEMP"/resource-monitors/resource-monitor-*; do
-            resource_key="${artifact_dir##*/resource-monitor-}"
+          for artifact_dir in "$RUNNER_TEMP"/resource-monitors/sigidi-cli-resource-monitor-*; do
+            resource_key="${artifact_dir##*/sigidi-cli-resource-monitor-}"
             target_dir="apps/server/dist/resource-monitor/${resource_key}"
             mkdir -p "$target_dir"
             cp "$artifact_dir"/t3-resource-monitor* "$target_dir/"
@@ -828,7 +870,7 @@ jobs:
           done
 
       - name: Publish CLI package
-        run: node apps/server/scripts/cli.ts publish --tag "${{ needs.preflight.outputs.cli_dist_tag }}" --app-version "${{ needs.preflight.outputs.version }}" --verbose
+        run: node apps/server/scripts/cli.ts publish --tag "$CLI_DIST_TAG" --app-version "${{ needs.release_metadata.outputs.version }}" --verbose
 
   release:
     name: Publish GitHub Release

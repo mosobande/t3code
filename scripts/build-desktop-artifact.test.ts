@@ -29,6 +29,8 @@ import {
   pinStageDependenciesToLockfile,
   resolveClerkPasskeyNativeArtifacts,
   resolveMacPasskeySigningConfiguration,
+  parseMacCodeSignatureDetails,
+  isTrustedMacCodeSignature,
   resolveDesktopRuntimeDependencies,
   resolveFffNativeDependencies,
   resolveBuildOptions,
@@ -71,6 +73,29 @@ function mockProcess(exitCode: number) {
 it("allows stale build-output reuse only for the non-publishable maintainer profile", () => {
   assert.isFalse(canReuseDesktopBuildOutputs(resolveProductProfile("local")));
   assert.isTrue(canReuseDesktopBuildOutputs(resolveProductProfile("upstream")));
+});
+
+it("accepts only a macOS signature with the expected identity and Apple team", () => {
+  const signed =
+    parseMacCodeSignatureDetails(`Executable=/Applications/SIGIDI Nightly.app/Contents/MacOS/SIGIDI Nightly
+Identifier=com.quantipixels.sigidi.nightly
+Signature size=4789
+Authority=Apple Development: SIGIDI Developer (ABCDEFGHIJ)
+TeamIdentifier=ABCDEFGHIJ
+`);
+  const adHoc = parseMacCodeSignatureDetails(`Identifier=com.quantipixels.sigidi.nightly
+Signature=adhoc
+TeamIdentifier=not set
+`);
+
+  assert.deepStrictEqual(signed, {
+    identifier: "com.quantipixels.sigidi.nightly",
+    signature: "signed",
+    teamIdentifier: "ABCDEFGHIJ",
+  });
+  assert.isTrue(isTrustedMacCodeSignature(signed, "com.quantipixels.sigidi.nightly"));
+  assert.isFalse(isTrustedMacCodeSignature(signed, "com.quantipixels.sigidi"));
+  assert.isFalse(isTrustedMacCodeSignature(adHoc, "com.quantipixels.sigidi.nightly"));
 });
 
 function iconResizeSpawnerLayer(
