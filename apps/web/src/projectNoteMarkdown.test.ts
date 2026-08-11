@@ -41,4 +41,55 @@ describe("project note Markdown", () => {
         .read(() => $convertToMarkdownString(PROJECT_NOTE_MARKDOWN_TRANSFORMERS)),
     ).toBe("- [x] Finished\n- [ ] Follow up");
   });
+
+  it("round-trips existing links after link authoring tools are removed", () => {
+    const editor = createEditor({
+      nodes: [
+        HeadingNode,
+        QuoteNode,
+        ListNode,
+        ListItemNode,
+        LinkNode,
+        CodeNode,
+        CodeHighlightNode,
+      ],
+      onError: (error) => {
+        throw error;
+      },
+    });
+
+    editor.update(
+      () => {
+        $convertFromMarkdownString(
+          "Read [the guide](https://example.com/guide).",
+          PROJECT_NOTE_MARKDOWN_TRANSFORMERS,
+        );
+      },
+      { discrete: true },
+    );
+
+    expect(editor.getEditorState().toJSON()).toMatchObject({
+      root: {
+        children: [
+          {
+            children: [
+              { text: "Read ", type: "text" },
+              {
+                children: [{ text: "the guide", type: "text" }],
+                type: "link",
+                url: "https://example.com/guide",
+              },
+              { text: ".", type: "text" },
+            ],
+            type: "paragraph",
+          },
+        ],
+      },
+    });
+    expect(
+      editor
+        .getEditorState()
+        .read(() => $convertToMarkdownString(PROJECT_NOTE_MARKDOWN_TRANSFORMERS)),
+    ).toBe("Read [the guide](https://example.com/guide).");
+  });
 });

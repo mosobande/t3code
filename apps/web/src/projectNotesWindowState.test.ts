@@ -6,62 +6,9 @@ import {
   persistProjectNotesWindowRect,
   projectNotePendingDraftStorageKey,
   projectNotesWindowStorageKey,
-  projectNotesTargetMatchesActiveProject,
-  resolveProjectNotesNavigation,
 } from "./projectNotesWindowState";
 
 describe("project notes window state", () => {
-  it("carries a pinned note to another thread in the same project", () => {
-    expect(
-      resolveProjectNotesNavigation({
-        ownerProjectKey: "local:project-a",
-        activeProjectKey: "local:project-a",
-        ownerThreadKey: "local:thread-a",
-        activeThreadKey: "local:thread-b",
-        keepOpenAcrossThreads: true,
-      }),
-    ).toEqual({ action: "carry", resetKeepOpen: false });
-  });
-
-  it("leaves an unpinned note in its original thread", () => {
-    expect(
-      resolveProjectNotesNavigation({
-        ownerProjectKey: "local:project-a",
-        activeProjectKey: "local:project-a",
-        ownerThreadKey: "local:thread-a",
-        activeThreadKey: "local:thread-b",
-        keepOpenAcrossThreads: false,
-      }),
-    ).toEqual({ action: "leave", resetKeepOpen: false });
-  });
-
-  it("closes a pinned note and resets the pin at a project boundary", () => {
-    expect(
-      resolveProjectNotesNavigation({
-        ownerProjectKey: "local:project-a",
-        activeProjectKey: "local:project-b",
-        ownerThreadKey: "local:thread-a",
-        activeThreadKey: "local:thread-c",
-        keepOpenAcrossThreads: true,
-      }),
-    ).toEqual({ action: "close", resetKeepOpen: true });
-  });
-
-  it("hides a floating note synchronously at a project boundary", () => {
-    expect(
-      projectNotesTargetMatchesActiveProject({
-        targetProjectKey: "local:project-a",
-        activeProjectKey: "local:project-b",
-      }),
-    ).toBe(false);
-    expect(
-      projectNotesTargetMatchesActiveProject({
-        targetProjectKey: "local:project-a",
-        activeProjectKey: "local:project-a",
-      }),
-    ).toBe(true);
-  });
-
   it("keeps a restored window inside the viewport", () => {
     expect(
       clampProjectNotesWindowRect(
@@ -76,7 +23,7 @@ describe("project notes window state", () => {
     });
   });
 
-  it("separates saved window geometry by environment and project", () => {
+  it("shares saved window geometry across threads of one environment and project", () => {
     expect(projectNotesWindowStorageKey("local", "project-a")).toBe(
       "t3.project-notes.window.v1:local:project-a",
     );

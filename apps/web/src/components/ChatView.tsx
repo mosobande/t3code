@@ -29,7 +29,6 @@ import {
 import { effectiveSettled, effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
 import {
   parseScopedThreadKey,
-  scopedProjectKey,
   scopedThreadKey,
   scopeProjectRef,
   scopeThreadRef,
@@ -241,12 +240,7 @@ import { ExpandedImageDialog } from "./chat/ExpandedImageDialog";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { MessagesTimeline } from "./chat/MessagesTimeline";
 import { ChatHeader } from "./chat/ChatHeader";
-import type { ProjectNotesDisplayMode } from "./projectNotes/projectNotesConstants";
-import { subscribeProjectNotesAction } from "./projectNotes/projectNotesActionBus";
-import {
-  projectNotesTargetMatchesActiveProject,
-  resolveProjectNotesNavigation,
-} from "~/projectNotesWindowState";
+import { useProjectNotesLifecycle } from "~/sigidi/projectNotes/ProjectNotesLifecycle";
 import { PanelLayoutControls, RightPanelMaximizeControl } from "./chat/PanelLayoutControls";
 import { type ExpandedImagePreview } from "./chat/ExpandedImagePreview";
 import { NoActiveThreadState } from "./NoActiveThreadState";
@@ -269,15 +263,6 @@ import {
   runMobileComposerTransition,
 } from "./chat/draftHeroTransition";
 
-interface ProjectNotesTarget {
-  readonly environmentId: EnvironmentId;
-  readonly projectId: ProjectId;
-  readonly projectName: string;
-}
-
-function projectNotesTargetKey(target: ProjectNotesTarget): string {
-  return `${target.environmentId}:${target.projectId}`;
-}
 import {
   MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
   branchMismatchKey,
@@ -421,11 +406,6 @@ const PreviewPanel = lazy(() =>
 );
 const DiffPanel = lazy(() => import("./DiffPanel"));
 const FilePreviewPanel = lazy(() => import("./files/FilePreviewPanel"));
-const ProjectNotesSurface = lazy(() =>
-  import("./projectNotes/ProjectNotesSurface").then((module) => ({
-    default: module.ProjectNotesSurface,
-  })),
-);
 const EMPTY_PENDING_FILE_SURFACE_IDS: ReadonlySet<string> = new Set();
 const TYPE_TO_FOCUS_EDITABLE_SELECTOR = [
   "input",
@@ -1314,11 +1294,6 @@ function ChatViewContent(props: ChatViewProps) {
   const localComposerRef = useRef<ChatComposerHandle | null>(null);
   const composerRef = useComposerHandleContext() ?? localComposerRef;
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [floatingProjectNotesTarget, setFloatingProjectNotesTarget] =
-    useState<ProjectNotesTarget | null>(null);
-  const [keepProjectNotesOpenAcrossThreads, setKeepProjectNotesOpenAcrossThreads] = useState(false);
-  const projectNotesOwnerProjectKeyRef = useRef<string | null>(null);
-  const projectNotesOwnerThreadRef = useRef<ScopedThreadRef | null>(null);
   const [expandedImage, setExpandedImage] = useState<ExpandedImagePreview | null>(null);
   const [optimisticUserMessages, setOptimisticUserMessages] = useState<ChatMessage[]>([]);
   const optimisticUserMessagesRef = useRef(optimisticUserMessages);
@@ -1662,34 +1637,23 @@ function ChatViewContent(props: ChatViewProps) {
   const handleNewThreadInActiveProject = useCallback(() => {
     startNewThreadForProject(activeProjectRef, handleNewThread);
   }, [activeProjectRef, handleNewThread]);
-  const activeProjectNotesTarget = useMemo<ProjectNotesTarget | null>(
+  const activeProjectNotesContext = useMemo(
     () =>
-      activeProject
+      activeThreadRef && activeProject
         ? {
-            environmentId: activeProject.environmentId,
-            projectId: activeProject.id,
-            projectName: activeProject.title,
+            project: {
+              environmentId: activeProject.environmentId,
+              projectId: activeProject.id,
+              projectName: activeProject.title,
+            },
+            threadRef: activeThreadRef,
           }
         : null,
-    [activeProject],
+    [activeProject, activeThreadRef],
   );
-  const activeProjectNotesTargetKey = activeProjectRef ? scopedProjectKey(activeProjectRef) : null;
-  const visibleFloatingProjectNotesTarget = projectNotesTargetMatchesActiveProject({
-    targetProjectKey: floatingProjectNotesTarget
-      ? projectNotesTargetKey(floatingProjectNotesTarget)
-      : null,
-    activeProjectKey: activeProjectNotesTargetKey,
-  })
-    ? floatingProjectNotesTarget
-    : null;
-  const dockedProjectNotesSurfacePresent = rightPanelState.surfaces.some(
-    (surface) => surface.kind === "notes",
-  );
-  const projectNotesMode: ProjectNotesDisplayMode | null = visibleFloatingProjectNotesTarget
-    ? "floating"
-    : dockedProjectNotesSurfacePresent
-      ? "panel"
-      : null;
+  const projectNotes = useProjectNotesLifecycle({
+    active: activeProjectNotesContext,
+  });
   const activeEnvironmentShell = useEnvironmentQuery(
     activeThread ? environmentShell.stateAtom(activeThread.environmentId) : null,
   );
@@ -1730,70 +1694,6 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeEnvironmentBootstrapComplete) return;
     useRightPanelStore.getState().reconcileFileSurfaces(activeThreadRef, activeProject !== null);
   }, [activeEnvironmentBootstrapComplete, activeProject, activeThreadRef]);
-
-  useEffect(() => {
-    const ownerProjectKey = projectNotesOwnerProjectKeyRef.current;
-    const ownerThreadRef = projectNotesOwnerThreadRef.current;
-    if (ownerProjectKey === null || ownerThreadRef === null) {
-      if (
-        !floatingProjectNotesTarget &&
-        dockedProjectNotesSurfacePresent &&
-        activeProjectNotesTargetKey !== null &&
-        activeThreadRef
-      ) {
-        projectNotesOwnerProjectKeyRef.current = activeProjectNotesTargetKey;
-        projectNotesOwnerThreadRef.current = activeThreadRef;
-      }
-      return;
-    }
-
-    const navigation = resolveProjectNotesNavigation({
-      ownerProjectKey,
-      activeProjectKey: activeProjectNotesTargetKey,
-      ownerThreadKey: scopedThreadKey(ownerThreadRef),
-      activeThreadKey: activeThreadRef ? scopedThreadKey(activeThreadRef) : null,
-      keepOpenAcrossThreads: keepProjectNotesOpenAcrossThreads,
-    });
-
-    if (navigation.action === "stay") return;
-    if (navigation.action === "carry" && activeThreadRef) {
-      if (floatingProjectNotesTarget) {
-        projectNotesOwnerThreadRef.current = activeThreadRef;
-        return;
-      }
-      useRightPanelStore.getState().open(activeThreadRef, "notes");
-      if (scopedThreadKey(activeThreadRef) !== scopedThreadKey(ownerThreadRef)) {
-        useRightPanelStore.getState().closeSurface(ownerThreadRef, "notes");
-      }
-      projectNotesOwnerProjectKeyRef.current = ownerProjectKey;
-      projectNotesOwnerThreadRef.current = activeThreadRef;
-      return;
-    }
-
-    if (navigation.action === "leave") {
-      setFloatingProjectNotesTarget(null);
-      projectNotesOwnerProjectKeyRef.current = null;
-      projectNotesOwnerThreadRef.current = null;
-      return;
-    }
-
-    useRightPanelStore.getState().closeSurface(ownerThreadRef, "notes");
-    if (activeThreadRef && scopedThreadKey(activeThreadRef) !== scopedThreadKey(ownerThreadRef)) {
-      useRightPanelStore.getState().closeSurface(activeThreadRef, "notes");
-    }
-    setFloatingProjectNotesTarget(null);
-    projectNotesOwnerProjectKeyRef.current = null;
-    projectNotesOwnerThreadRef.current = null;
-    if (navigation.resetKeepOpen) {
-      setKeepProjectNotesOpenAcrossThreads(false);
-    }
-  }, [
-    activeProjectNotesTargetKey,
-    activeThreadRef,
-    dockedProjectNotesSurfacePresent,
-    floatingProjectNotesTarget,
-    keepProjectNotesOpenAcrossThreads,
-  ]);
 
   // Compute the list of environments this logical project spans, used to
   // drive the environment picker in BranchToolbar.
@@ -3287,57 +3187,8 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeProject) return;
     useRightPanelStore.getState().open(activeThreadRef, "files");
   }, [activeProject, activeThreadRef]);
-  const addProjectNotesSurface = useCallback(() => {
-    if (!activeThreadRef || !activeProjectNotesTarget) return;
-    setFloatingProjectNotesTarget(null);
-    projectNotesOwnerProjectKeyRef.current = projectNotesTargetKey(activeProjectNotesTarget);
-    projectNotesOwnerThreadRef.current = activeThreadRef;
-    useRightPanelStore.getState().open(activeThreadRef, "notes");
-  }, [activeProjectNotesTarget, activeThreadRef]);
-  const closeProjectNotes = useCallback(() => {
-    const ownerThreadRef = projectNotesOwnerThreadRef.current ?? activeThreadRef;
-    projectNotesOwnerProjectKeyRef.current = null;
-    projectNotesOwnerThreadRef.current = null;
-    if (ownerThreadRef) {
-      useRightPanelStore.getState().closeSurface(ownerThreadRef, "notes");
-    }
-    setFloatingProjectNotesTarget(null);
-    setKeepProjectNotesOpenAcrossThreads(false);
-  }, [activeThreadRef]);
-  const changeProjectNotesMode = useCallback(
-    (nextMode: ProjectNotesDisplayMode) => {
-      if (nextMode === projectNotesMode) return;
-      if (nextMode === "floating") {
-        if (!activeProjectNotesTarget) return;
-        const ownerThreadRef = projectNotesOwnerThreadRef.current;
-        if (ownerThreadRef) {
-          useRightPanelStore.getState().closeSurface(ownerThreadRef, "notes");
-        }
-        projectNotesOwnerProjectKeyRef.current = projectNotesTargetKey(activeProjectNotesTarget);
-        projectNotesOwnerThreadRef.current = activeThreadRef;
-        setFloatingProjectNotesTarget(activeProjectNotesTarget);
-        return;
-      }
-      if (!activeThreadRef || !activeProjectNotesTarget) return;
-      setFloatingProjectNotesTarget(null);
-      projectNotesOwnerProjectKeyRef.current = projectNotesTargetKey(activeProjectNotesTarget);
-      projectNotesOwnerThreadRef.current = activeThreadRef;
-      useRightPanelStore.getState().open(activeThreadRef, "notes");
-    },
-    [activeProjectNotesTarget, activeThreadRef, projectNotesMode],
-  );
-  const toggleProjectNotes = useCallback(() => {
-    if (projectNotesMode === "floating" || activeRightPanelKind === "notes") {
-      closeProjectNotes();
-      return;
-    }
-    addProjectNotesSurface();
-  }, [activeRightPanelKind, addProjectNotesSurface, closeProjectNotes, projectNotesMode]);
-  const openProjectNotes = () => {
-    if (projectNotesMode === "floating") return;
-    addProjectNotesSurface();
-  };
-  useEffect(() => subscribeProjectNotesAction(() => toggleProjectNotes()), [toggleProjectNotes]);
+  const addProjectNotesSurface = projectNotes.open;
+  const openProjectNotes = projectNotes.open;
   const addAgentsSurface = useCallback(() => {
     if (!activeThreadRef) return;
     useRightPanelStore.getState().open(activeThreadRef, "agents");
@@ -3514,9 +3365,7 @@ function ChatViewContent(props: ChatViewProps) {
 
       for (const surface of surfaces) {
         if (surface.kind === "notes") {
-          projectNotesOwnerProjectKeyRef.current = null;
-          projectNotesOwnerThreadRef.current = null;
-          setKeepProjectNotesOpenAcrossThreads(false);
+          projectNotes.onPanelClosed();
         }
         if (surface.kind === "preview" && surface.resourceId) {
           void closePreviewSession({
@@ -3543,6 +3392,7 @@ function ChatViewContent(props: ChatViewProps) {
       closePreview,
       closeTerminalMutation,
       dismissPlanSidebarForCurrentTurn,
+      projectNotes.onPanelClosed,
       storeCloseTerminal,
     ],
   );
@@ -6013,7 +5863,6 @@ function ChatViewContent(props: ChatViewProps) {
       {panelToggleControls}
     </div>
   );
-  const renderedProjectNotesTarget = visibleFloatingProjectNotesTarget ?? activeProjectNotesTarget;
   const rightPanelContent = activeThreadRef ? (
     activeRightPanelSurface?.kind === "preview" ? (
       <Suspense fallback={null}>
@@ -6067,22 +5916,8 @@ function ChatViewContent(props: ChatViewProps) {
         timestampFormat={timestampFormat}
         mode="embedded"
       />
-    ) : activeRightPanelSurface?.kind === "notes" &&
-      !visibleFloatingProjectNotesTarget &&
-      renderedProjectNotesTarget ? (
-      <Suspense fallback={null}>
-        <ProjectNotesSurface
-          key={`${renderedProjectNotesTarget.environmentId}:${renderedProjectNotesTarget.projectId}`}
-          environmentId={renderedProjectNotesTarget.environmentId}
-          projectId={renderedProjectNotesTarget.projectId}
-          projectName={renderedProjectNotesTarget.projectName}
-          mode="panel"
-          keepOpenAcrossThreads={keepProjectNotesOpenAcrossThreads}
-          onModeChange={changeProjectNotesMode}
-          onKeepOpenAcrossThreadsChange={setKeepProjectNotesOpenAcrossThreads}
-          onClose={closeProjectNotes}
-        />
-      </Suspense>
+    ) : activeRightPanelSurface?.kind === "notes" ? (
+      projectNotes.panel
     ) : activeRightPanelSurface?.kind === "agents" ? (
       <AgentsPanel
         model={agentPanelModel}
@@ -6162,7 +5997,7 @@ function ChatViewContent(props: ChatViewProps) {
             onAddProjectScript={saveProjectScript}
             onUpdateProjectScript={updateProjectScript}
             onDeleteProjectScript={deleteProjectScript}
-            projectNotesOpen={projectNotesMode === "floating" || activeRightPanelKind === "notes"}
+            projectNotesOpen={projectNotes.mode === "floating" || activeRightPanelKind === "notes"}
             onOpenProjectNotes={openProjectNotes}
           />
         </header>
@@ -6567,21 +6402,7 @@ function ChatViewContent(props: ChatViewProps) {
         </RightPanelSheet>
       ) : null}
 
-      {projectNotesMode === "floating" && visibleFloatingProjectNotesTarget ? (
-        <Suspense fallback={null}>
-          <ProjectNotesSurface
-            key={`${visibleFloatingProjectNotesTarget.environmentId}:${visibleFloatingProjectNotesTarget.projectId}`}
-            environmentId={visibleFloatingProjectNotesTarget.environmentId}
-            projectId={visibleFloatingProjectNotesTarget.projectId}
-            projectName={visibleFloatingProjectNotesTarget.projectName}
-            mode="floating"
-            keepOpenAcrossThreads={keepProjectNotesOpenAcrossThreads}
-            onModeChange={changeProjectNotesMode}
-            onKeepOpenAcrossThreadsChange={setKeepProjectNotesOpenAcrossThreads}
-            onClose={closeProjectNotes}
-          />
-        </Suspense>
-      ) : null}
+      {projectNotes.floating}
 
       {expandedImage && (
         <ExpandedImageDialog
