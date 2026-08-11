@@ -304,7 +304,7 @@ describe("rightPanelStore", () => {
 
   it("keeps project notes as a singleton surface", () => {
     useRightPanelStore.getState().open(refA, "notes");
-    useRightPanelStore.getState().open(refA, "plan");
+    useRightPanelStore.getState().open(refA, "agents");
     useRightPanelStore.getState().open(refA, "notes");
 
     expect(selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
@@ -312,17 +312,17 @@ describe("rightPanelStore", () => {
       activeSurfaceId: "notes",
       surfaces: [
         { id: "notes", kind: "notes" },
-        { id: "plan", kind: "plan" },
+        { id: "agents", kind: "agents" },
       ],
     });
   });
 
   it("keeps Notes state local to each thread", () => {
     useRightPanelStore.getState().open(refA, "notes");
-    useRightPanelStore.getState().open(refB, "plan");
+    useRightPanelStore.getState().open(refB, "agents");
 
     expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("notes");
-    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refB)).toBe("plan");
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refB)).toBe("agents");
 
     useRightPanelStore.getState().open(refB, "notes");
     expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("notes");

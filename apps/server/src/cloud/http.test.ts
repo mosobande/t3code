@@ -284,6 +284,7 @@ describe("releaseManagedTunnelOnShutdown", () => {
       yield* Effect.promise(() =>
         writeServiceState(statePath, {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
+          runtimePackageName: productProfile.cliPackageName,
           activeVersion: "0.0.30",
           update,
         }),

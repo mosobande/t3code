@@ -18,7 +18,7 @@ type LocalDesktopBridge = Pick<
   | "getClientSettings"
   | "setClientSettings"
   | "pickFolder"
-  | "confirm"
+  | "pickThemeFiles"
   | "setTheme"
   | "showContextMenu"
   | "openExternal"

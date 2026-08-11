@@ -26,6 +26,6 @@ Each SIGIDI migration declares its minimum upstream migration ID and required up
 
 Remote service replacement is allowed only when both migration ledgers exactly match the candidate manifests. A pending migration in either lane requires a local service update.
 
-The pre-release supported baseline is the deterministic upstream-only fixture in `apps/server/src/persistence/fixtures/upstream-a483337a.sql`. Its metadata records the source revision, both manifests, Effect identity, fixture digest, and representative data case. Run `pnpm migrations:fixture:check` before using it as upgrade proof.
+The supported upstream-only fixture keeps the compatibility filename `apps/server/src/persistence/fixtures/upstream-a483337a.sql`. Its adjacent metadata, not the legacy filename, records the current source revision, both manifests, Effect identity, fixture digest, and representative data case. Run `pnpm migrations:fixture:check` before using it as upgrade proof.
 
 Migrations are forward-only. Prefer additive expand-and-contract changes so an older application can tolerate a newer schema. Follow [the recovery runbook](../operations/sigidi-migration-recovery.md) when validation or migration startup fails.

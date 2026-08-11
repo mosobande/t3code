@@ -13,8 +13,6 @@ import {
 } from "../lib/backgroundActivityReporter";
 import { connectionPlatformLayer } from "./platform";
 
-const snapshotLoaderLayer = Layer.merge(threadSnapshotLoaderLayer, shellSnapshotLoaderLayer);
-
 const providedConnectionPlatformLayer = connectionPlatformLayer.pipe(
   Layer.provide(runtimeContextLayer),
 );

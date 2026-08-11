@@ -192,6 +192,7 @@ function RightPanelEmptyState(props: {
       available: props.notesAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.notes,
       onClick: props.onAddNotes,
+      badgeCount: 0,
     },
     {
       label: "Agents",

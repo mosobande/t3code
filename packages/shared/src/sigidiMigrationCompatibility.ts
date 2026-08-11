@@ -6,10 +6,10 @@
  * checks and supported upgrade fixtures pass.
  */
 export const sigidiUpstreamCompatibility = {
-  testedUpstreamCommit: "a483337a02d4ac641db0219517816c300a33be6b",
+  testedUpstreamCommit: "2db08457f2f4eaaa713a067b2ea480ca2b583025",
   effectEngine: {
     version: "4.0.0-beta.103",
-    patchHash: "a18f963109656ddbeb2a99ca45f942ecf54830986259eb01ce6a970421c9c6a9",
+    patchHash: "af36b7948b6f9c56623074662b51dade5699880c1a7c71245de73e13c3185fb6",
   },
   migrations: [
     {
@@ -235,6 +235,31 @@ export const sigidiUpstreamCompatibility = {
       name: "ProjectionThreadsPinned",
       sourcePath: "apps/server/src/persistence/Migrations/036_ProjectionThreadsPinned.ts",
       sha256: "effd5f8f7f8ecd4348b306396ebee9dbb67688994c434c262c4d71aeb0157acb",
+    },
+    {
+      id: 37,
+      name: "ProjectionTurnsKeysetIndex",
+      sourcePath: "apps/server/src/persistence/Migrations/037_ProjectionTurnsKeysetIndex.ts",
+      sha256: "79e56b053aa6872fdf91aea3368d2c0a0a754c176256e6a9af852d949ba7cff5",
+    },
+    {
+      id: 38,
+      name: "ProjectionThreadsPinOrderKey",
+      sourcePath: "apps/server/src/persistence/Migrations/038_ProjectionThreadsPinOrderKey.ts",
+      sha256: "0b5bf37e0b75b6cb3cc95540e9342449b93790c4356772bdc97feea820f5266f",
+    },
+    {
+      id: 39,
+      name: "ProjectionProjectsDefaultThreadEnvMode",
+      sourcePath:
+        "apps/server/src/persistence/Migrations/039_ProjectionProjectsDefaultThreadEnvMode.ts",
+      sha256: "bd48dddf9a31cdf028995f3d9f3030a00db85e6de9231c030115d92244b46a50",
+    },
+    {
+      id: 40,
+      name: "ProjectionProjectFaviconPath",
+      sourcePath: "apps/server/src/persistence/Migrations/040_ProjectionProjectFaviconPath.ts",
+      sha256: "6c439ab1e249f906e48cb552acafd3350e9b0e809b27557923da805a7c8e308a",
     },
   ],
 } as const;
