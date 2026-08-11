@@ -90,6 +90,7 @@ SIGIDI-specific features should use standalone `sigidi` modules and narrow regis
 - [Install and first run](./docs/user/install.md)
 - [Permission modes](./docs/user/permission-modes.md)
 - [Keyboard shortcuts](./docs/user/keybindings.md)
+- [Customize a project icon](./docs/user/project-settings.md)
 - [Source-control integrations](./docs/user/source-control.md)
 - [Internal architecture](./docs/internals/overview.md)
 - [SIGIDI downstream boundary](./docs/architecture/sigidi-downstream-boundary.md)

@@ -2,6 +2,7 @@ import { Connection, type ConnectionTarget } from "@t3tools/client-runtime/conne
 import { shellSnapshotLoaderLayer } from "@t3tools/client-runtime/state/shell";
 import { threadSnapshotLoaderLayer } from "@t3tools/client-runtime/state/threads";
 import { productProfile } from "@t3tools/shared/productProfile";
+import { pullRequestDiffLoaderLayer } from "@t3tools/client-runtime/state/pull-requests";
 import * as Layer from "effect/Layer";
 import { Atom } from "effect/unstable/reactivity";
 
@@ -29,6 +30,12 @@ export const allowsTarget = (target: ConnectionTarget) => {
       return productProfile.capabilities.inheritedRemoteIntegrations;
   }
 };
+
+const snapshotLoaderLayer = Layer.mergeAll(
+  threadSnapshotLoaderLayer,
+  shellSnapshotLoaderLayer,
+  pullRequestDiffLoaderLayer,
+);
 
 export const connectionRuntimeOptions = {
   allowsTarget,
