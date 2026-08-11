@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 
 import {
   buildHostedChannelSelectionUrl,
@@ -24,15 +25,30 @@ describe("hostedPairing", () => {
     expect(hasHostedPairingRequest(url)).toBe(true);
   });
 
-  it("prefers hash tokens so generated hosted links do not put credentials in search params", () => {
+  it("does not build inherited hosted links in the local profile", () => {
+    expect(
+      buildHostedPairingUrl(
+        {
+          host: "https://backend.example.com:3773",
+          token: "pairing-token",
+        },
+        resolveProductProfile("local"),
+      ),
+    ).toBeNull();
+  });
+
+  it("prefers hash tokens for the upstream hosted profile", () => {
     vi.stubEnv("VITE_HOSTED_APP_URL", "https://preview.t3.codes");
 
     const url = new URL(
-      buildHostedPairingUrl({
-        host: "https://backend.example.com:3773",
-        token: "pairing-token",
-        label: "Workstation",
-      }),
+      buildHostedPairingUrl(
+        {
+          host: "https://backend.example.com:3773",
+          token: "pairing-token",
+          label: "Workstation",
+        },
+        resolveProductProfile("upstream"),
+      ) ?? "",
     );
 
     expect(url.origin).toBe("https://preview.t3.codes");

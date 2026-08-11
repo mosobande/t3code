@@ -2,7 +2,6 @@ import * as NodeCrypto from "node:crypto";
 import {
   AuthRelayReadScope,
   AuthRelayWriteScope,
-  AuthStandardClientScopes,
   EnvironmentCloudEndpointUnavailableError,
   EnvironmentCloudLinkStateResult,
   EnvironmentCloudRelayConfigResult,
@@ -12,6 +11,7 @@ import {
   EnvironmentHttpInternalServerError,
   EnvironmentHttpUnauthorizedError,
 } from "@t3tools/contracts";
+import { productStandardClientScopes } from "@t3tools/shared/productAuthScopes";
 import {
   RelayCloudEnvironmentHealthProofPayload,
   RelayCloudEnvironmentHealthRequest,
@@ -975,7 +975,7 @@ const cloudMintCredentialHandler = Effect.fn("environment.cloud.mintCredential")
 
     const keyPair = yield* getOrCreateEnvironmentKeyPairFromSecretStore(dependencies.secrets);
     const issued = yield* dependencies.environmentAuth.createPairingLink({
-      scopes: AuthStandardClientScopes,
+      scopes: productStandardClientScopes,
       subject: "cloud-connect",
       ttl: Duration.minutes(2),
       label: "T3 Connect connect",

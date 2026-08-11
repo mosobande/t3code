@@ -39,11 +39,23 @@ interface ManagedChild {
   readonly process: NodeChildProcess.ChildProcess;
 }
 
-const runtimePaths = (baseDir: string, version: string) => {
-  const versionDir = NodePath.join(baseDir, "runtime", "versions", version);
+const runtimePaths = (
+  baseDir: string,
+  packageName: ServiceState["runtimePackageName"],
+  version: string,
+) => {
+  const packageSegments = packageName.split("/");
+  const versionDir = NodePath.join(
+    baseDir,
+    "runtime",
+    "npm",
+    ...packageSegments,
+    "versions",
+    version,
+  );
   return {
     versionDir,
-    entryPath: NodePath.join(versionDir, "node_modules", "t3", "dist", "bin.mjs"),
+    entryPath: NodePath.join(versionDir, "node_modules", ...packageSegments, "dist", "bin.mjs"),
     sentinelPath: NodePath.join(versionDir, ".install-complete"),
   };
 };
@@ -198,14 +210,18 @@ export async function writeServiceState(filePath: string, state: ServiceState): 
   }
 }
 
-async function runtimeExists(baseDir: string, version: string): Promise<boolean> {
-  const paths = runtimePaths(baseDir, version);
+async function runtimeExists(
+  baseDir: string,
+  packageName: ServiceState["runtimePackageName"],
+  version: string,
+): Promise<boolean> {
+  const paths = runtimePaths(baseDir, packageName, version);
   try {
     const [entry, sentinel] = await Promise.all([
       NodeFSP.stat(paths.entryPath),
       NodeFSP.readFile(paths.sentinelPath, "utf8"),
     ]);
-    return entry.isFile() && sentinel.trim() === version;
+    return entry.isFile() && sentinel.trim() === `${packageName}@${version}`;
   } catch {
     return false;
   }
@@ -342,7 +358,9 @@ export class Launcher {
       await this.#returnToPrevious(update, "failed", "rollback-interrupted");
       return;
     }
-    if (!(await runtimeExists(this.#baseDir, update.targetVersion))) {
+    if (
+      !(await runtimeExists(this.#baseDir, this.#state.runtimePackageName, update.targetVersion))
+    ) {
       await this.#returnToPrevious(update, "failed", "target-runtime-missing");
       return;
     }
@@ -366,11 +384,13 @@ export class Launcher {
 
   async #startChild(version: string, role: ChildRole, update?: ServiceUpdateRecord): Promise<void> {
     if (this.#stopping) return;
-    if (!(await runtimeExists(this.#baseDir, version))) {
-      throw new Error(`Selected t3@${version} runtime is missing or incomplete.`);
+    if (!(await runtimeExists(this.#baseDir, this.#state.runtimePackageName, version))) {
+      throw new Error(
+        `Selected ${this.#state.runtimePackageName}@${version} runtime is missing or incomplete.`,
+      );
     }
     if (this.#stopping) return;
-    const paths = runtimePaths(this.#baseDir, version);
+    const paths = runtimePaths(this.#baseDir, this.#state.runtimePackageName, version);
     const context: ServiceLauncherContext = {
       protocol: SERVICE_LAUNCHER_PROTOCOL,
       childVersion: version,
@@ -455,7 +475,9 @@ export class Launcher {
       await reject("The requested database path is not absolute.");
       return;
     }
-    if (!(await runtimeExists(this.#baseDir, message.targetVersion))) {
+    if (
+      !(await runtimeExists(this.#baseDir, this.#state.runtimePackageName, message.targetVersion))
+    ) {
       await reject("The requested target runtime is missing or incomplete.");
       return;
     }
@@ -579,7 +601,7 @@ export class Launcher {
 async function main(): Promise<void> {
   const baseDir = process.env.T3CODE_HOME?.trim();
   if (baseDir === undefined || baseDir === "") {
-    throw new Error("T3CODE_HOME is required by the T3 Code service launcher.");
+    throw new Error("T3CODE_HOME is required by the service launcher.");
   }
   const statePath = NodePath.join(baseDir, "runtime", SERVICE_STATE_FILE);
   const state = await readServiceState(statePath);

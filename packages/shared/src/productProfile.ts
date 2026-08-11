@@ -21,24 +21,32 @@ export interface ProductCapabilities {
 export interface ProductProfile {
   readonly name: ProductProfileName;
   readonly purpose: ProductBuildPurpose;
+  readonly productName: "SIGIDI" | "T3 Code";
+  readonly cliPackageName: CliPackageName;
   readonly capabilities: ProductCapabilities;
   readonly publishableAsSigidi: boolean;
 }
 
 export const SIGIDI_CLI_PACKAGE_NAME = "@sigidi/cli";
 export const UPSTREAM_CLI_PACKAGE_NAME = "t3";
+export type CliPackageName = typeof SIGIDI_CLI_PACKAGE_NAME | typeof UPSTREAM_CLI_PACKAGE_NAME;
+
+export const isCliPackageName = (value: unknown): value is CliPackageName =>
+  value === SIGIDI_CLI_PACKAGE_NAME || value === UPSTREAM_CLI_PACKAGE_NAME;
 
 /** Select the public CLI package owned by the compiled product profile. */
 export function resolveCliPackageName(
-  profile: Pick<ProductProfile, "publishableAsSigidi">,
-): typeof SIGIDI_CLI_PACKAGE_NAME | typeof UPSTREAM_CLI_PACKAGE_NAME {
-  return profile.publishableAsSigidi ? SIGIDI_CLI_PACKAGE_NAME : UPSTREAM_CLI_PACKAGE_NAME;
+  profile: Pick<ProductProfile, "cliPackageName">,
+): CliPackageName {
+  return profile.cliPackageName;
 }
 
 const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
   local: {
     name: "local",
     purpose: "product",
+    productName: "SIGIDI",
+    cliPackageName: SIGIDI_CLI_PACKAGE_NAME,
     capabilities: {
       inheritedRemoteIntegrations: false,
       hostedAuthentication: false,
@@ -52,6 +60,8 @@ const PROFILES: Readonly<Record<ProductProfileName, ProductProfile>> = {
   upstream: {
     name: "upstream",
     purpose: "integration",
+    productName: "T3 Code",
+    cliPackageName: UPSTREAM_CLI_PACKAGE_NAME,
     capabilities: {
       inheritedRemoteIntegrations: true,
       hostedAuthentication: true,

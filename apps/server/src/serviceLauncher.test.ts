@@ -12,6 +12,16 @@ import {
   SERVICE_LAUNCHER_PROTOCOL,
 } from "./cloud/serviceProtocol.ts";
 
+const runtimePackageName = "@sigidi/cli" as const;
+
+const runtimePaths = (path: Path.Path, root: string, version: string) => {
+  const versionDir = path.join(root, "runtime", "npm", "@sigidi", "cli", "versions", version);
+  return {
+    versionDir,
+    entryPath: path.join(versionDir, "node_modules", "@sigidi", "cli", "dist", "bin.mjs"),
+  };
+};
+
 it("accepts only exact semantic versions", () => {
   for (const version of ["0.0.0", "1.2.3", "1.2.3-alpha.1", "1.2.3-0", "1.2.3+001"]) {
     assert.isTrue(isExactServiceVersion(version), version);
@@ -36,6 +46,21 @@ it("rejects contradictory service state", () => {
     decodeServiceState({
       protocol: SERVICE_LAUNCHER_PROTOCOL,
       activeVersion: "0.0.31",
+    }),
+  );
+  assert.isUndefined(
+    decodeServiceState({
+      protocol: SERVICE_LAUNCHER_PROTOCOL,
+      runtimePackageName: "another-package",
+      activeVersion: "0.0.31",
+    }),
+  );
+
+  assert.isUndefined(
+    decodeServiceState({
+      protocol: SERVICE_LAUNCHER_PROTOCOL,
+      runtimePackageName,
+      activeVersion: "0.0.31",
       update: {
         id: "update-1",
         fromVersion: "0.0.30",
@@ -49,6 +74,7 @@ it("rejects contradictory service state", () => {
   assert.isUndefined(
     decodeServiceState({
       protocol: SERVICE_LAUNCHER_PROTOCOL,
+      runtimePackageName,
       activeVersion: "1.0.0",
       update: {
         id: "update-3",
@@ -62,6 +88,7 @@ it("rejects contradictory service state", () => {
   assert.isUndefined(
     decodeServiceState({
       protocol: SERVICE_LAUNCHER_PROTOCOL,
+      runtimePackageName,
       activeVersion: "1.0.0",
       update: {
         id: "update-2",
@@ -83,6 +110,7 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
       const statePath = path.join(root, "runtime", "service-state.json");
       const state = {
         protocol: SERVICE_LAUNCHER_PROTOCOL,
+        runtimePackageName,
         activeVersion: "0.0.31",
       } as const;
 
@@ -97,14 +125,14 @@ it.layer(NodeServices.layer)("service state persistence", (it) => {
       const path = yield* Path.Path;
       const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-launcher-stop-" });
       const statePath = path.join(root, "runtime", "service-state.json");
-      const versionDir = path.join(root, "runtime", "versions", "1.0.0");
-      const entryPath = path.join(versionDir, "node_modules", "t3", "dist", "bin.mjs");
+      const { versionDir, entryPath } = runtimePaths(path, root, "1.0.0");
       yield* fs.makeDirectory(path.dirname(entryPath), { recursive: true });
       yield* fs.writeFileString(entryPath, "setInterval(() => {}, 1_000);\n");
-      yield* fs.writeFileString(path.join(versionDir, ".install-complete"), "1.0.0\n");
+      yield* fs.writeFileString(path.join(versionDir, ".install-complete"), "@sigidi/cli@1.0.0\n");
       yield* Effect.promise(() =>
         writeServiceState(statePath, {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
+          runtimePackageName,
           activeVersion: "1.0.0",
         }),
       );
@@ -142,15 +170,18 @@ if (context.update?.status === "pending") {
 }
 `;
       for (const version of ["1.0.0", "1.1.0"]) {
-        const versionDir = path.join(root, "runtime", "versions", version);
-        const entryPath = path.join(versionDir, "node_modules", "t3", "dist", "bin.mjs");
+        const { versionDir, entryPath } = runtimePaths(path, root, version);
         yield* fs.makeDirectory(path.dirname(entryPath), { recursive: true });
         yield* fs.writeFileString(entryPath, childSource);
-        yield* fs.writeFileString(path.join(versionDir, ".install-complete"), `${version}\n`);
+        yield* fs.writeFileString(
+          path.join(versionDir, ".install-complete"),
+          `@sigidi/cli@${version}\n`,
+        );
       }
       yield* Effect.promise(() =>
         writeServiceState(statePath, {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
+          runtimePackageName,
           activeVersion: "1.0.0",
         }),
       );
@@ -192,15 +223,18 @@ if (context.update?.status === "pending") {
 }
 `;
       for (const version of ["1.0.0", "1.1.0"]) {
-        const versionDir = path.join(root, "runtime", "versions", version);
-        const entryPath = path.join(versionDir, "node_modules", "t3", "dist", "bin.mjs");
+        const { versionDir, entryPath } = runtimePaths(path, root, version);
         yield* fs.makeDirectory(path.dirname(entryPath), { recursive: true });
         yield* fs.writeFileString(entryPath, childSource);
-        yield* fs.writeFileString(path.join(versionDir, ".install-complete"), `${version}\n`);
+        yield* fs.writeFileString(
+          path.join(versionDir, ".install-complete"),
+          `@sigidi/cli@${version}\n`,
+        );
       }
       yield* Effect.promise(() =>
         writeServiceState(statePath, {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
+          runtimePackageName,
           activeVersion: "1.0.0",
         }),
       );
@@ -251,15 +285,18 @@ if (context.update?.status === "pending") {
 }
 `;
       for (const version of ["1.0.0", "1.1.0"]) {
-        const versionDir = path.join(root, "runtime", "versions", version);
-        const entryPath = path.join(versionDir, "node_modules", "t3", "dist", "bin.mjs");
+        const { versionDir, entryPath } = runtimePaths(path, root, version);
         yield* fs.makeDirectory(path.dirname(entryPath), { recursive: true });
         yield* fs.writeFileString(entryPath, childSource);
-        yield* fs.writeFileString(path.join(versionDir, ".install-complete"), `${version}\n`);
+        yield* fs.writeFileString(
+          path.join(versionDir, ".install-complete"),
+          `@sigidi/cli@${version}\n`,
+        );
       }
       yield* Effect.promise(() =>
         writeServiceState(statePath, {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
+          runtimePackageName,
           activeVersion: "1.0.0",
         }),
       );

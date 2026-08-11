@@ -49,7 +49,7 @@ export const setTailscaleServeEnabled = DesktopIpc.makeIpcMethod({
     const lifecycle = yield* DesktopLifecycle.DesktopLifecycle;
     const serverExposure = yield* DesktopServerExposure.DesktopServerExposure;
     const change = yield* serverExposure.setTailscaleServeEnabled(input);
-    if (change.requiresRelaunch || input.enabled) {
+    if (change.requiresRelaunch) {
       yield* lifecycle.relaunch(
         change.state.tailscaleServeEnabled ? "tailscale-serve-enabled" : "tailscale-serve-disabled",
       );

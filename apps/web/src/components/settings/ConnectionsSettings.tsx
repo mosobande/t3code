@@ -11,13 +11,11 @@ import { type ReactNode, memo, useCallback, useId, useMemo, useState } from "rea
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
-  AuthAdministrativeScopes,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthRelayReadScope,
   AuthRelayWriteScope,
   AuthReviewWriteScope,
-  AuthStandardClientScopes,
   AuthTerminalOperateScope,
   type AuthEnvironmentScope,
   type AdvertisedEndpoint,
@@ -29,6 +27,11 @@ import {
 } from "@t3tools/contracts";
 import { connectionStatusText } from "@t3tools/client-runtime/connection";
 import { productProfile } from "@t3tools/shared/productProfile";
+import {
+  productAdministrativeScopes,
+  productStandardClientScopes,
+  resolveProductAuthScopes,
+} from "@t3tools/shared/productAuthScopes";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -159,7 +162,7 @@ function formatAccessTimestamp(value: string): string {
   return accessTimestampFormatter.format(parsed);
 }
 
-const PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
+const ALL_PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
   readonly scope: AuthEnvironmentScope;
   readonly title: string;
   readonly description: string;
@@ -205,6 +208,10 @@ const PAIRING_SCOPE_OPTIONS: ReadonlyArray<{
     description: "Change managed tunnel connectivity.",
   },
 ];
+const productAdministrativeScopeSet = new Set(productAdministrativeScopes);
+const PAIRING_SCOPE_OPTIONS = ALL_PAIRING_SCOPE_OPTIONS.filter(({ scope }) =>
+  productAdministrativeScopeSet.has(scope),
+);
 
 function AccessScopeSummary({
   scopes,
@@ -213,7 +220,8 @@ function AccessScopeSummary({
   readonly scopes: ReadonlyArray<AuthEnvironmentScope>;
   readonly label: string;
 }) {
-  const scopeCountLabel = `${scopes.length} ${scopes.length === 1 ? "scope" : "scopes"}`;
+  const productScopes = resolveProductAuthScopes(scopes);
+  const scopeCountLabel = `${productScopes.length} ${productScopes.length === 1 ? "scope" : "scopes"}`;
 
   return (
     <Popover>
@@ -239,7 +247,7 @@ function AccessScopeSummary({
       >
         <p className="mb-1 font-medium">Granted scopes</p>
         <div className="flex flex-col gap-0.5">
-          {scopes.map((scope) => (
+          {productScopes.map((scope) => (
             <code key={scope} className="font-mono text-foreground/85">
               {scope}
             </code>
@@ -944,7 +952,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pairingLabel, setPairingLabel] = useState("");
   const [pairingScopes, setPairingScopes] = useState<ReadonlyArray<AuthEnvironmentScope>>([
-    ...AuthStandardClientScopes,
+    ...productStandardClientScopes,
   ]);
   const [isCreatingPairingLink, setIsCreatingPairingLink] = useState(false);
 
@@ -953,7 +961,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
     try {
       await createServerPairingCredential({ label: pairingLabel, scopes: pairingScopes });
       setPairingLabel("");
-      setPairingScopes([...AuthStandardClientScopes]);
+      setPairingScopes([...productStandardClientScopes]);
       setDialogOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create pairing URL.";
@@ -993,7 +1001,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
           setDialogOpen(open);
           if (!open) {
             setPairingLabel("");
-            setPairingScopes([...AuthStandardClientScopes]);
+            setPairingScopes([...productStandardClientScopes]);
           }
         }}
       >
@@ -1047,7 +1055,7 @@ const AuthorizedClientsHeaderAction = memo(function AuthorizedClientsHeaderActio
                     size="xs"
                     variant="outline"
                     disabled={isCreatingPairingLink}
-                    onClick={() => setPairingScopes([...AuthStandardClientScopes])}
+                    onClick={() => setPairingScopes([...productStandardClientScopes])}
                   >
                     Standard
                   </Button>
@@ -1698,7 +1706,7 @@ export function ConnectionsSettings() {
   const primaryEnvironmentId = primaryEnvironment?.environmentId ?? null;
   const primarySessionState = usePrimarySessionState();
   const currentSessionScopes = desktopBridge
-    ? AuthAdministrativeScopes
+    ? productAdministrativeScopes
     : primarySessionState.data?.authenticated
       ? (primarySessionState.data.scopes ?? null)
       : null;

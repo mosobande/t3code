@@ -5,6 +5,7 @@ import {
   HostProcessExecutablePath,
   HostProcessPlatform,
 } from "@t3tools/shared/hostProcess";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -46,14 +47,14 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
   const sourceLauncher = path.join(home, "service-launcher.mjs");
   const statePath = path.join(baseDir, "runtime", "service-state.json");
   yield* fs.writeFileString(sourceLauncher, "export {};\n");
-  const runtime = pinnedRuntimePaths(path, baseDir, "1.2.3");
+  const runtime = pinnedRuntimePaths(path, baseDir, cliPackageName, "1.2.3");
   yield* fs.makeDirectory(path.dirname(runtime.entryPath), { recursive: true });
   yield* fs.writeFileString(runtime.entryPath, "export {};\n");
   yield* fs.writeFileString(
     path.join(path.dirname(runtime.entryPath), "service-launcher.mjs"),
     "export const source = 'pinned runtime';\n",
   );
-  yield* fs.writeFileString(runtime.sentinelPath, "1.2.3\n");
+  yield* fs.writeFileString(runtime.sentinelPath, `${cliPackageName}@1.2.3\n`);
 
   const commands: string[] = [];
   const control: { failCommand: string | undefined } = { failCommand: undefined };
@@ -102,6 +103,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
 
       expect(parseServiceState(yield* fs.readFileString(statePath))).toEqual({
         protocol: SERVICE_LAUNCHER_PROTOCOL,
+        runtimePackageName: cliPackageName,
         activeVersion: "1.2.3",
       });
       expect(yield* fs.readFileString(plan.launcherPath)).toBe("export {};\n");
@@ -109,6 +111,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       // @effect-diagnostics-next-line preferSchemaOverJson:off - fixed launcher-owned test document.
       const pendingState = JSON.stringify({
         protocol: SERVICE_LAUNCHER_PROTOCOL,
+        runtimePackageName: cliPackageName,
         activeVersion: "1.2.3",
         update: {
           id: "u",

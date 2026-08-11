@@ -76,13 +76,13 @@ function makeLayer(input: {
 }
 
 describe("server exposure IPC", () => {
-  it.effect("relaunches when the user retries an enabled but unavailable Tailscale mapping", () => {
+  it.effect("relaunches when the exposure owner requests it", () => {
     const relaunchReasons: Array<string> = [];
 
     return Effect.gen(function* () {
       yield* setTailscaleServeEnabled.handler({ enabled: true, port: 443 });
       assert.deepEqual(relaunchReasons, ["tailscale-serve-enabled"]);
-    }).pipe(Effect.provide(makeLayer({ requiresRelaunch: false, relaunchReasons })), Effect.scoped);
+    }).pipe(Effect.provide(makeLayer({ requiresRelaunch: true, relaunchReasons })), Effect.scoped);
   });
 
   it.effect("does not relaunch for a repeated disable request", () => {

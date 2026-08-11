@@ -1,6 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
 import { HostProcessExecutablePath } from "@t3tools/shared/hostProcess";
+import { cliPackageName } from "@t3tools/shared/productProfile";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -33,9 +34,18 @@ const makeHarness = Effect.fn("test.make_self_update_harness")(function* (
       Effect.gen(function* () {
         if (input.command === "npm") {
           order.push("install");
+          if (input.args.at(-1) !== `${cliPackageName}@1.1.0`) {
+            return yield* Effect.die(`unexpected runtime package ${input.args.at(-1)}`);
+          }
           const prefix = input.args[input.args.indexOf("--prefix") + 1];
           if (prefix === undefined) return yield* Effect.die("missing npm prefix");
-          const entry = path.join(prefix, "node_modules", "t3", "dist", "bin.mjs");
+          const entry = path.join(
+            prefix,
+            "node_modules",
+            ...cliPackageName.split("/"),
+            "dist",
+            "bin.mjs",
+          );
           yield* fs.makeDirectory(path.dirname(entry), { recursive: true }).pipe(Effect.orDie);
           yield* fs.writeFileString(entry, "export {};\n").pipe(Effect.orDie);
           return {
@@ -108,7 +118,7 @@ it.layer(NodeServices.layer)("server self update", (it) => {
       const web = yield* makeHarness();
       expect(
         (yield* web.selfUpdate.update({ targetVersion: "latest" }).pipe(Effect.flip)).reason,
-      ).toBe("'latest' is not an exact t3 version.");
+      ).toBe("'latest' is not an exact CLI version.");
       const desktop = yield* makeHarness({ mode: "desktop" });
       expect(
         (yield* desktop.selfUpdate.update({ targetVersion: "1.1.0" }).pipe(Effect.flip)).reason,

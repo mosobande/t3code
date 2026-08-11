@@ -1,8 +1,6 @@
 import {
   AuthAccessTokenType,
   AuthAccessWriteScope,
-  AuthAdministrativeScopes,
-  AuthStandardClientScopes,
   type AuthAccessTokenResult,
   type AuthBrowserSessionResult,
   type AuthClientMetadata,
@@ -18,6 +16,11 @@ import {
   type AuthWebSocketTicketResult,
 } from "@t3tools/contracts";
 import { encodeOAuthScope } from "@t3tools/shared/oauthScope";
+import {
+  productAdministrativeScopes,
+  productStandardClientScopes,
+  resolveProductAuthScopes,
+} from "@t3tools/shared/productAuthScopes";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
 import * as DateTime from "effect/DateTime";
@@ -771,8 +774,9 @@ export const make = Effect.gen(function* () {
   )(
     function* (input) {
       const createdAt = yield* DateTime.now;
+      const scopes = resolveProductAuthScopes(input?.scopes ?? productStandardClientScopes);
       const issued = yield* bootstrapCredentials.issueOneTimeToken({
-        scopes: input?.scopes ?? AuthStandardClientScopes,
+        scopes,
         subject: input?.subject ?? "one-time-token",
         ...(input?.ttl ? { ttl: input.ttl } : {}),
         ...(input?.label ? { label: input.label } : {}),
@@ -782,7 +786,7 @@ export const make = Effect.gen(function* () {
       return {
         id: issued.id,
         credential: issued.credential,
-        scopes: input?.scopes ?? AuthStandardClientScopes,
+        scopes,
         subject: input?.subject ?? "one-time-token",
         ...(issued.label ? { label: issued.label } : {}),
         createdAt: DateTime.toUtc(createdAt),
@@ -819,7 +823,7 @@ export const make = Effect.gen(function* () {
       .issue({
         subject: input?.subject ?? DEFAULT_SESSION_SUBJECT,
         method: "bearer-access-token",
-        scopes: input?.scopes ?? AuthAdministrativeScopes,
+        scopes: resolveProductAuthScopes(input?.scopes ?? productAdministrativeScopes),
         client: {
           ...(input?.label ? { label: input.label } : {}),
           deviceType: "bot",
@@ -866,7 +870,7 @@ export const make = Effect.gen(function* () {
 
   const issuePairingCredential: EnvironmentAuth["Service"]["issuePairingCredential"] = (input) =>
     issuePairingCredentialForSubject({
-      scopes: input?.scopes ?? AuthStandardClientScopes,
+      scopes: input?.scopes ?? productStandardClientScopes,
       subject: "one-time-token",
       ...(input?.label ? { label: input.label } : {}),
     }).pipe(Effect.withSpan("EnvironmentAuth.issuePairingCredential"));
@@ -874,7 +878,7 @@ export const make = Effect.gen(function* () {
   const issueStartupPairingCredential: EnvironmentAuth["Service"]["issueStartupPairingCredential"] =
     () =>
       issuePairingCredentialForSubject({
-        scopes: AuthAdministrativeScopes,
+        scopes: productAdministrativeScopes,
         subject: INTERNAL_ADMINISTRATIVE_BOOTSTRAP_SUBJECT,
         purpose: "startup",
       }).pipe(Effect.withSpan("EnvironmentAuth.issueStartupPairingCredential"));

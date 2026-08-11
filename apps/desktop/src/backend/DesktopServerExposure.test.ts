@@ -238,7 +238,7 @@ describe("DesktopServerExposure", () => {
           enabled: true,
           port: 8443,
         });
-        assert.equal(unchanged.requiresRelaunch, false);
+        assert.equal(unchanged.requiresRelaunch, productProfile.capabilities.tailscaleExposure);
 
         const persisted = yield* settings.get;
         assert.equal(

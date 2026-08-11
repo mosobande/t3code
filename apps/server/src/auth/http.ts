@@ -1,13 +1,6 @@
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
-  AuthStandardClientScopes,
-  AuthOrchestrationOperateScope,
-  AuthOrchestrationReadScope,
-  AuthRelayReadScope,
-  AuthRelayWriteScope,
-  AuthReviewWriteScope,
-  AuthTerminalOperateScope,
   EnvironmentAuthInvalidError,
   type EnvironmentAuthInvalidReason,
   EnvironmentHttpApi,
@@ -25,6 +18,10 @@ import {
 import type { AuthEnvironmentScope } from "@t3tools/contracts";
 import { parseAllowedOAuthScope } from "@t3tools/shared/oauthScope";
 import { causeErrorTag } from "@t3tools/shared/observability";
+import {
+  productAdministrativeScopes,
+  productStandardClientScopes,
+} from "@t3tools/shared/productAuthScopes";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import { identity } from "effect/Function";
@@ -262,16 +259,7 @@ export const authHttpApiLayer = HttpApiBuilder.group(
                 ? undefined
                 : parseAllowedOAuthScope({
                     value: args.payload.scope,
-                    allowedScopes: new Set<AuthEnvironmentScope>([
-                      AuthOrchestrationReadScope,
-                      AuthOrchestrationOperateScope,
-                      AuthTerminalOperateScope,
-                      AuthReviewWriteScope,
-                      AuthAccessReadScope,
-                      AuthAccessWriteScope,
-                      AuthRelayReadScope,
-                      AuthRelayWriteScope,
-                    ]),
+                    allowedScopes: new Set<AuthEnvironmentScope>(productAdministrativeScopes),
                   });
             if (requestedScopes === null) {
               return yield* failEnvironmentInvalidRequest("invalid_scope");
@@ -337,7 +325,7 @@ export const authHttpApiLayer = HttpApiBuilder.group(
           function* (args) {
             yield* annotateEnvironmentRequest(args.endpoint.name);
             const session = yield* requireEnvironmentScope(AuthAccessWriteScope);
-            const delegatedScopes = args.payload.scopes ?? AuthStandardClientScopes;
+            const delegatedScopes = args.payload.scopes ?? productStandardClientScopes;
             if (
               delegatedScopes.length === 0 ||
               new Set<AuthEnvironmentScope>(delegatedScopes).size !== delegatedScopes.length

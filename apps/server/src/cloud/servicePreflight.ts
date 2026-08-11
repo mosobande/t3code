@@ -1,5 +1,5 @@
 import * as NodeSqlite from "node:sqlite";
-import { cliPackageName } from "@t3tools/shared/productProfile";
+import { cliPackageName, productProfile } from "@t3tools/shared/productProfile";
 
 import packageJson from "../../package.json" with { type: "json" };
 import { migrationManifest } from "../persistence/Migrations.ts";
@@ -60,8 +60,7 @@ export function runServicePreflight(input: {
     return {
       status: "blocked",
       version,
-      reason:
-        "This release requires a newer T3 Code service launcher. Update it on the server machine.",
+      reason: `This release requires a newer ${productProfile.productName} service launcher. Update it on the server machine.`,
     };
   }
 

@@ -1,5 +1,9 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { AuthAdministrativeScopes } from "@t3tools/contracts";
+import {
+  productAdministrativeScopes,
+  productStandardClientScopes,
+} from "@t3tools/shared/productAuthScopes";
 import { expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -98,13 +102,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
       );
 
       expect(verified.sessionId.length).toBeGreaterThan(0);
-      expect(verified.scopes).toEqual([
-        "orchestration:read",
-        "orchestration:operate",
-        "terminal:operate",
-        "review:write",
-        "relay:read",
-      ]);
+      expect(verified.scopes).toEqual(productStandardClientScopes);
       expect(verified.subject).toBe("one-time-token");
     }).pipe(Effect.provide(makeEnvironmentAuthLayer())),
   );
@@ -154,6 +152,9 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
       expect(
         listedPairingLinks.find((pairingLink) => pairingLink.id === pairingCredential.id)?.subject,
       ).toBe("one-time-token");
+      expect(
+        listedPairingLinks.find((pairingLink) => pairingLink.id === pairingCredential.id)?.scopes,
+      ).toEqual(productAdministrativeScopes);
     }).pipe(Effect.provide(makeEnvironmentAuthLayer())),
   );
 
@@ -177,16 +178,7 @@ it.layer(NodeServices.layer)("EnvironmentAuth.layer", (it) => {
         makeCookieRequest(sessions.cookieName, exchanged.sessionToken),
       );
 
-      expect(verified.scopes).toEqual([
-        "orchestration:read",
-        "orchestration:operate",
-        "terminal:operate",
-        "review:write",
-        "relay:read",
-        "access:read",
-        "access:write",
-        "relay:write",
-      ]);
+      expect(verified.scopes).toEqual(productAdministrativeScopes);
       expect(verified.subject).toBe("administrative-bootstrap");
     }).pipe(Effect.provide(makeEnvironmentAuthLayer())),
   );

@@ -6,6 +6,7 @@ import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NetService from "@t3tools/shared/Net";
+import { productStandardClientScopes } from "@t3tools/shared/productAuthScopes";
 import { productProfile } from "@t3tools/shared/productProfile";
 import { assert, describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -168,9 +169,16 @@ describe("t3 pair", () => {
           runCli(["auth", "pairing", "list", "--base-dir", baseDir, "--json"]),
         );
         // @effect-diagnostics-next-line preferSchemaOverJson:off - CLI JSON output is decoded as a presentation DTO.
-        const credentials = JSON.parse(listed) as ReadonlyArray<{ readonly label?: string }>;
+        const credentials = JSON.parse(listed) as ReadonlyArray<{
+          readonly label?: string;
+          readonly scopes: ReadonlyArray<string>;
+        }>;
         assert.equal(credentials.length, 1);
-        assert.equal(credentials[0]?.label, "t3 pair");
+        assert.equal(
+          credentials[0]?.label,
+          productProfile.name === "local" ? "SIGIDI CLI pair" : "t3 pair",
+        );
+        assert.deepEqual(credentials[0]?.scopes, productStandardClientScopes);
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );
@@ -207,12 +215,13 @@ describe("t3 pair", () => {
       const rendered = String(
         typeof error === "object" && error !== null && "cause" in error ? error.cause : error,
       );
-      assert.include(rendered, "No running T3 Code server found.");
-      assert.include(rendered, "npx t3 serve");
+      assert.include(rendered, `No running ${productProfile.productName} server found.`);
+      assert.include(rendered, `npx ${productProfile.cliPackageName}@latest serve`);
       if (productProfile.capabilities.inheritedRemoteIntegrations) {
-        assert.include(rendered, "npx t3 connect");
+        assert.include(rendered, `npx ${productProfile.cliPackageName}@latest connect`);
       } else {
-        assert.notInclude(rendered, "npx t3 connect");
+        assert.notInclude(rendered, "T3 Connect");
+        assert.notInclude(rendered, "npx t3");
       }
     }).pipe(Effect.provide(NodeServices.layer)),
   );
@@ -261,7 +270,7 @@ describe("t3 pair", () => {
         const rendered = String(
           typeof error === "object" && error !== null && "cause" in error ? error.cause : error,
         );
-        assert.include(rendered, "No running T3 Code server found.");
+        assert.include(rendered, `No running ${productProfile.productName} server found.`);
       }),
     ).pipe(Effect.provide(NodeServices.layer)),
   );
@@ -287,7 +296,7 @@ describe("t3 pair", () => {
       const rendered = String(
         typeof error === "object" && error !== null && "cause" in error ? error.cause : error,
       );
-      assert.include(rendered, "No running T3 Code server found.");
+      assert.include(rendered, `No running ${productProfile.productName} server found.`);
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 });

@@ -8,8 +8,15 @@ import {
 
 describe("productProfile", () => {
   it("selects the npm CLI owner from the product profile", () => {
-    assert.equal(resolveCliPackageName(resolveProductProfile("local")), "@sigidi/cli");
-    assert.equal(resolveCliPackageName(resolveProductProfile("upstream")), "t3");
+    const local = resolveProductProfile("local");
+    const upstream = resolveProductProfile("upstream");
+
+    assert.equal(local.cliPackageName, "@sigidi/cli");
+    assert.equal(upstream.cliPackageName, "t3");
+    assert.equal(local.productName, "SIGIDI");
+    assert.equal(upstream.productName, "T3 Code");
+    assert.equal(resolveCliPackageName(local), "@sigidi/cli");
+    assert.equal(resolveCliPackageName(upstream), "t3");
   });
 
   it("defaults to the publishable local desktop profile", () => {
