@@ -150,6 +150,7 @@ describe("ProviderCommandReactor", () => {
     readonly requiresNewThreadForModelChange?: boolean;
     readonly titleRegenerationCompletionDispatchFailures?: number;
     readonly titleRegenerationBeforeStart?: "one" | "two";
+    readonly worktreeBranchPrefix?: string;
     readonly startSessionEffect?: (
       session: ProviderSession,
     ) => Effect.Effect<ProviderSession, ProviderAdapterRequestError>;
@@ -412,7 +413,13 @@ describe("ProviderCommandReactor", () => {
           generateThreadTitle,
         }),
       ),
-      Layer.provideMerge(ServerSettingsService.layerTest()),
+      Layer.provideMerge(
+        ServerSettingsService.layerTest({
+          ...(input?.worktreeBranchPrefix
+            ? { worktreeBranchPrefix: input.worktreeBranchPrefix }
+            : {}),
+        }),
+      ),
       Layer.provideMerge(ServerConfig.layerTest(process.cwd(), baseDir)),
       Layer.provideMerge(NodeServices.layer),
     );
@@ -1457,7 +1464,7 @@ describe("ProviderCommandReactor", () => {
   });
 
   it("generates a worktree branch name for the first turn", async () => {
-    const harness = await createHarness();
+    const harness = await createHarness({ worktreeBranchPrefix: "acme" });
     const now = "2026-01-01T00:00:00.000Z";
 
     await Effect.runPromise(
@@ -1480,7 +1487,7 @@ describe("ProviderCommandReactor", () => {
           input.modelSelection !== null &&
           "model" in input.modelSelection &&
           typeof input.modelSelection.model === "string"
-            ? `feature/${input.modelSelection.model}`
+            ? `sigidi/feature/${input.modelSelection.model}`
             : "feature/generated",
       }),
     );
@@ -1508,6 +1515,10 @@ describe("ProviderCommandReactor", () => {
       message: "Add a safer reconnect backoff.",
     });
     expect(harness.refreshStatus.mock.calls[0]?.[0]).toBe("/tmp/provider-project-worktree");
+    expect(harness.renameBranch.mock.calls[0]?.[0]).toMatchObject({
+      oldBranch: "t3code/1234abcd",
+      newBranch: "acme/feature/gpt-5-6-luna",
+    });
   });
 
   it("forwards codex model options through session start and turn send", async () => {

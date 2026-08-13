@@ -132,6 +132,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "new-threads",
   },
   {
+    id: "worktree-name-prefix",
+    title: "Worktree name prefix",
+    to: "/settings/general",
+    targetId: "new-threads",
+  },
+  {
     id: "add-project-starts-in",
     title: "Add project starts in",
     to: "/settings/general",

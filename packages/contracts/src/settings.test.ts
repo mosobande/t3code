@@ -108,6 +108,17 @@ describe("ClientSettings sidebar", () => {
 });
 
 describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
+  it("defaults generated worktree names to the Sigidi prefix", () => {
+    expect(DEFAULT_SERVER_SETTINGS.worktreeBranchPrefix).toBe("sigidi");
+  });
+
+  it("accepts a safe custom worktree prefix and rejects Git ref separators", () => {
+    expect(decodeServerSettings({ worktreeBranchPrefix: "acme-dev" }).worktreeBranchPrefix).toBe(
+      "acme-dev",
+    );
+    expect(() => decodeServerSettings({ worktreeBranchPrefix: "team/worktrees" })).toThrow();
+  });
+
   it("defaults text generation to Luna at low reasoning effort", () => {
     expect(DEFAULT_SERVER_SETTINGS.textGenerationModelSelection).toEqual({
       instanceId: ProviderInstanceId.make("codex"),

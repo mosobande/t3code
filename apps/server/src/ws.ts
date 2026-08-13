@@ -59,6 +59,7 @@ import {
   WsRpcGroup,
 } from "@t3tools/contracts";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
+import { replaceTemporaryWorktreeBranchPrefix } from "@t3tools/shared/git";
 import { HttpRouter, HttpServerRequest, HttpServerRespondable } from "effect/unstable/http";
 import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
@@ -915,6 +916,7 @@ const makeWsRpcLayer = (
             }
 
             if (bootstrap?.prepareWorktree) {
+              const settings = yield* serverSettings.getSettings;
               let worktreeBaseRef = bootstrap.prepareWorktree.baseBranch;
               // "Start from origin" is a stored default; repos without an
               // origin remote fall back to the local base branch instead of
@@ -940,7 +942,13 @@ const makeWsRpcLayer = (
               const worktree = yield* gitWorkflow.createWorktree({
                 cwd: bootstrap.prepareWorktree.projectCwd,
                 refName: worktreeBaseRef,
-                newRefName: bootstrap.prepareWorktree.branch,
+                newRefName:
+                  bootstrap.prepareWorktree.branch === undefined
+                    ? undefined
+                    : replaceTemporaryWorktreeBranchPrefix(
+                        bootstrap.prepareWorktree.branch,
+                        settings.worktreeBranchPrefix,
+                      ),
                 baseRefName: bootstrap.prepareWorktree.baseBranch,
                 path: null,
               });

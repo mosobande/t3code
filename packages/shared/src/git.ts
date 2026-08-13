@@ -6,18 +6,19 @@ import type {
   VcsStatusResult,
   VcsStatusStreamEvent,
 } from "@t3tools/contracts";
+import { DEFAULT_WORKTREE_BRANCH_PREFIX } from "@t3tools/contracts/settings";
 import * as Arr from "effect/Array";
 import * as Result from "effect/Result";
 import { detectSourceControlProviderFromRemoteUrl } from "./sourceControl.ts";
 
-export const WORKTREE_BRANCH_PREFIX = "t3code";
-// Canonical form is `t3code/<8 hex>`. Older mobile builds generated `t3code/<uuid>`
+export const WORKTREE_BRANCH_PREFIX = DEFAULT_WORKTREE_BRANCH_PREFIX;
+export const LEGACY_WORKTREE_BRANCH_PREFIX = "t3code";
+// Canonical form is `<prefix>/<8 hex>`. Older mobile builds generated `t3code/<uuid>`
 // via Crypto.randomUUID() (always RFC 4122 v4), so the matcher also accepts exactly
 // that shape — version nibble `4`, variant nibble `[89ab]` — to keep those threads
 // eligible for branch regeneration without loosening beyond what was ever generated.
-const TEMP_WORKTREE_BRANCH_PATTERN = new RegExp(
-  `^${WORKTREE_BRANCH_PREFIX}\\/(?:[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`,
-);
+const TEMP_WORKTREE_BRANCH_SUFFIX_PATTERN =
+  /^(?:[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
 
 /**
  * Sanitize an arbitrary string into a valid, lowercase git refName fragment.
@@ -94,6 +95,7 @@ export function deriveLocalBranchNameFromRemoteRef(branchName: string): string {
 
 export function buildTemporaryWorktreeBranchName(
   randomHex: (byteLength: number) => string,
+  prefix = WORKTREE_BRANCH_PREFIX,
 ): string {
   // Normalize to exactly 8 lowercase hex chars so a UUID-shaped callback
   // still produces the canonical temporary branch form.
@@ -101,11 +103,31 @@ export function buildTemporaryWorktreeBranchName(
     .toLowerCase()
     .replace(/[^0-9a-f]/g, "")
     .slice(0, 8);
-  return `${WORKTREE_BRANCH_PREFIX}/${token}`;
+  return `${prefix}/${token}`;
 }
 
-export function isTemporaryWorktreeBranch(refName: string): boolean {
-  return TEMP_WORKTREE_BRANCH_PATTERN.test(refName.trim().toLowerCase());
+export function isTemporaryWorktreeBranch(
+  refName: string,
+  configuredPrefix = WORKTREE_BRANCH_PREFIX,
+): boolean {
+  const normalized = refName.trim().toLowerCase();
+  const separatorIndex = normalized.indexOf("/");
+  if (separatorIndex <= 0) return false;
+  const prefix = normalized.slice(0, separatorIndex);
+  const suffix = normalized.slice(separatorIndex + 1);
+  return (
+    new Set([configuredPrefix, WORKTREE_BRANCH_PREFIX, LEGACY_WORKTREE_BRANCH_PREFIX]).has(
+      prefix,
+    ) && TEMP_WORKTREE_BRANCH_SUFFIX_PATTERN.test(suffix)
+  );
+}
+
+export function replaceTemporaryWorktreeBranchPrefix(
+  refName: string,
+  configuredPrefix: string,
+): string {
+  if (!isTemporaryWorktreeBranch(refName, configuredPrefix)) return refName;
+  return `${configuredPrefix}/${refName.trim().slice(refName.trim().indexOf("/") + 1)}`;
 }
 
 /**

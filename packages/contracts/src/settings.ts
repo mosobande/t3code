@@ -549,6 +549,13 @@ export const BackgroundActivitySettings = Schema.Struct({
 }).pipe(Schema.withDecodingDefault(Effect.succeed({})));
 export type BackgroundActivitySettings = typeof BackgroundActivitySettings.Type;
 
+export const DEFAULT_WORKTREE_BRANCH_PREFIX = "sigidi";
+export const WorktreeBranchPrefix = TrimmedNonEmptyString.check(
+  Schema.isMaxLength(32),
+  Schema.isPattern(/^[a-z0-9][a-z0-9_-]*$/),
+);
+export type WorktreeBranchPrefix = typeof WorktreeBranchPrefix.Type;
+
 export const ServerSettings = Schema.Struct({
   // Legacy token-by-token assistant output. Deliberately a fresh key (was
   // `enableAssistantStreaming`): decoding drops the old key, so everyone,
@@ -578,6 +585,9 @@ export const ServerSettings = Schema.Struct({
   ),
   newWorktreesStartFromOrigin: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(true)),
+  ),
+  worktreeBranchPrefix: WorktreeBranchPrefix.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_WORKTREE_BRANCH_PREFIX)),
   ),
   addProjectBaseDirectory: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
   textGenerationModelSelection: ModelSelection.pipe(
@@ -725,6 +735,7 @@ export const ServerSettingsPatch = Schema.Struct({
   backgroundActivityProfile: Schema.optionalKey(BackgroundActivityProfile),
   defaultThreadEnvMode: Schema.optionalKey(ThreadEnvMode),
   newWorktreesStartFromOrigin: Schema.optionalKey(Schema.Boolean),
+  worktreeBranchPrefix: Schema.optionalKey(WorktreeBranchPrefix),
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),
   textGenerationModelSelection: Schema.optionalKey(ModelSelectionPatch),
   promptClarificationModelSelection: Schema.optionalKey(ModelSelectionPatch),

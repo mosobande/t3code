@@ -5,6 +5,7 @@ import {
   applyGitStatusStreamEvent,
   buildTemporaryWorktreeBranchName,
   isTemporaryWorktreeBranch,
+  replaceTemporaryWorktreeBranchPrefix,
   normalizeGitRemoteUrl,
   parseGitHubRepositoryNameWithOwnerFromRemoteUrl,
   WORKTREE_BRANCH_PREFIX,
@@ -54,6 +55,21 @@ describe("parseGitHubRepositoryNameWithOwnerFromRemoteUrl", () => {
 });
 
 describe("isTemporaryWorktreeBranch", () => {
+  it("uses the Sigidi prefix by default", () => {
+    expect(buildTemporaryWorktreeBranchName(() => "deadbeef")).toBe("sigidi/deadbeef");
+  });
+
+  it("uses a configured prefix", () => {
+    expect(buildTemporaryWorktreeBranchName(() => "deadbeef", "acme")).toBe("acme/deadbeef");
+  });
+
+  it("replaces a client prefix with the configured server prefix", () => {
+    expect(replaceTemporaryWorktreeBranchPrefix("t3code/deadbeef", "acme")).toBe("acme/deadbeef");
+    expect(replaceTemporaryWorktreeBranchPrefix("feature/deadbeef", "acme")).toBe(
+      "feature/deadbeef",
+    );
+  });
+
   it("matches the generated temporary worktree refName format", () => {
     expect(
       isTemporaryWorktreeBranch(
@@ -69,6 +85,10 @@ describe("isTemporaryWorktreeBranch", () => {
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/deadbeef`)).toBe(true);
     expect(isTemporaryWorktreeBranch(` ${WORKTREE_BRANCH_PREFIX}/deadbeef `)).toBe(true);
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/DEADBEEF`)).toBe(true);
+  });
+
+  it("matches the legacy t3code prefix", () => {
+    expect(isTemporaryWorktreeBranch("t3code/deadbeef")).toBe(true);
   });
 
   it("normalizes a UUID-shaped random callback to the canonical 8-hex form", () => {

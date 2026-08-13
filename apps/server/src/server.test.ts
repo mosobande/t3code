@@ -7446,7 +7446,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             isRepo: true,
             hasPrimaryRemote: true,
             isDefaultRef: false,
-            refName: "t3code/bootstrap-refName",
+            refName: "acme/deadbeef",
             hasWorkingTreeChanges: false,
             workingTree: {
               files: [],
@@ -7489,7 +7489,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
               bootstrapGitOperations.push("create-worktree");
               return {
                 worktree: {
-                  refName: "t3code/bootstrap-refName",
+                  refName: "acme/deadbeef",
                   path: "/tmp/bootstrap-worktree",
                 },
               };
@@ -7520,6 +7520,12 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
             },
             vcsStatusBroadcaster: {
               refreshStatus,
+            },
+            serverSettings: {
+              getSettings: Effect.succeed({
+                ...DEFAULT_SERVER_SETTINGS,
+                worktreeBranchPrefix: "acme",
+              }),
             },
             orchestrationEngine: {
               dispatch: (command) =>
@@ -7566,7 +7572,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
                 prepareWorktree: {
                   projectCwd: "/tmp/project",
                   baseBranch: "main",
-                  branch: "t3code/bootstrap-refName",
+                  branch: "t3code/deadbeef",
                   startFromOrigin: true,
                 },
                 runSetupScript: true,
@@ -7590,7 +7596,7 @@ it.layer(NodeServices.layer)("server router seam", (it) => {
         assert.deepEqual(createWorktree.mock.calls[0]?.[0], {
           cwd: "/tmp/project",
           refName: fetchedOriginCommit,
-          newRefName: "t3code/bootstrap-refName",
+          newRefName: "acme/deadbeef",
           baseRefName: "main",
           path: null,
         });
