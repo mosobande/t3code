@@ -12,13 +12,7 @@ import * as Result from "effect/Result";
 import { detectSourceControlProviderFromRemoteUrl } from "./sourceControl.ts";
 
 export const WORKTREE_BRANCH_PREFIX = DEFAULT_WORKTREE_BRANCH_PREFIX;
-export const LEGACY_WORKTREE_BRANCH_PREFIX = "t3code";
-// Canonical form is `<prefix>/<8 hex>`. Older mobile builds generated `t3code/<uuid>`
-// via Crypto.randomUUID() (always RFC 4122 v4), so the matcher also accepts exactly
-// that shape — version nibble `4`, variant nibble `[89ab]` — to keep those threads
-// eligible for branch regeneration without loosening beyond what was ever generated.
-const TEMP_WORKTREE_BRANCH_SUFFIX_PATTERN =
-  /^(?:[0-9a-f]{8}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/;
+const TEMP_WORKTREE_BRANCH_SUFFIX_PATTERN = /^[0-9a-f]{8}$/;
 
 /**
  * Sanitize an arbitrary string into a valid, lowercase git refName fragment.
@@ -116,9 +110,8 @@ export function isTemporaryWorktreeBranch(
   const prefix = normalized.slice(0, separatorIndex);
   const suffix = normalized.slice(separatorIndex + 1);
   return (
-    new Set([configuredPrefix, WORKTREE_BRANCH_PREFIX, LEGACY_WORKTREE_BRANCH_PREFIX]).has(
-      prefix,
-    ) && TEMP_WORKTREE_BRANCH_SUFFIX_PATTERN.test(suffix)
+    new Set([configuredPrefix, WORKTREE_BRANCH_PREFIX]).has(prefix) &&
+    TEMP_WORKTREE_BRANCH_SUFFIX_PATTERN.test(suffix)
   );
 }
 

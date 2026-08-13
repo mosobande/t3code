@@ -60,12 +60,14 @@ describe("isTemporaryWorktreeBranch", () => {
   });
 
   it("uses a configured prefix", () => {
-    expect(buildTemporaryWorktreeBranchName(() => "deadbeef", "acme")).toBe("acme/deadbeef");
+    expect(buildTemporaryWorktreeBranchName(() => "deadbeef", "studio")).toBe("studio/deadbeef");
   });
 
   it("replaces a client prefix with the configured server prefix", () => {
-    expect(replaceTemporaryWorktreeBranchPrefix("t3code/deadbeef", "acme")).toBe("acme/deadbeef");
-    expect(replaceTemporaryWorktreeBranchPrefix("feature/deadbeef", "acme")).toBe(
+    expect(replaceTemporaryWorktreeBranchPrefix("sigidi/deadbeef", "studio")).toBe(
+      "studio/deadbeef",
+    );
+    expect(replaceTemporaryWorktreeBranchPrefix("feature/deadbeef", "studio")).toBe(
       "feature/deadbeef",
     );
   });
@@ -87,8 +89,8 @@ describe("isTemporaryWorktreeBranch", () => {
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/DEADBEEF`)).toBe(true);
   });
 
-  it("matches the legacy t3code prefix", () => {
-    expect(isTemporaryWorktreeBranch("t3code/deadbeef")).toBe(true);
+  it("rejects the retired t3code prefix", () => {
+    expect(isTemporaryWorktreeBranch("t3code/deadbeef")).toBe(false);
   });
 
   it("normalizes a UUID-shaped random callback to the canonical 8-hex form", () => {
@@ -97,20 +99,9 @@ describe("isTemporaryWorktreeBranch", () => {
     );
   });
 
-  it("matches legacy UUID-shaped temporary worktree refs from older mobile builds", () => {
+  it("rejects non-canonical UUID-shaped refs", () => {
     expect(
       isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/f4ae4e0e-f971-4d48-b4f2-9cf0aa54ab12`),
-    ).toBe(true);
-  });
-
-  it("rejects UUID-shaped refs that are not RFC 4122 v4", () => {
-    // version nibble is not 4
-    expect(
-      isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/f4ae4e0e-f971-1d48-b4f2-9cf0aa54ab12`),
-    ).toBe(false);
-    // variant nibble is not [89ab]
-    expect(
-      isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/f4ae4e0e-f971-4d48-c4f2-9cf0aa54ab12`),
     ).toBe(false);
   });
 

@@ -113,8 +113,8 @@ describe("ServerSettings.providerInstances (slice-2 invariant)", () => {
   });
 
   it("accepts a safe custom worktree prefix and rejects Git ref separators", () => {
-    expect(decodeServerSettings({ worktreeBranchPrefix: "acme-dev" }).worktreeBranchPrefix).toBe(
-      "acme-dev",
+    expect(decodeServerSettings({ worktreeBranchPrefix: "studio-dev" }).worktreeBranchPrefix).toBe(
+      "studio-dev",
     );
     expect(() => decodeServerSettings({ worktreeBranchPrefix: "team/worktrees" })).toThrow();
   });
