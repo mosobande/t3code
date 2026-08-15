@@ -5,6 +5,7 @@ import {
   applyGitStatusStreamEvent,
   buildTemporaryWorktreeBranchName,
   isTemporaryWorktreeBranch,
+  resolveLiveThreadBranchUpdate,
   replaceTemporaryWorktreeBranchPrefix,
   normalizeGitRemoteUrl,
   parseGitHubRepositoryNameWithOwnerFromRemoteUrl,
@@ -109,6 +110,56 @@ describe("isTemporaryWorktreeBranch", () => {
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/feature/demo`)).toBe(false);
     expect(isTemporaryWorktreeBranch("main")).toBe(false);
     expect(isTemporaryWorktreeBranch(`${WORKTREE_BRANCH_PREFIX}/deadbeef-extra`)).toBe(false);
+  });
+});
+
+describe("resolveLiveThreadBranchUpdate", () => {
+  const status = (refName: string | null): VcsStatusResult => ({
+    isRepo: true,
+    hasPrimaryRemote: false,
+    isDefaultRef: false,
+    refName,
+    hasWorkingTreeChanges: false,
+    workingTree: { files: [], insertions: 0, deletions: 0 },
+    hasUpstream: false,
+    aheadCount: 0,
+    behindCount: 0,
+    pr: null,
+  });
+
+  it("does not regress a semantic branch to the default temporary branch", () => {
+    expect(
+      resolveLiveThreadBranchUpdate({
+        threadBranch: "feature/github-query-rate-limit",
+        gitStatus: status("sigidi/bda76797"),
+      }),
+    ).toBeNull();
+  });
+
+  it("does not regress a semantic branch to a configured temporary branch", () => {
+    expect(
+      resolveLiveThreadBranchUpdate({
+        threadBranch: "feature/github-query-rate-limit",
+        gitStatus: status("studio/bda76797"),
+        worktreeBranchPrefix: "studio",
+      }),
+    ).toBeNull();
+  });
+
+  it("treats t3code as temporary only when it is the configured prefix", () => {
+    expect(
+      resolveLiveThreadBranchUpdate({
+        threadBranch: "feature/github-query-rate-limit",
+        gitStatus: status("t3code/bda76797"),
+      }),
+    ).toEqual({ branch: "t3code/bda76797" });
+    expect(
+      resolveLiveThreadBranchUpdate({
+        threadBranch: "feature/github-query-rate-limit",
+        gitStatus: status("t3code/bda76797"),
+        worktreeBranchPrefix: "t3code",
+      }),
+    ).toBeNull();
   });
 });
 

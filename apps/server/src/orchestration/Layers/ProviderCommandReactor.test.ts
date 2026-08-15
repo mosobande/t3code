@@ -1517,7 +1517,7 @@ describe("ProviderCommandReactor", () => {
     expect(harness.refreshStatus.mock.calls[0]?.[0]).toBe("/tmp/provider-project-worktree");
     expect(harness.renameBranch.mock.calls[0]?.[0]).toMatchObject({
       oldBranch: "sigidi/1234abcd",
-      newBranch: "studio/feature/gpt-5-6-luna",
+      newBranch: "feature/gpt-5-6-luna",
     });
   });
 

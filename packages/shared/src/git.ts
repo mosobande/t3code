@@ -124,6 +124,35 @@ export function replaceTemporaryWorktreeBranchPrefix(
 }
 
 /**
+ * Reconcile stored thread metadata with the live checkout without replacing a
+ * semantic branch while a temporary worktree checkout is still visible.
+ */
+export function resolveLiveThreadBranchUpdate(input: {
+  readonly threadBranch: string | null;
+  readonly gitStatus: VcsStatusResult | null;
+  readonly worktreeBranchPrefix?: string;
+}): { branch: string | null } | null {
+  if (!input.gitStatus) return null;
+
+  if (input.gitStatus.refName === null && input.threadBranch !== null) {
+    return null;
+  }
+
+  if (input.threadBranch === input.gitStatus.refName) return null;
+
+  if (
+    input.threadBranch !== null &&
+    input.gitStatus.refName !== null &&
+    !isTemporaryWorktreeBranch(input.threadBranch, input.worktreeBranchPrefix) &&
+    isTemporaryWorktreeBranch(input.gitStatus.refName, input.worktreeBranchPrefix)
+  ) {
+    return null;
+  }
+
+  return { branch: input.gitStatus.refName };
+}
+
+/**
  * Normalize a git remote URL into a stable comparison key.
  */
 export function normalizeGitRemoteUrl(value: string): string {

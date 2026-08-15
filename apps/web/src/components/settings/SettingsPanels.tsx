@@ -2202,7 +2202,7 @@ export function GeneralSettingsPanel() {
 
         <SettingsRow
           title={searchableSetting("worktree-name-prefix").title}
-          description="Prefix for generated worktree folders and branches. Use lowercase letters, numbers, hyphens, or underscores."
+          description="Prefix for temporary worktree folders and branches. Final branches keep semantic names such as feature/my-change. Use lowercase letters, numbers, hyphens, or underscores."
           resetAction={
             settings.worktreeBranchPrefix !== DEFAULT_UNIFIED_SETTINGS.worktreeBranchPrefix ? (
               <SettingResetButton
