@@ -6,7 +6,7 @@
  * checks and supported upgrade fixtures pass.
  */
 export const sigidiUpstreamCompatibility = {
-  testedUpstreamCommit: "2db08457f2f4eaaa713a067b2ea480ca2b583025",
+  testedUpstreamCommit: "2f486ab80c748b4d8e3d3b17e49b5a327cb93335",
   effectEngine: {
     version: "4.0.0-beta.103",
     patchHash: "af36b7948b6f9c56623074662b51dade5699880c1a7c71245de73e13c3185fb6",
