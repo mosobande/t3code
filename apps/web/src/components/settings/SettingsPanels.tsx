@@ -32,6 +32,8 @@ import {
   MIN_PROMPT_FONT_SIZE,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_TERMINAL_FONT_SIZE,
+  WorktreeBranchPrefix,
+  type WorktreeBranchPrefix as WorktreeBranchPrefixValue,
 } from "@t3tools/contracts/settings";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
 import { createModelSelection } from "@t3tools/shared/model";
@@ -539,6 +541,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin
         ? ["New worktrees start from origin"]
         : []),
+      ...(settings.worktreeBranchPrefix !== DEFAULT_UNIFIED_SETTINGS.worktreeBranchPrefix
+        ? ["Worktree name prefix"]
+        : []),
       ...(settings.addProjectBaseDirectory !== DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory
         ? ["Add project base directory"]
         : []),
@@ -562,6 +567,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.addProjectBaseDirectory,
       settings.defaultThreadEnvMode,
       settings.newWorktreesStartFromOrigin,
+      settings.worktreeBranchPrefix,
       settings.diffIgnoreWhitespace,
       settings.environmentIdentificationMode,
       settings.fontFamilyCode,
@@ -665,6 +671,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       providerHealthRefreshInterval: DEFAULT_UNIFIED_SETTINGS.providerHealthRefreshInterval,
       defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
+      worktreeBranchPrefix: DEFAULT_UNIFIED_SETTINGS.worktreeBranchPrefix,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
@@ -1621,6 +1628,46 @@ function FontFamilySettingsRow({
 }
 
 const AUTO_SETTLE_DEFAULT_DAYS = DEFAULT_UNIFIED_SETTINGS.sidebarAutoSettleAfterDays ?? 3;
+const isWorktreeBranchPrefix = Schema.is(WorktreeBranchPrefix);
+
+function WorktreeBranchPrefixInput({
+  value,
+  onCommit,
+}: {
+  value: WorktreeBranchPrefixValue;
+  onCommit: (value: WorktreeBranchPrefixValue) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const valid = isWorktreeBranchPrefix(draft);
+
+  return (
+    <Input
+      aria-label="Worktree name prefix"
+      aria-invalid={!valid || undefined}
+      autoCapitalize="off"
+      autoComplete="off"
+      className="w-full sm:w-44"
+      maxLength={32}
+      spellCheck={false}
+      value={draft}
+      onChange={(event) => setDraft(event.currentTarget.value.toLowerCase())}
+      onBlur={() => {
+        if (valid) {
+          onCommit(draft);
+        } else {
+          setDraft(value);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          setDraft(value);
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
 
 function AutoSettleDaysInput({
   value,
@@ -2152,6 +2199,30 @@ export function GeneralSettingsPanel() {
             }
           />
         ) : null}
+
+        <SettingsRow
+          title={searchableSetting("worktree-name-prefix").title}
+          description="Prefix for temporary worktree folders and branches. Final branches keep semantic names such as feature/my-change. Use lowercase letters, numbers, hyphens, or underscores."
+          resetAction={
+            settings.worktreeBranchPrefix !== DEFAULT_UNIFIED_SETTINGS.worktreeBranchPrefix ? (
+              <SettingResetButton
+                label="worktree name prefix"
+                onClick={() =>
+                  updateSettings({
+                    worktreeBranchPrefix: DEFAULT_UNIFIED_SETTINGS.worktreeBranchPrefix,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <WorktreeBranchPrefixInput
+              key={settings.worktreeBranchPrefix}
+              value={settings.worktreeBranchPrefix}
+              onCommit={(worktreeBranchPrefix) => updateSettings({ worktreeBranchPrefix })}
+            />
+          }
+        />
 
         <SettingsRow
           {...searchableSetting("add-project-starts-in")}

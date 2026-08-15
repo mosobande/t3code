@@ -1,4 +1,4 @@
 interface:
   display_name: "T3 Code Sync"
-  short_description: "Merge upstream into SIGIDI with boundary proof"
-  default_prompt: "Use $t3code-sync to merge the latest upstream T3 Code main branch into an ori-based SIGIDI candidate, preserve active worktrees and channel boundaries, prove downstream and migration compatibility, and deliver a draft PR when authorized."
+  short_description: "Merge upstream with HTML evidence and boundary proof"
+  default_prompt: "Use $t3code-sync to merge the latest upstream T3 Code main branch into an ori-based SIGIDI candidate, preserve active worktrees and channel boundaries, prove downstream and migration compatibility, produce the commit-by-commit HTML evidence report, and deliver a draft PR when authorized."

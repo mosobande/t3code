@@ -38,6 +38,7 @@ import type { OrchestrationDispatchError } from "../Errors.ts";
 import { isGitRepository } from "../../git/Utils.ts";
 import { VcsStatusBroadcaster } from "../../vcs/VcsStatusBroadcaster.ts";
 import * as WorkspaceEntries from "../../workspace/WorkspaceEntries.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 
 const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
 
@@ -88,6 +89,7 @@ const make = Effect.gen(function* () {
   const receiptBus = yield* RuntimeReceiptBus;
   const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
   const vcsStatusBroadcaster = yield* VcsStatusBroadcaster;
+  const serverSettingsService = yield* ServerSettingsService;
 
   const appendRevertFailureActivity = (input: {
     readonly threadId: ThreadId;
@@ -568,10 +570,24 @@ const make = Effect.gen(function* () {
     readonly cwd: string;
     readonly local: VcsStatusLocalResult;
   }) {
+    const settings = yield* serverSettingsService.getSettings.pipe(
+      Effect.catch((error) =>
+        Effect.logWarning("failed to read settings while following worktree branch drift", {
+          path: error.settingsPath,
+          operation: error.operation,
+          cause: error.cause,
+        }).pipe(Effect.as(null)),
+      ),
+    );
+    if (settings === null) return;
+    const configuredPrefix = settings.worktreeBranchPrefix;
     // Detached HEAD has no branch to adopt; a temporary placeholder checkout
     // means the first-turn auto-rename is still in flight — don't race it.
     const checkedOutBranch = input.local.refName;
-    if (checkedOutBranch === null || isTemporaryWorktreeBranch(checkedOutBranch)) {
+    if (
+      checkedOutBranch === null ||
+      isTemporaryWorktreeBranch(checkedOutBranch, configuredPrefix)
+    ) {
       return;
     }
 
@@ -585,7 +601,7 @@ const make = Effect.gen(function* () {
         thread.branch === checkedOutBranch ||
         thread.worktreePath === null ||
         thread.worktreePath !== input.cwd ||
-        isTemporaryWorktreeBranch(thread.branch)
+        isTemporaryWorktreeBranch(thread.branch, configuredPrefix)
       ) {
         return;
       }

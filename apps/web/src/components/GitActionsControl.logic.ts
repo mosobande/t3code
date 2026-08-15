@@ -3,7 +3,6 @@ import type {
   GitStackedAction,
   VcsStatusResult,
 } from "@t3tools/contracts";
-import { isTemporaryWorktreeBranch } from "@t3tools/shared/git";
 import {
   DEFAULT_CHANGE_REQUEST_TERMINOLOGY,
   getChangeRequestTerminology,
@@ -383,35 +382,5 @@ export function resolveThreadBranchMetadataPatch(
   return { branch, expectedBranch };
 }
 
-export function resolveLiveThreadBranchUpdate(input: {
-  threadBranch: string | null;
-  gitStatus: VcsStatusResult | null;
-}): { branch: string | null } | null {
-  if (!input.gitStatus) {
-    return null;
-  }
-
-  if (input.gitStatus.refName === null && input.threadBranch !== null) {
-    return null;
-  }
-
-  if (input.threadBranch === input.gitStatus.refName) {
-    return null;
-  }
-
-  if (
-    input.threadBranch !== null &&
-    input.gitStatus.refName !== null &&
-    !isTemporaryWorktreeBranch(input.threadBranch) &&
-    isTemporaryWorktreeBranch(input.gitStatus.refName)
-  ) {
-    return null;
-  }
-
-  return {
-    branch: input.gitStatus.refName,
-  };
-}
-
-// Re-export from shared for backwards compatibility in this module's exports
-export { resolveAutoFeatureBranchName } from "@t3tools/shared/git";
+// Keep this module's existing public API while shared owns branch policy.
+export { resolveAutoFeatureBranchName, resolveLiveThreadBranchUpdate } from "@t3tools/shared/git";

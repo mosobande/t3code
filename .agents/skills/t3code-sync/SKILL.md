@@ -1,6 +1,6 @@
 ---
 name: t3code-sync
-description: Safely sync the latest pingdotgg/t3code main branch into an ori-based quantipixels/sigidi candidate, with optional draft-PR delivery. Use for upstream syncs that must preserve SIGIDI work, downstream ownership, migration history, release policy, active worktrees, and Stable or Nightly tag boundaries.
+description: Safely sync the latest pingdotgg/t3code main branch into an ori-based quantipixels/sigidi candidate, produce a durable HTML evidence report, and optionally deliver a draft PR. Use for upstream syncs that must preserve SIGIDI work, downstream ownership, migration history, release policy, active worktrees, Stable or Nightly tag boundaries, and a commit-by-commit integration record.
 ---
 
 # T3 Code Sync
@@ -54,6 +54,8 @@ upstream_head=$(root_git rev-parse upstream/main)
 ```
 
 Record the full commits for `github-sigidi/ori`, `upstream/main`, their merge base, and the left/right unique commit counts. Inspect unique commits and changed paths before merging. Verify both remote URLs match the repository contract. Fast-forward the local `t3code-main` mirror to `upstream/main` only when it is not checked out in another worktree.
+
+Build an upstream commit inventory before the merge. For every commit in chronological order, record the full and short SHA, author, date, exact subject, affected product area, changed paths or a concise path summary, a plain-language summary, and integration analysis. The analysis must state why the change matters to SIGIDI, its ownership or adapter boundary, its likely overlap or conflict risk, and any focused proof it requires. Do not infer behavior from the subject alone when the diff supplies material detail.
 
 ## 2. Inspect overlaps and ownership
 
@@ -163,7 +165,28 @@ Imported package patch payloads can contain whitespace that is significant to th
 
 Install with `pnpm --dir "$sync_dir" install --frozen-lockfile` only when focused proof needs dependencies. Run focused tests for every conflict and affected boundary. Commit only after applicable proof passes. Rerun focused tests if hooks change files.
 
-## 7. Deliver without overwriting new work
+## 7. Create the HTML evidence report
+
+Create one self-contained, tracked HTML artifact at
+`docs/operations/sync-reports/<YYYY-MM-DD>-t3code-main-<upstream-short-sha>.html` before delivery. Use semantic HTML, responsive local CSS, and small local JavaScript only when filtering or navigation materially helps. Do not load remote scripts, fonts, or assets.
+
+The report must let a maintainer understand both the individual commits and the sync as one change. Include:
+
+- pinned `ori`, upstream, merge-base, candidate, and merge commits; imported range and count; branch and delivery state;
+- a concise composite explanation of the imported work, its main product effects, downstream risk, and the final integration result;
+- a chronological list of every imported commit with its exact identity, individual plain-language summary, changed area or paths, SIGIDI impact analysis, ownership classification, overlap or conflict status, resolution when applicable, and focused proof;
+- grouped analysis by product area, with commit counts and the relationship between related commits;
+- all overlapping paths, separated from textual conflicts;
+- every conflict with base, `ori`, and upstream intent; the chosen resolution; why it preserves both accepted behaviors; and the proof that covers it;
+- behavior-level integration defects found after the textual merge, including their fix and proof;
+- dependency and generated-artifact reconciliation, migration compatibility identity, Stable and Nightly ref reconciliation, tests and checks, integrated client verification, residual gaps, original-worktree equality, push or PR state, and CI state;
+- a short evidence-method note that separates Git facts, agent analysis, decisions, and limitations.
+
+Use exact SHAs and commands or check results for factual claims. Mark inferred impact analysis as analysis. Do not hide failed, partial, unavailable, or engine-mismatched checks. Never include pairing tokens, credentials, or other secrets. If the sync is only an outline, create the artifact outside tracked source or omit it unless the user explicitly asks for a durable report; state that no candidate or remote mutation occurred.
+
+Check the artifact before delivery: confirm its required sections and all imported commit SHAs are present, verify internal anchors and interactive controls, open or render it when browser tooling is available, and inspect narrow and wide layouts when the design is responsive. Commit the report with the sync skill update or in a clearly named follow-up commit; do not rewrite the merge parents merely to add reporting.
+
+## 8. Deliver without overwriting new work
 
 Fetch `ori` again and confirm it still equals the commit pinned before the merge. If it moved, rebuild from the new remote commit. Never retarget a candidate onto the moved branch with a rebase.
 
@@ -185,8 +208,8 @@ When the user separately authorized a direct `ori` update, push `HEAD:ori` only 
 
 Remove only the worktree created by this run after the candidate is committed and delivered or retained safely. Keep the named local branch. Confirm every original worktree still has its captured branch, HEAD, and status. Do not prune unrelated worktrees.
 
-## Report
+## Report handoff
 
-Report `ori`; old and candidate commits; imported upstream range and count; merge commit; candidate branch and PR link; Stable and Nightly ref reconciliation; overlap and conflict resolutions; fork-patch register changes; migration compatibility identity; focused tests; residual gaps; original-worktree equality proof; push state; and CI state.
+Link the HTML artifact in the final handoff. Also report `ori`; old and candidate commits; imported upstream range and count; merge commit; candidate branch and PR link; Stable and Nightly ref reconciliation; overlap and conflict resolutions; fork-patch register changes; migration compatibility identity; focused tests; residual gaps; original-worktree equality proof; push state; and CI state. Keep the chat summary concise because the artifact owns the detailed commit-by-commit record.
 
 When asked only for an outline, group upstream commits by product area, separate imported work from SIGIDI-specific resolutions, and state that no Git or remote mutation occurred.
