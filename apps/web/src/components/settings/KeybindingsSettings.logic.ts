@@ -1,4 +1,5 @@
 import {
+  STATIC_KEYBINDING_COMMANDS,
   type KeybindingCommand,
   type KeybindingShortcut,
   type KeybindingWhenNode,
@@ -35,10 +36,6 @@ export function keybindingCommandDisabledReason(
 ): string | null {
   return command === "composer.clarify" ? promptClarificationUnavailableReason : null;
 }
-
-const STATIC_UNBOUND_KEYBINDING_COMMANDS = [
-  "composer.clarify",
-] as const satisfies ReadonlyArray<KeybindingCommand>;
 
 const CORE_WHEN_VARIABLES = ["terminalFocus", "terminalOpen", "true", "false"] as const;
 
@@ -266,13 +263,7 @@ export function buildWhenVariableOptions(): ReadonlyArray<WhenVariableOption> {
 export function buildKeybindingCommandOptions(
   keybindings: ResolvedKeybindingsConfig,
 ): ReadonlyArray<KeybindingCommandOption> {
-  const commands = new Set<KeybindingCommand>();
-  for (const binding of DEFAULT_RESOLVED_KEYBINDINGS) {
-    commands.add(binding.command);
-  }
-  for (const command of STATIC_UNBOUND_KEYBINDING_COMMANDS) {
-    commands.add(command);
-  }
+  const commands = new Set<KeybindingCommand>(STATIC_KEYBINDING_COMMANDS);
   for (const binding of keybindings) {
     commands.add(binding.command);
   }

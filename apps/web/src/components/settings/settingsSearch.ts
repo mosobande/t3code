@@ -1,4 +1,5 @@
 import { productProfile } from "@t3tools/shared/productProfile";
+import { isElectron } from "~/env";
 
 export type SettingsPath =
   | "/settings/general"
@@ -14,6 +15,9 @@ export interface SettingsSearchItem {
   readonly title: string;
   readonly to: SettingsPath;
   readonly targetId?: string;
+  // Its row only renders in the desktop app, so a browser result would land on
+  // an anchor that isn't there.
+  readonly desktopOnly?: boolean;
 }
 
 /**
@@ -106,6 +110,11 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/general",
   },
   {
+    id: "auto-settle-merged-threads",
+    title: "Auto-settle merged threads",
+    to: "/settings/general",
+  },
+  {
     id: "time-format",
     title: "Time format",
     to: "/settings/general",
@@ -151,6 +160,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "delete-confirmation",
     title: "Delete confirmation",
     to: "/settings/general",
+  },
+  {
+    id: "quit-confirmation",
+    title: "Hold to quit",
+    to: "/settings/general",
+    desktopOnly: true,
   },
   {
     id: "text-generation-model",
@@ -249,6 +264,7 @@ export function searchSettings(
       (productProfile.capabilities.remoteEnvironments ||
         productProfile.capabilities.lanMobilePairing ||
         item.to !== "/settings/connections") &&
+      (isElectron || item.desktopOnly !== true) &&
       normalizeSearchText(item.title).includes(normalizedQuery),
   );
 }
