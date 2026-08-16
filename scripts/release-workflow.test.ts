@@ -117,6 +117,12 @@ describe("release workflow", () => {
     assert.isFalse(
       NodeFS.existsSync(NodePath.join(repoRoot, ".github/workflows/deploy-marketing.yml")),
     );
+    assert.notProperty(releaseWorkflow.jobs, "publish_aur");
+    assert.isFalse(NodeFS.existsSync(NodePath.join(repoRoot, ".github/workflows/publish-aur.yml")));
+    assert.isFalse(NodeFS.existsSync(NodePath.join(repoRoot, "packaging/aur/t3code-bin/PKGBUILD")));
+    assert.isFalse(
+      NodeFS.existsSync(NodePath.join(repoRoot, "packaging/aur/t3code-nightly-bin/PKGBUILD")),
+    );
   });
 
   it("keeps inherited mobile and hosted-web workflows source-only", () => {
