@@ -30,6 +30,7 @@ const environmentLayer = (input: {
     appVersion: input.appVersion ?? "1.2.3",
     appPath: "/repo",
     isPackaged: input.isPackaged ?? true,
+    packagedBaseDirOverride: input.baseDir,
     resourcesPath: input.resourcesPath,
     runningUnderArm64Translation: false,
   }).pipe(
@@ -243,8 +244,8 @@ describe("DesktopWslServerTree", () => {
         });
         yield* fileSystem.writeFileString(path.join(serverRoot, "apps/server/dist/bin.mjs"), "x");
 
-        // T3CODE_HOME is set to tempDir, so the desktop state dir resolves to
-        // <tempDir>/userdata (no .t3 segment).
+        // The packaged test override sets the product data root to tempDir, so
+        // the desktop state directory resolves to <tempDir>/userdata.
         const treeRoot = path.join(tempDir, "userdata", "wsl-server-tree");
         yield* fileSystem.makeDirectory(path.join(treeRoot, "1.0.0"), { recursive: true });
         yield* fileSystem.makeDirectory(path.join(treeRoot, "1.2.3.partial"), { recursive: true });
