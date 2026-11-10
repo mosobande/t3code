@@ -179,11 +179,15 @@ export const layer = Layer.effect(
         if (input.sourceThreadId === input.successorThreadId)
           return { status: "conflict", reason: "invalid_threads" } as const;
 
-        const sideChats = yield* sql`SELECT 1 FROM orchestration_v2_projection_threads
+        const endpoints = yield* sql`SELECT thread_id FROM orchestration_v2_projection_threads
           WHERE thread_id IN (${input.sourceThreadId}, ${input.successorThreadId})
-            AND json_extract(payload_json, '$.lineage.sideChat') = 1 LIMIT 1`;
-        // Parent deletion owns side-chat locks in a different order; these endpoints are unsupported.
-        if (sideChats.length > 0) return { status: "conflict", reason: "invalid_threads" } as const;
+            AND deleted_at IS NULL AND archived_at IS NULL
+            AND json_extract(payload_json, '$.lineage.parentThreadId') IS NULL
+            AND json_extract(payload_json, '$.lineage.relationshipToParent') IS NULL
+            AND COALESCE(json_extract(payload_json, '$.lineage.sideChat'), 0) = 0`;
+        // Lineage is immutable; missing identities may become side chats with a different lock order.
+        if (endpoints.length !== 2)
+          return { status: "conflict", reason: "invalid_threads" } as const;
 
         // Ancestors precede descendants, matching command intake's parent-before-child lock order.
         const order = yield* Effect.forEach([input.sourceThreadId, input.successorThreadId], (id) =>

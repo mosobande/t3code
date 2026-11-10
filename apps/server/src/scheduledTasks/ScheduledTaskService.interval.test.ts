@@ -207,10 +207,10 @@ it.effect.each([
     saved: ONCE,
     edited: ONCE,
     pause: true,
-    expected: "2026-11-01T08:00:00.000Z",
+    expected: MOVED,
   },
 ] as const)(
-  "a title save keeps the stored next run only while nothing else changed: $change",
+  "a title save preserves run completion and rejects a concurrent pause: $change",
   ({ saved, edited, pause, expected }) =>
     Effect.gen(function* () {
       yield* TestClock.setTime(Date.parse("2026-11-01T07:00:00.000Z"));
@@ -235,14 +235,14 @@ it.effect.each([
       yield* Effect.gen(function* () {
         const service = yield* ScheduledTaskService.ScheduledTaskService;
         const worktree = { type: "worktree", baseRef: "main" };
-        yield* service.upsert(
+        const created = yield* service.upsert(
           yield* decodeInput({
             ...onceInput,
             schedule: saved,
             workspaceStrategy: { type: "root" },
           }),
         );
-        const renamed = yield* service.upsert(
+        const save = service.upsert(
           yield* decodeInput({
             ...onceInput,
             schedule: edited,
@@ -250,6 +250,22 @@ it.effect.each([
             title: "Renamed",
           }),
         );
+        if (pause) {
+          const failure = yield* save.pipe(Effect.flip);
+          expect(failure.message).toBe(
+            "Schedule task changed or no longer exists. Refresh it before editing.",
+          );
+          const [stored] = (yield* service.list()).tasks;
+          expect(stored).toEqual({
+            ...created.task,
+            enabled: false,
+            nextRunAt: expected,
+            configRevision: expect.any(String),
+          });
+          expect(stored?.configRevision).not.toBe(created.task.configRevision);
+          return;
+        }
+        const renamed = yield* save;
         expect(renamed.task.enabled).toBe(true);
         expect(renamed.task.nextRunAt).toBe(expected);
       }).pipe(Effect.provide(layer));

@@ -624,10 +624,21 @@ it.effect.each([
     }),
 );
 
-it.effect.each([sourceThreadId, successorThreadId])(
-  "rejects side-chat endpoint %s before requesting held command locks",
-  (threadId) =>
+it.effect.each([
+  { endpoint: "source", invalid: "side-chat" },
+  { endpoint: "successor", invalid: "side-chat" },
+  { endpoint: "source", invalid: "missing" },
+  { endpoint: "successor", invalid: "missing" },
+] as const)(
+  "rejects $invalid $endpoint before requesting held command locks",
+  ({ endpoint, invalid }) =>
     Effect.gen(function* () {
+      const threadId =
+        invalid === "missing"
+          ? ThreadId.make(`thread:transition:absent-${endpoint}`)
+          : endpoint === "source"
+            ? sourceThreadId
+            : successorThreadId;
       const executor = yield* KeyedLock.make<ThreadId>();
       const attempted = yield* Deferred.make<void>();
       const held = yield* Deferred.make<void>();
@@ -646,20 +657,27 @@ it.effect.each([sourceThreadId, successorThreadId])(
       yield* Deferred.await(held);
       yield* Effect.gen(function* () {
         const fixture = yield* seed();
-        const thread = yield* fixture.projections.getThread(threadId);
-        yield* fixture.append({
-          id: fixture.eventId(),
-          threadId,
-          type: "thread.metadata-updated",
-          occurredAt: fixture.now,
-          payload: { ...thread, lineage: { ...thread.lineage, sideChat: true } },
-        });
+        if (invalid === "side-chat") {
+          const thread = yield* fixture.projections.getThread(threadId);
+          yield* fixture.append({
+            id: fixture.eventId(),
+            threadId,
+            type: "thread.metadata-updated",
+            occurredAt: fixture.now,
+            payload: { ...thread, lineage: { ...thread.lineage, sideChat: true } },
+          });
+        }
         const service = yield* DestinationTransitionService.DestinationTransitionService;
-        const input = yield* fixture.input();
+        const input = {
+          ...(yield* fixture.input()),
+          ...(endpoint === "source"
+            ? { sourceThreadId: threadId }
+            : { successorThreadId: threadId }),
+        };
         const result = yield* Effect.raceFirst(
           service.commit(input),
           Deferred.await(attempted).pipe(
-            Effect.andThen(Effect.die("Side-chat transition requested a command lock")),
+            Effect.andThen(Effect.die("Invalid transition endpoint requested a command lock")),
           ),
         );
         assert.deepEqual(result, { status: "conflict", reason: "invalid_threads" });

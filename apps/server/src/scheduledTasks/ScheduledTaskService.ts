@@ -1355,6 +1355,8 @@ export const layer = Layer.effect(
       // keep their run history, and so real load failures propagate instead
       // of silently resetting an existing row.
       const existingTask = yield* findTask(id);
+      if (existingTask === null && input.requireExisting === true)
+        return yield* taskError("Schedule task not found.", { taskId: id });
       if (
         input.expectedConfigRevision !== undefined &&
         input.expectedConfigRevision !== existingTask?.configRevision
