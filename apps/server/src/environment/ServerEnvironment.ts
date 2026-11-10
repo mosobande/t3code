@@ -231,6 +231,7 @@ export const make = Effect.gen(function* () {
       inlineMessageContext: true,
       requiredWorktreeBootstrap: true,
       threadSettlement: true,
+      threadDestinationTransitions: 1,
       threadAutoSettlement: true,
       storageCleanup: true,
       storageCleanupRun: true,

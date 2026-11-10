@@ -94,6 +94,8 @@ const RPC_AGGREGATES = {
   [WS_METHODS.serverRefreshUsageRates]: "server",
   [WS_METHODS.serverSignalProcess]: "server",
   [WS_METHODS.serverReportClientActivity]: "server",
+  [WS_METHODS.scheduledTasksCommitDestinationTransition]: "scheduledTasks",
+  [WS_METHODS.scheduledTasksGetDestinationTransition]: "scheduledTasks",
   [WS_METHODS.scheduledTasksSubscribe]: "scheduledTasks",
   [WS_METHODS.scheduledTasksUpsert]: "scheduledTasks",
   [WS_METHODS.scheduledTasksSetEnabled]: "scheduledTasks",

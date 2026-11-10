@@ -383,6 +383,12 @@ import {
   ScheduledTaskUpsertInput,
   ScheduledTaskMutationResult,
 } from "./scheduledTask.ts";
+import {
+  CommitDestinationTransitionInput,
+  CommitDestinationTransitionResult,
+  GetDestinationTransitionInput,
+  GetDestinationTransitionResult,
+} from "./destinationTransition.ts";
 import { SecretRequestAnswerInput, SecretRequestError } from "./secretRequest.ts";
 import {
   ProjectCloneActionInput,
@@ -549,6 +555,8 @@ export const WS_METHODS = {
   serverRefreshUsageRates: "server.refreshUsageRates",
 
   scheduledTasksSubscribe: "scheduledTasks.subscribe",
+  scheduledTasksCommitDestinationTransition: "scheduledTasks.commitDestinationTransition",
+  scheduledTasksGetDestinationTransition: "scheduledTasks.getDestinationTransition",
   scheduledTasksUpsert: "scheduledTasks.upsert",
   scheduledTasksSetEnabled: "scheduledTasks.setEnabled",
   scheduledTasksDelete: "scheduledTasks.delete",
@@ -1976,6 +1984,23 @@ const WsSubscribeServerLifecycleRpc = Rpc.make(WS_METHODS.subscribeServerLifecyc
   stream: true,
 });
 
+const WsScheduledTasksCommitDestinationTransitionRpc = Rpc.make(
+  WS_METHODS.scheduledTasksCommitDestinationTransition,
+  {
+    payload: CommitDestinationTransitionInput,
+    success: CommitDestinationTransitionResult,
+    error: Schema.Union([ScheduledTaskError, EnvironmentAuthorizationError]),
+  },
+);
+const WsScheduledTasksGetDestinationTransitionRpc = Rpc.make(
+  WS_METHODS.scheduledTasksGetDestinationTransition,
+  {
+    payload: GetDestinationTransitionInput,
+    success: GetDestinationTransitionResult,
+    error: Schema.Union([ScheduledTaskError, EnvironmentAuthorizationError]),
+  },
+);
+
 const WsScheduledTasksSubscribeRpc = Rpc.make(WS_METHODS.scheduledTasksSubscribe, {
   payload: ScheduledTaskListInput,
   success: ScheduledTaskListResult,
@@ -2125,6 +2150,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsServerRefreshUsageRatesRpc,
   WsServerSignalProcessRpc,
   WsScheduledTasksSubscribeRpc,
+  WsScheduledTasksCommitDestinationTransitionRpc,
+  WsScheduledTasksGetDestinationTransitionRpc,
   WsScheduledTasksUpsertRpc,
   WsScheduledTasksSetEnabledRpc,
   WsScheduledTasksDeleteRpc,

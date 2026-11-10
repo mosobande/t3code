@@ -127,6 +127,7 @@ class WebhookDeliverySkipped extends Schema.TaggedError<WebhookDeliverySkipped>(
   "WebhookDeliverySkipped",
   { reason: Schema.String },
 ) {}
+const isWebhookDeliverySkipped = Schema.is(WebhookDeliverySkipped);
 
 interface RateWindow {
   readonly accepted: ReadonlyArray<{ readonly at: number }>;
@@ -208,6 +209,7 @@ function resolveThreadMode(
 
 interface ScheduledTaskRow {
   readonly task_id: string;
+  readonly config_revision: string;
   readonly title: string;
   readonly prompt: string;
   readonly enabled: number;
@@ -255,6 +257,7 @@ export class ScheduledTaskService extends Context.Service<
   {
     readonly list: () => Effect.Effect<ScheduledTaskListResult, ScheduledTaskError>;
     readonly subscribeList: () => Stream.Stream<ScheduledTaskListResult, ScheduledTaskError>;
+    readonly invalidate: Effect.Effect<void>;
     readonly upsert: (
       input: ScheduledTaskUpsertInput,
     ) => Effect.Effect<ScheduledTaskMutationResult, ScheduledTaskError>;
@@ -382,6 +385,7 @@ const decodeRow = Effect.fnUntraced(
     const modelSelection = yield* decodeModelSelectionJson(row.model_selection_json);
     return yield* decodeTask({
       id: row.task_id,
+      configRevision: row.config_revision,
       title: row.title,
       prompt: row.prompt,
       enabled: row.enabled === 1,
@@ -505,6 +509,7 @@ export const layer = Layer.effect(
       sql<ScheduledTaskRow>`
       SELECT
         task_id,
+        config_revision,
         title,
         prompt,
         enabled,
@@ -547,6 +552,7 @@ export const layer = Layer.effect(
       sql<ScheduledTaskRow>`
       SELECT
         task_id,
+        config_revision,
         title,
         prompt,
         enabled,
@@ -742,7 +748,7 @@ export const layer = Layer.effect(
           ),
         );
 
-    const markRunning = (id: ScheduledTaskId, startedAtIso: string, webhookDeliveryId?: string) =>
+    const markRunning = (task: ScheduledTask, startedAtIso: string, webhookDeliveryId?: string) =>
       sql<{ task_id: string }>`
         UPDATE scheduled_tasks
         SET updated_at = ${startedAtIso},
@@ -750,15 +756,18 @@ export const layer = Layer.effect(
             last_run_webhook_delivery_id = ${webhookDeliveryId ?? null},
             last_run_status = 'running',
             last_run_error = NULL
-        WHERE task_id = ${id}
+        WHERE task_id = ${task.id}
+          AND config_revision = ${task.configRevision ?? ""}
+          AND thread_id IS ${task.threadId}
+          AND next_run_at IS ${task.nextRunAt}
+          AND last_run_status <> 'running'
+          AND NOT EXISTS (SELECT 1 FROM retired_thread_destinations WHERE thread_id = scheduled_tasks.thread_id)
         RETURNING task_id
       `.pipe(
         Effect.mapError((cause) =>
-          taskError("Could not mark schedule task as running.", { taskId: id, cause }),
+          taskError("Could not mark schedule task as running.", { taskId: task.id, cause }),
         ),
-        Effect.flatMap((rows) =>
-          rows.length > 0 ? Effect.void : taskError("Schedule task not found.", { taskId: id }),
-        ),
+        Effect.map((rows) => rows.length > 0),
       );
 
     const markCompleted = (input: {
@@ -812,6 +821,7 @@ export const layer = Layer.effect(
                 WHERE delivery_id = ${pendingDeliveryId ?? null} AND state = 'running'
               ) THEN 0 ELSE 1 END
           WHERE task_id = ${task.id} AND last_run_status = 'running'
+            AND last_run_at = ${startedAtIso}
         `;
         yield* notifyChanged;
       },
@@ -858,70 +868,86 @@ export const layer = Layer.effect(
       const startedAt = yield* localNow;
       const startedAtIso = iso(startedAt);
       const run = Effect.gen(function* () {
-        // Re-read stale poll snapshots so deleted, paused or postponed tasks cannot fire.
-        const active = yield* findTask(task.id);
-        if (active === null) {
+        const claimActive = Effect.gen(function* () {
+          // Re-read stale poll snapshots so deleted, paused or postponed tasks cannot fire.
+          const active = yield* findTask(task.id);
+          if (active === null) {
+            if (webhook !== undefined) {
+              return yield* new WebhookDeliverySkipped({
+                reason: "The task was deleted before this delivery ran.",
+              });
+            }
+            if (trigger !== "scheduled") {
+              return yield* taskError("Schedule task not found.", { taskId: task.id });
+            }
+            return { skipped: { task, threadId: null, dispatchFailed: false } };
+          }
+          if (
+            webhook !== undefined &&
+            (yield* sql`SELECT 1 FROM scheduled_task_webhook_pending WHERE delivery_id = ${webhook.deliveryId} AND state = 'completed'`.pipe(
+              NodeSqliteClient.readOnly,
+            )).length > 0
+          )
+            return {
+              skipped: {
+                task: { ...active, lastRunStatus: "succeeded" as const },
+                threadId: null,
+                dispatchFailed: false,
+              },
+            };
+          const parsedNextRunAt =
+            active.nextRunAt === null ? Option.none() : DateTime.make(active.nextRunAt);
+          if (
+            trigger === "scheduled" &&
+            (!active.enabled ||
+              Option.isNone(parsedNextRunAt) ||
+              DateTime.toEpochMillis(parsedNextRunAt.value) > DateTime.toEpochMillis(startedAt))
+          ) {
+            return { skipped: { task: active, threadId: null, dispatchFailed: false } };
+          }
+          // Reject queued deliveries after pause, same-id recreation or trigger changes.
           if (webhook !== undefined) {
-            return yield* new WebhookDeliverySkipped({
-              reason: "The task was deleted before this delivery ran.",
-            });
+            const reason =
+              active.createdAt !== task.createdAt
+                ? "The task was replaced before this delivery ran."
+                : active.schedule.type !== "webhook"
+                  ? "The task's trigger changed before this delivery ran."
+                  : webhookPolicyBlock !== undefined
+                    ? webhookPolicyBlock
+                    : !active.enabled
+                      ? "The task was paused before this delivery ran."
+                      : null;
+            if (reason !== null) return yield* new WebhookDeliverySkipped({ reason });
           }
-          if (trigger !== "scheduled") {
-            return yield* taskError("Schedule task not found.", { taskId: task.id });
-          }
-          return { task, threadId: null, dispatchFailed: false };
-        }
-        if (
-          webhook !== undefined &&
-          (yield* sql`SELECT 1 FROM scheduled_task_webhook_pending WHERE delivery_id = ${webhook.deliveryId} AND state = 'completed'`.pipe(
-            NodeSqliteClient.readOnly,
-          )).length > 0
-        )
-          return {
-            task: { ...active, lastRunStatus: "succeeded" as const },
-            threadId: null,
-            dispatchFailed: false,
-          };
-        const parsedNextRunAt =
-          active.nextRunAt === null ? Option.none() : DateTime.make(active.nextRunAt);
-        if (
-          trigger === "scheduled" &&
-          (!active.enabled ||
-            Option.isNone(parsedNextRunAt) ||
-            DateTime.toEpochMillis(parsedNextRunAt.value) > DateTime.toEpochMillis(startedAt))
-        ) {
-          return { task: active, threadId: null, dispatchFailed: false };
-        }
-        // Reject queued deliveries after pause, same-id recreation or trigger changes.
-        if (webhook !== undefined) {
-          const reason =
-            active.createdAt !== task.createdAt
-              ? "The task was replaced before this delivery ran."
-              : active.schedule.type !== "webhook"
-                ? "The task's trigger changed before this delivery ran."
-                : webhookPolicyBlock !== undefined
-                  ? webhookPolicyBlock
-                  : !active.enabled
-                    ? "The task was paused before this delivery ran."
-                    : null;
-          if (reason !== null) return yield* new WebhookDeliverySkipped({ reason });
-        }
 
-        if (webhook === undefined) yield* markRunning(active.id, startedAtIso);
-        else
-          yield* sql
-            .withTransaction(
-              Effect.gen(function* () {
-                yield* markRunning(active.id, startedAtIso, webhook.deliveryId);
-                // Recovery must distinguish this delivery from other windows waiting on the same task.
+          const claimed = yield* sql.withTransaction(
+            Effect.gen(function* () {
+              if (!(yield* markRunning(active, startedAtIso, webhook?.deliveryId))) return false;
+              if (webhook !== undefined) {
                 yield* sql`UPDATE scheduled_task_webhook_pending SET state = 'running' WHERE delivery_id = ${webhook.deliveryId}`;
-              }),
-            )
-            .pipe(
-              Effect.mapError((cause) =>
-                taskError("Could not start webhook run.", { taskId: task.id, cause }),
-              ),
-            );
+              }
+              yield* sql`INSERT INTO scheduled_task_dispatch_claims (task_id, thread_id, config_revision, started_at)
+              VALUES (${active.id}, ${active.threadId}, ${active.configRevision ?? ""}, ${startedAtIso})`;
+              return true;
+            }),
+          );
+          return claimed ? { active } : { stale: true };
+        }).pipe(
+          Effect.mapError((cause) =>
+            isScheduledTaskError(cause) || isWebhookDeliverySkipped(cause)
+              ? cause
+              : taskError("Could not claim schedule task.", { taskId: task.id, cause }),
+          ),
+        );
+        let claim = yield* claimActive;
+        for (let attempt = 0; claim.stale === true && attempt < 3; attempt++)
+          claim = yield* claimActive;
+        if (claim.skipped !== undefined) return claim.skipped;
+        if (claim.active === undefined)
+          return yield* taskError("Schedule task changed before it could run.", {
+            taskId: task.id,
+          });
+        const active = claim.active;
 
         yield* notifyChanged;
 
@@ -1084,6 +1110,17 @@ export const layer = Layer.effect(
         Effect.onError((cause) =>
           releaseStuckRun(task, startedAtIso, errorMessage(cause), webhook?.deliveryId),
         ),
+        Effect.ensuring(
+          sql`DELETE FROM scheduled_task_dispatch_claims
+          WHERE task_id = ${task.id} AND started_at = ${startedAtIso}`.pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Could not release schedule dispatch claim", {
+                taskId: task.id,
+                cause,
+              }),
+            ),
+          ),
+        ),
       );
 
       // Reserve and release as one bracket so an interrupt cannot leave the task marked busy.
@@ -1182,6 +1219,8 @@ export const layer = Layer.effect(
 
     // Recover crash-left running rows that the due-task filter would otherwise skip forever.
     yield* Effect.gen(function* () {
+      // A previous process cannot dispatch after restart; its committed thread work remains projected.
+      yield* sql`DELETE FROM scheduled_task_dispatch_claims`;
       const rows = yield* selectAllRows();
       const stuck = rows.filter((row) => row.last_run_status === "running");
       if (stuck.length === 0) return;
@@ -2503,6 +2542,7 @@ export const layer = Layer.effect(
     yield* scheduler.register("webhook-coalescing", dispatchPending());
 
     return ScheduledTaskService.of({
+      invalidate: notifyChanged,
       list,
       subscribeList,
       upsert,

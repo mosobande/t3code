@@ -240,6 +240,7 @@ export function scheduledTaskThreadMode(
 
 export const ScheduledTask = Schema.Struct({
   id: ScheduledTaskId,
+  configRevision: Schema.optionalKey(TrimmedNonEmptyString),
   title: TrimmedNonEmptyString,
   prompt: TrimmedNonEmptyString,
   enabled: Schema.Boolean,

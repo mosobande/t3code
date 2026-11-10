@@ -33,6 +33,7 @@ import { makeRunOutcomeRecorder, type RunOutcome } from "./RunMetrics.ts";
 
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
+import { assertEventsAllowed } from "./DestinationAdmission.ts";
 import * as EventStore from "./EventStore.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProjectStore from "./ProjectStore.ts";
@@ -365,18 +366,24 @@ const layerBase: Layer.Layer<
             : [],
         ),
       );
-      return Effect.forEach(
-        events,
-        (event): Effect.Effect<OrchestrationV2DomainEvent, unknown> =>
-          event.type === "turn-item.updated"
-            ? turnItemPositions
-                .normalize(
-                  event.payload,
-                  event.payload.runId === null ? undefined : runOrdinals.get(event.payload.runId),
-                )
-                .pipe(Effect.map((payload) => ({ ...event, payload })))
-            : Effect.succeed(event),
-        { concurrency: 1 },
+      return assertEventsAllowed(sql, events).pipe(
+        Effect.andThen(
+          Effect.forEach(
+            events,
+            (event): Effect.Effect<OrchestrationV2DomainEvent, unknown> =>
+              event.type === "turn-item.updated"
+                ? turnItemPositions
+                    .normalize(
+                      event.payload,
+                      event.payload.runId === null
+                        ? undefined
+                        : runOrdinals.get(event.payload.runId),
+                    )
+                    .pipe(Effect.map((payload) => ({ ...event, payload })))
+                : Effect.succeed(event),
+            { concurrency: 1 },
+          ),
+        ),
       );
     };
 

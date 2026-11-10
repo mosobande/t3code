@@ -28,6 +28,7 @@ import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { forkParked } from "../serverActivation.ts";
+import { assertDestinationOpen } from "./DestinationAdmission.ts";
 
 export const OrchestrationEffectRequestV2 = Schema.Union([
   Schema.Struct({
@@ -368,6 +369,19 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
     const service: EffectOutboxV2Shape = {
       enqueue: Effect.fn("EffectOutbox.enqueue")(
         function* (effects) {
+          for (const effect of effects) {
+            if (
+              ![
+                "provider-session.detach",
+                "scheduled-tasks.cleanup",
+                "terminal.cleanup",
+                "preview.cleanup",
+                "attachment.cleanup",
+                "delegated-tasks.stop",
+              ].includes(effect.request.type)
+            )
+              yield* assertDestinationOpen(sql, effect.threadId);
+          }
           const now = yield* DateTime.now;
           const nowIso = DateTime.formatIso(now);
           yield* Effect.forEach(
@@ -403,6 +417,7 @@ export const layer: Layer.Layer<EffectOutboxV2, never, SqlClient.SqlClient> = La
           );
           // EventSink owns the corresponding post-commit notification.
         },
+        sql.withTransaction,
         Effect.mapError((cause) => new EffectOutboxError({ operation: "enqueue", cause })),
       ),
       get: (effectId) =>

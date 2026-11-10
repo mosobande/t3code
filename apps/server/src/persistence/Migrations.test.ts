@@ -116,6 +116,58 @@ describe("runMigrations", () => {
     }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
   );
 
+  it.effect("preserves existing schedules and webhook history when adding config revisions", () =>
+    Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient;
+      yield* runMigrations({ toMigrationInclusive: 80 });
+      yield* sql`
+        INSERT INTO scheduled_tasks (
+          task_id, title, prompt, enabled, schedule_json, project_id, thread_id, thread_mode,
+          workspace_strategy_json, model_selection_json, runtime_mode, interaction_mode,
+          created_by, creation_source, created_at, updated_at, next_run_at, last_run_at,
+          last_run_status, last_run_error, run_count, webhook_token, webhook_secret
+        ) VALUES (
+          'existing-task', 'Review', 'Review the project', 1,
+          '{"type":"interval","everyMs":60000}', 'existing-project', 'existing-thread', 'continue',
+          '{"type":"root"}', '{"instanceId":"codex","model":"test-model"}',
+          'full-access', 'default', 'user', 'web', '2026-11-01', '2026-11-01',
+          '2026-11-02', '2026-11-01', 'success', NULL, 7, 'fixture-token', 'fixture-secret'
+        )
+      `;
+      yield* sql`
+        INSERT INTO scheduled_task_webhook_deliveries (
+          delivery_id, task_id, received_at, method, query, headers_json, body, body_bytes,
+          body_truncated, outcome, signature_verified, missing_fields_json, rendered_prompt, error
+        ) VALUES (
+          'existing-delivery', 'existing-task', '2026-11-01', 'POST', '', '{}', '{}', 2,
+          0, 'started', 1, '[]', 'Review the project', NULL
+        )
+      `;
+      const schedules = yield* sql`SELECT * FROM scheduled_tasks`;
+      const deliveries = yield* sql`SELECT * FROM scheduled_task_webhook_deliveries`;
+
+      assert.deepStrictEqual(yield* runMigrations(), [[81, "DestinationTransitions"]]);
+      const [upgraded] = yield* sql`SELECT * FROM scheduled_tasks`;
+      const { config_revision: revision, ...preserved } = upgraded!;
+      assert.deepStrictEqual([preserved], schedules);
+      assert.match(String(revision), /^[a-f0-9]{32}$/);
+      assert.deepStrictEqual(
+        yield* sql`SELECT * FROM scheduled_task_webhook_deliveries`,
+        deliveries,
+      );
+
+      yield* sql`UPDATE scheduled_tasks SET run_count = 8, last_run_status = 'running'`;
+      assert.deepStrictEqual(yield* sql`SELECT config_revision FROM scheduled_tasks`, [
+        { config_revision: revision },
+      ]);
+      yield* sql`UPDATE scheduled_tasks SET creation_source = 'mcp'`;
+      const [edited] = yield* sql`SELECT config_revision FROM scheduled_tasks`;
+      assert.match(String(edited!.config_revision), /^[a-f0-9]{32}$/);
+      assert.notStrictEqual(edited!.config_revision, revision);
+      assert.deepStrictEqual(yield* runMigrations(), []);
+    }).pipe(Effect.provide(NodeSqliteClient.layer({ filename: ":memory:" }))),
+  );
+
   it.effect.each([30, 54])("still starts with a site-local migration at id %s", (id) =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
