@@ -1530,6 +1530,7 @@ function ScheduledTaskEditorForm({
             };
     const input: ScheduledTaskUpsertInput = {
       ...(draft.editingId ? { id: draft.editingId as ScheduledTaskId, requireExisting: true } : {}),
+      expectedConfigRevision: draft.configRevision,
       title: draft.title.trim(),
       prompt: draft.prompt.trim(),
       enabled: draft.enabled,

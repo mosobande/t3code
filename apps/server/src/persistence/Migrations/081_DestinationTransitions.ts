@@ -11,7 +11,7 @@ export default Effect.gen(function* () {
   )`;
   yield* sql`CREATE TABLE retired_thread_destinations (
     thread_id TEXT PRIMARY KEY,
-    successor_thread_id TEXT NOT NULL,
+    successor_thread_id TEXT NOT NULL UNIQUE,
     operation_id TEXT NOT NULL UNIQUE,
     retired_at TEXT NOT NULL
   )`;

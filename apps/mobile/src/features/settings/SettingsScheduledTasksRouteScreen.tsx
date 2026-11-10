@@ -764,6 +764,7 @@ function TaskForm({
     }
     const input: ScheduledTaskUpsertInput = {
       ...(draft.task ? { id: draft.task.id, requireExisting: true } : {}),
+      expectedConfigRevision: draft.task?.configRevision,
       title: draft.title.trim(),
       prompt: draft.prompt.trim(),
       projectId: draft.projectId,

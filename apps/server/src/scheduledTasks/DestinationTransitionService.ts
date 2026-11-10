@@ -179,6 +179,12 @@ export const layer = Layer.effect(
         if (input.sourceThreadId === input.successorThreadId)
           return { status: "conflict", reason: "invalid_threads" } as const;
 
+        const sideChats = yield* sql`SELECT 1 FROM orchestration_v2_projection_threads
+          WHERE thread_id IN (${input.sourceThreadId}, ${input.successorThreadId})
+            AND json_extract(payload_json, '$.lineage.sideChat') = 1 LIMIT 1`;
+        // Parent deletion owns side-chat locks in a different order; these endpoints are unsupported.
+        if (sideChats.length > 0) return { status: "conflict", reason: "invalid_threads" } as const;
+
         // Ancestors precede descendants, matching command intake's parent-before-child lock order.
         const order = yield* Effect.forEach([input.sourceThreadId, input.successorThreadId], (id) =>
           depth(id).pipe(Effect.map((depth) => ({ id, depth }))),
@@ -194,8 +200,10 @@ export const layer = Layer.effect(
               return { status: "committed", receipt: yield* decodeReceipt(operation.receipt_json) };
             const retired = yield* sql<{
               thread_id: string;
-            }>`SELECT thread_id FROM retired_thread_destinations
-        WHERE thread_id IN (${input.sourceThreadId}, ${input.successorThreadId})`;
+              successor_thread_id: string;
+            }>`SELECT thread_id, successor_thread_id FROM retired_thread_destinations
+        WHERE thread_id IN (${input.sourceThreadId}, ${input.successorThreadId})
+          OR successor_thread_id = ${input.successorThreadId}`;
             if (retired.some((row) => row.thread_id === input.sourceThreadId))
               return { status: "conflict", reason: "source_retired" };
             if (retired.length > 0) return { status: "conflict", reason: "successor_unavailable" };
@@ -211,7 +219,9 @@ export const layer = Layer.effect(
             const successor = yield* projections.getThreadSnapshot(input.successorThreadId);
             if (
               isProviderNativeSubagentThread(source.projection.thread) ||
-              isProviderNativeSubagentThread(successor.projection.thread)
+              isProviderNativeSubagentThread(successor.projection.thread) ||
+              source.projection.thread.lineage.sideChat === true ||
+              successor.projection.thread.lineage.sideChat === true
             )
               return { status: "conflict", reason: "invalid_threads" };
             if (

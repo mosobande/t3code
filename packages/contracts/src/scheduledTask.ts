@@ -277,6 +277,8 @@ export type ScheduledTaskListResult = typeof ScheduledTaskListResult.Type;
 
 export const ScheduledTaskUpsertInput = Schema.Struct({
   id: Schema.optional(ScheduledTaskId),
+  /** Required for existing tasks moved by a destination transition; stale revisions reject the edit. */
+  expectedConfigRevision: Schema.optional(TrimmedNonEmptyString),
   requireExisting: Schema.optional(Schema.Boolean).annotate({
     description: "Reject the save if the task no longer exists, for edits from a client form.",
   }),
@@ -300,12 +302,14 @@ export type ScheduledTaskUpsertInput = typeof ScheduledTaskUpsertInput.Type;
 
 export const ScheduledTaskSetEnabledInput = Schema.Struct({
   id: ScheduledTaskId,
+  expectedConfigRevision: Schema.optional(TrimmedNonEmptyString),
   enabled: Schema.Boolean,
 });
 export type ScheduledTaskSetEnabledInput = typeof ScheduledTaskSetEnabledInput.Type;
 
 export const ScheduledTaskDeleteInput = Schema.Struct({
   id: ScheduledTaskId,
+  expectedConfigRevision: Schema.optional(TrimmedNonEmptyString),
 });
 export type ScheduledTaskDeleteInput = typeof ScheduledTaskDeleteInput.Type;
 
@@ -316,6 +320,7 @@ export type ScheduledTaskRunNowInput = typeof ScheduledTaskRunNowInput.Type;
 
 export const ScheduledTaskRotateWebhookTokenInput = Schema.Struct({
   id: ScheduledTaskId,
+  expectedConfigRevision: Schema.optional(TrimmedNonEmptyString),
 });
 export type ScheduledTaskRotateWebhookTokenInput = typeof ScheduledTaskRotateWebhookTokenInput.Type;
 

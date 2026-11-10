@@ -1,8 +1,10 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { assert, it } from "@effect/vitest";
 import {
   type CommitDestinationTransitionInput,
+  type ScheduledTaskUpsertInput,
   CommandId,
   EventId,
   MessageId,
@@ -85,6 +87,7 @@ const testLayer = <E, R, E2 = never>(
     E2,
     SqlClient.SqlClient
   > = Layer.mock(ScheduledTaskService.ScheduledTaskService)({ invalidate: Effect.void }),
+  commands = ThreadCommandExecutor.layer,
 ) => {
   const stores = Layer.mergeAll(EventStore.layer, ProjectionStore.layer, EffectOutbox.layer).pipe(
     Layer.provideMerge(database),
@@ -92,7 +95,7 @@ const testLayer = <E, R, E2 = never>(
   const dependencies = Layer.mergeAll(
     stores,
     EventSink.layer.pipe(Layer.provide(stores)),
-    ThreadCommandExecutor.layer,
+    commands,
     scheduledTasks.pipe(Layer.provide(stores)),
   );
   return DestinationTransitionService.layer.pipe(Layer.provideMerge(dependencies));
@@ -261,6 +264,411 @@ const seed = (ready = true) =>
       });
     return { sql, sink, projections, now, append, eventId, readyRun, input, insertSchedule };
   });
+
+const configurationTasks = (readOrigin: Effect.Effect<{ relayHookBaseUrl: null }>) =>
+  ScheduledTaskService.layer.pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        ManagedPolicy.layerTest(),
+        Layer.mock(ThreadLaunchService.ThreadLaunchService)({}),
+        Layer.mock(ThreadManagementService.ThreadManagementService)({}),
+        Layer.mock(SecretRequests.SecretRequests)({}),
+        Layer.mock(ManagedProjectFolders.ManagedProjectFolders)({
+          namedProjectsRoot: "/projects",
+          isScratchProject: () => Effect.succeed(false),
+        }),
+        NodeCrypto.layer,
+        Layer.succeed(Scheduler.Scheduler, { register: () => Effect.void }),
+        Layer.succeed(ScheduledTaskService.ScheduledTaskWebhookOrigin, readOrigin),
+      ),
+    ),
+  );
+
+const editInput: ScheduledTaskUpsertInput = {
+  id: ScheduledTaskId.make("schedule:a"),
+  requireExisting: true,
+  title: "Edited",
+  prompt: "Edited prompt",
+  enabled: true,
+  schedule: { type: "interval", everyMs: 60_000 },
+  projectId: ProjectId.make("project:transition"),
+  threadId: null,
+  threadMode: "new_thread",
+  workspaceStrategy: { type: "root" },
+  modelSelection,
+  runtimeMode: "full-access",
+  interactionMode: "default",
+};
+
+type TransitionFixture = Effect.Success<ReturnType<typeof seed>>;
+
+const createDestination = (fixture: TransitionFixture, id: ThreadId, ready = false) =>
+  Effect.gen(function* () {
+    const template = yield* fixture.projections.getThreadProjection(successorThreadId);
+    const runId = RunId.make(`${id}:run`);
+    const attemptId = RunAttemptId.make(`${id}:attempt`);
+    const providerThreadId = ProviderThreadId.make(`${id}:provider`);
+    const providerTurnId = ProviderTurnId.make(`${id}:turn`);
+    const metadata = () => ({ id: fixture.eventId(), threadId: id, occurredAt: fixture.now });
+    yield* fixture.append({
+      ...metadata(),
+      type: "thread.created",
+      payload: {
+        ...template.thread,
+        id,
+        lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: id },
+      },
+    });
+    if (!ready) return;
+    yield* fixture.append({
+      ...metadata(),
+      type: "run.created",
+      payload: {
+        ...template.runs[0]!,
+        id: runId,
+        threadId: id,
+        activeAttemptId: attemptId,
+        providerThreadId,
+      },
+    });
+    yield* fixture.append({
+      ...metadata(),
+      type: "run-attempt.created",
+      payload: { ...template.attempts[0]!, id: attemptId, runId, providerThreadId, providerTurnId },
+    });
+    yield* fixture.append({
+      ...metadata(),
+      type: "provider-thread.updated",
+      payload: { ...template.providerThreads[0]!, id: providerThreadId, appThreadId: id },
+    });
+    yield* fixture.append({
+      ...metadata(),
+      type: "provider-turn.updated",
+      payload: {
+        ...template.providerTurns[0]!,
+        id: providerTurnId,
+        providerThreadId,
+        runAttemptId: attemptId,
+      },
+    });
+  });
+
+const destinationInput = (
+  fixture: TransitionFixture,
+  source: ThreadId,
+  successor: ThreadId,
+  operationId: string,
+) =>
+  Effect.gen(function* () {
+    const sourceSnapshot = yield* fixture.projections.getThreadSnapshot(source);
+    const successorSnapshot = yield* fixture.projections.getThreadSnapshot(successor);
+    const bindings = yield* fixture.sql<{ task_id: string; config_revision: string }>`
+      SELECT task_id, config_revision FROM scheduled_tasks WHERE thread_id = ${source} ORDER BY task_id`;
+    return {
+      operationId,
+      sourceThreadId: source,
+      successorThreadId: successor,
+      expectedSourceSequence: sourceSnapshot.snapshotSequence,
+      expectedSuccessorSequence: successorSnapshot.snapshotSequence,
+      expectedScheduleBindings: bindings.map((row) => ({
+        id: ScheduledTaskId.make(row.task_id),
+        configRevision: row.config_revision,
+      })),
+    };
+  });
+
+it.effect.each(["missing", "stale", "wrong", "current"] as const)(
+  "requires a current form revision after transition (%s)",
+  (revision) =>
+    Effect.gen(function* () {
+      const fixture = yield* seed();
+      const service = yield* DestinationTransitionService.DestinationTransitionService;
+      const schedules = yield* ScheduledTaskService.ScheduledTaskService;
+      const before = (yield* schedules.list()).tasks.find((task) => task.id === editInput.id)!;
+      const committed = yield* service.commit(yield* fixture.input());
+      assert.equal(committed.status, "committed");
+      const current = (yield* schedules.list()).tasks.find((task) => task.id === editInput.id)!;
+      const rows = yield* fixture.sql`SELECT * FROM scheduled_tasks ORDER BY task_id`;
+      const result = yield* schedules
+        .upsert({
+          ...editInput,
+          ...(revision === "missing"
+            ? {}
+            : {
+                expectedConfigRevision:
+                  revision === "stale"
+                    ? before.configRevision!
+                    : revision === "wrong"
+                      ? "wrong-revision"
+                      : current.configRevision!,
+              }),
+        })
+        .pipe(Effect.exit);
+      assert.equal(Exit.isSuccess(result), revision === "current");
+      if (revision !== "current")
+        assert.deepEqual(yield* fixture.sql`SELECT * FROM scheduled_tasks ORDER BY task_id`, rows);
+      else if (Exit.isSuccess(result)) {
+        assert.equal(result.value.task.threadId, null);
+        assert.equal(result.value.task.threadMode, "new_thread");
+        assert.notEqual(result.value.task.configRevision, current.configRevision);
+      }
+    }).pipe(
+      Effect.provide(
+        testLayer(
+          SqlitePersistence.layerMemory,
+          configurationTasks(Effect.succeed({ relayHookBaseUrl: null })),
+        ),
+      ),
+    ),
+);
+
+it.effect("keeps legacy full edits compatible for schedules without a transition", () =>
+  Effect.gen(function* () {
+    yield* seed();
+    const schedules = yield* ScheduledTaskService.ScheduledTaskService;
+    const result = yield* schedules.upsert(editInput);
+    assert.equal(result.task.threadId, null);
+    assert.equal(result.task.title, "Edited");
+  }).pipe(
+    Effect.provide(
+      testLayer(
+        SqlitePersistence.layerMemory,
+        configurationTasks(Effect.succeed({ relayHookBaseUrl: null })),
+      ),
+    ),
+  ),
+);
+
+it.effect("allows exactly one of two queued distinct-source claims on a dedicated successor", () =>
+  Effect.gen(function* () {
+    const executor = yield* KeyedLock.make<ThreadId>();
+    const held = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    const queued = yield* Deferred.make<void>();
+    let requests = 0;
+    const commands = Layer.succeed(ThreadCommandExecutor.ThreadCommandExecutor, {
+      ...executor,
+      withLock: (key, work) =>
+        Effect.gen(function* () {
+          if (key === successorThreadId && ++requests === 2)
+            yield* Deferred.succeed(queued, undefined);
+          return yield* executor.withLock(key, work);
+        }),
+    });
+    const holding = yield* Effect.forkChild(
+      executor.withLock(
+        successorThreadId,
+        Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))),
+      ),
+    );
+    yield* Deferred.await(held);
+    yield* Effect.gen(function* () {
+      const fixture = yield* seed();
+      const otherSource = ThreadId.make("thread:transition:other-source");
+      yield* createDestination(fixture, otherSource);
+      const service = yield* DestinationTransitionService.DestinationTransitionService;
+      const inputs = [
+        yield* fixture.input(),
+        yield* destinationInput(fixture, otherSource, successorThreadId, "transition:other"),
+      ];
+      const pending = yield* Effect.forEach(inputs, (input) =>
+        Effect.forkChild(service.commit(input)),
+      );
+      yield* Deferred.await(queued);
+      assert.equal((yield* fixture.sql`SELECT * FROM thread_destination_transitions`).length, 2);
+      yield* Deferred.succeed(release, undefined);
+      const results = yield* Effect.forEach(pending, Fiber.join);
+      assert.equal(results.filter((result) => result.status === "committed").length, 1);
+      assert.deepEqual(
+        results.find((result) => result.status !== "committed"),
+        { status: "conflict", reason: "successor_unavailable" },
+      );
+      for (let index = 0; index < inputs.length; index++)
+        assert.deepEqual(yield* service.commit(inputs[index]!), results[index]);
+      assert.equal((yield* fixture.sql`SELECT * FROM retired_thread_destinations`).length, 1);
+    }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory, undefined, commands)));
+    yield* Fiber.join(holding);
+  }),
+);
+
+it.effect(
+  "keeps the dedicated incoming claim after reopen and permits a later outgoing renewal",
+  () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-dedicated-successor-" });
+      const databasePath = path.join(directory, "state.sqlite");
+      const prepared = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const fixture = yield* seed();
+          const otherSource = ThreadId.make("thread:transition:other-source");
+          const laterSuccessor = ThreadId.make("thread:transition:later-successor");
+          yield* createDestination(fixture, otherSource);
+          yield* createDestination(fixture, laterSuccessor, true);
+          const service = yield* DestinationTransitionService.DestinationTransitionService;
+          const input = yield* fixture.input();
+          const committed = yield* service.commit(input);
+          if (committed.status !== "committed") return assert.fail("Transition did not commit");
+          return {
+            input,
+            committed,
+            competing: yield* destinationInput(
+              fixture,
+              otherSource,
+              successorThreadId,
+              "transition:late-incoming",
+            ),
+            outgoing: yield* destinationInput(
+              fixture,
+              successorThreadId,
+              laterSuccessor,
+              "transition:outgoing",
+            ),
+          };
+        }).pipe(Effect.provide(testLayer(SqlitePersistence.layerFromPath(databasePath)))),
+      );
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const sql = yield* SqlClient.SqlClient;
+          const service = yield* DestinationTransitionService.DestinationTransitionService;
+          assert.deepEqual(yield* service.commit(prepared.competing), {
+            status: "conflict",
+            reason: "successor_unavailable",
+          });
+          assert.deepEqual(yield* service.commit(prepared.input), prepared.committed);
+          assert.deepEqual(
+            yield* service.get({ operationId: prepared.input.operationId }),
+            prepared.committed,
+          );
+          const outgoing = yield* service.commit(prepared.outgoing);
+          assert.equal(outgoing.status, "committed");
+          assert.deepEqual(yield* service.commit(prepared.outgoing), outgoing);
+          assert.equal(
+            (yield* sql`SELECT * FROM scheduled_tasks WHERE thread_id = ${prepared.outgoing.successorThreadId}`)
+              .length,
+            2,
+          );
+          assert.equal((yield* sql`SELECT * FROM retired_thread_destinations`).length, 2);
+        }).pipe(Effect.provide(testLayer(SqlitePersistence.layerFromPath(databasePath)))),
+      );
+    }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect.each([
+  { writer: "save", winner: "cutover" },
+  { writer: "save", winner: "edit" },
+  { writer: "toggle", winner: "cutover" },
+  { writer: "toggle", winner: "edit" },
+  { writer: "rotate", winner: "cutover" },
+  { writer: "rotate", winner: "edit" },
+  { writer: "delete", winner: "cutover" },
+  { writer: "delete", winner: "edit" },
+] as const)(
+  "rejects stale configuration when $winner wins the $writer race",
+  ({ writer, winner }) =>
+    Effect.gen(function* () {
+      const read = yield* Deferred.make<void>();
+      const proceed = yield* Deferred.make<void>();
+      let reads = 0;
+      const tasks = configurationTasks(
+        Effect.gen(function* () {
+          if (++reads === 1) {
+            yield* Deferred.succeed(read, undefined);
+            yield* Deferred.await(proceed);
+          }
+          return { relayHookBaseUrl: null };
+        }),
+      );
+      yield* Effect.gen(function* () {
+        const fixture = yield* seed();
+        if (writer === "rotate")
+          yield* fixture.sql`UPDATE scheduled_tasks SET schedule_json = '{"type":"webhook","signature":null}', next_run_at = NULL WHERE task_id = 'schedule:a'`;
+        const service = yield* DestinationTransitionService.DestinationTransitionService;
+        const schedules = yield* ScheduledTaskService.ScheduledTaskService;
+        const input = yield* fixture.input();
+        const expectedConfigRevision = input.expectedScheduleBindings.find(
+          (binding) => binding.id === editInput.id,
+        )!.configRevision;
+        const mutation =
+          writer === "save"
+            ? schedules.upsert({ ...editInput, expectedConfigRevision }).pipe(Effect.asVoid)
+            : writer === "toggle"
+              ? schedules.setEnabled({ id: editInput.id!, enabled: false }).pipe(Effect.asVoid)
+              : writer === "rotate"
+                ? schedules.rotateWebhookToken({ id: editInput.id! }).pipe(Effect.asVoid)
+                : schedules.delete({ id: editInput.id! }).pipe(Effect.asVoid);
+        const saving = yield* Effect.forkChild(mutation.pipe(Effect.exit));
+        yield* Deferred.await(read);
+        if (winner === "cutover") {
+          const committed = yield* service.commit(input);
+          if (committed.status !== "committed") return assert.fail("Transition did not commit");
+          const after = yield* fixture.sql`SELECT * FROM scheduled_tasks ORDER BY task_id`;
+          yield* Deferred.succeed(proceed, undefined);
+          assert.isTrue(Exit.isFailure(yield* Fiber.join(saving)));
+          assert.deepEqual(
+            yield* fixture.sql`SELECT * FROM scheduled_tasks ORDER BY task_id`,
+            after,
+          );
+          assert.deepEqual(yield* service.get({ operationId: input.operationId }), committed);
+        } else {
+          yield* Deferred.succeed(proceed, undefined);
+          assert.isTrue(Exit.isSuccess(yield* Fiber.join(saving)));
+          assert.deepEqual(yield* service.commit(input), {
+            status: "conflict",
+            reason: "schedule_manifest",
+          });
+          assert.equal((yield* fixture.sql`SELECT * FROM retired_thread_destinations`).length, 0);
+        }
+      }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory, tasks)));
+    }),
+);
+
+it.effect.each([sourceThreadId, successorThreadId])(
+  "rejects side-chat endpoint %s before requesting held command locks",
+  (threadId) =>
+    Effect.gen(function* () {
+      const executor = yield* KeyedLock.make<ThreadId>();
+      const attempted = yield* Deferred.make<void>();
+      const held = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const commands = Layer.succeed(ThreadCommandExecutor.ThreadCommandExecutor, {
+        ...executor,
+        withLock: (key, work) =>
+          Deferred.succeed(attempted, undefined).pipe(Effect.andThen(executor.withLock(key, work))),
+      });
+      const holding = yield* Effect.forkChild(
+        executor.withLock(
+          threadId,
+          Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))),
+        ),
+      );
+      yield* Deferred.await(held);
+      yield* Effect.gen(function* () {
+        const fixture = yield* seed();
+        const thread = yield* fixture.projections.getThread(threadId);
+        yield* fixture.append({
+          id: fixture.eventId(),
+          threadId,
+          type: "thread.metadata-updated",
+          occurredAt: fixture.now,
+          payload: { ...thread, lineage: { ...thread.lineage, sideChat: true } },
+        });
+        const service = yield* DestinationTransitionService.DestinationTransitionService;
+        const input = yield* fixture.input();
+        const result = yield* Effect.raceFirst(
+          service.commit(input),
+          Deferred.await(attempted).pipe(
+            Effect.andThen(Effect.die("Side-chat transition requested a command lock")),
+          ),
+        );
+        assert.deepEqual(result, { status: "conflict", reason: "invalid_threads" });
+        assert.equal((yield* fixture.sql`SELECT * FROM retired_thread_destinations`).length, 0);
+      }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory, undefined, commands)));
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(holding);
+    }),
+);
 
 it.effect(
   "commits all bindings and the fence once, preserves schedule data, and rejects retired admission",

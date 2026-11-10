@@ -61,6 +61,7 @@ export type WorkspaceMode = "root" | "worktree" | "existing_worktree";
 
 export interface DraftState {
   readonly editingId: string | null;
+  readonly configRevision?: string;
   readonly title: string;
   readonly prompt: string;
   readonly enabled: boolean;
@@ -247,6 +248,7 @@ export function taskToDraft(task: ScheduledTask): DraftState {
       : new Set([0, 1, 2, 3, 4, 5, 6]);
   return {
     editingId: task.id,
+    ...(task.configRevision === undefined ? {} : { configRevision: task.configRevision }),
     title: task.title,
     prompt: task.prompt,
     enabled: task.enabled,

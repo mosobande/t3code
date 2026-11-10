@@ -615,11 +615,16 @@ export const layer = Layer.effect(
       return task;
     });
 
+    const changedTask = (id: ScheduledTaskId) =>
+      taskError("Schedule task changed or no longer exists. Refresh it before editing.", {
+        taskId: id,
+      });
+
     // Run transitions own run-state columns; settings saves must not overwrite them.
-    // Check existence in the write so edits cannot undo concurrent deletion.
     const saveTask = (
       task: ScheduledTask,
       requireExisting: boolean,
+      expectedRevision: string | null,
       /** The schedule this save read, when it left the schedule unchanged. */
       keptSchedule: ScheduledTask["schedule"] | null,
       webhook: {
@@ -678,8 +683,10 @@ export const layer = Layer.effect(
           ${task.runCount},
           ${webhook.token},
           ${webhook.secret}
-        WHERE ${requireExisting ? 0 : 1} = 1
-           OR EXISTS (SELECT 1 FROM scheduled_tasks WHERE task_id = ${task.id})
+        WHERE (${requireExisting ? 0 : 1} = 1 AND ${expectedRevision} IS NULL
+            AND NOT EXISTS (SELECT 1 FROM scheduled_tasks WHERE task_id = ${task.id}))
+           OR EXISTS (SELECT 1 FROM scheduled_tasks
+            WHERE task_id = ${task.id} AND config_revision = ${expectedRevision})
         ON CONFLICT (task_id)
         DO UPDATE SET
           title = excluded.title,
@@ -687,8 +694,6 @@ export const layer = Layer.effect(
           enabled = excluded.enabled,
           schedule_json = excluded.schedule_json,
           project_id = excluded.project_id,
-          -- A first run may bind the thread while this save is in flight; only a
-          -- switch to new threads unbinds.
           thread_id = CASE
             WHEN excluded.thread_mode = 'new_thread' THEN NULL
             WHEN excluded.project_id != scheduled_tasks.project_id THEN excluded.thread_id
@@ -723,28 +728,31 @@ export const layer = Layer.effect(
             WHEN ${webhook.secretChanged ? 1 : 0} = 1 THEN excluded.webhook_secret
             ELSE scheduled_tasks.webhook_secret
           END
+        WHERE scheduled_tasks.config_revision = ${expectedRevision}
         RETURNING task_id
       `.pipe(
         Effect.mapError((cause) =>
           taskError("Could not save schedule task.", { taskId: task.id, cause }),
         ),
-        Effect.flatMap((rows) =>
-          rows.length > 0
-            ? Effect.void
-            : taskError("Schedule task not found.", { taskId: task.id }),
-        ),
+        Effect.flatMap((rows) => (rows.length > 0 ? Effect.void : changedTask(task.id))),
       );
 
-    const deleteRow = (id: ScheduledTaskId) =>
+    const deleteRow = (task: ScheduledTask) =>
       sql
         .withTransaction(
-          sql`DELETE FROM scheduled_task_webhook_deliveries WHERE task_id = ${id}`.pipe(
-            Effect.andThen(sql`DELETE FROM scheduled_tasks WHERE task_id = ${id}`),
-          ),
+          Effect.gen(function* () {
+            const removed = yield* sql`DELETE FROM scheduled_tasks
+              WHERE task_id = ${task.id} AND config_revision = ${task.configRevision ?? ""}
+              RETURNING task_id`;
+            if (removed.length === 0) return yield* changedTask(task.id);
+            yield* sql`DELETE FROM scheduled_task_webhook_deliveries WHERE task_id = ${task.id}`;
+          }),
         )
         .pipe(
           Effect.mapError((cause) =>
-            taskError("Could not delete schedule task.", { taskId: id, cause }),
+            isScheduledTaskError(cause)
+              ? cause
+              : taskError("Could not delete schedule task.", { taskId: task.id, cause }),
           ),
         );
 
@@ -844,6 +852,7 @@ export const layer = Layer.effect(
         yield* sql`
           UPDATE scheduled_tasks SET thread_id = ${threadId}
           WHERE task_id = ${task.id} AND created_at = ${task.createdAt}
+            AND config_revision = ${task.configRevision ?? ""}
             AND project_id = ${task.projectId}
             AND thread_id IS NULL AND thread_mode != 'new_thread'
         `;
@@ -1346,6 +1355,26 @@ export const layer = Layer.effect(
       // keep their run history, and so real load failures propagate instead
       // of silently resetting an existing row.
       const existingTask = yield* findTask(id);
+      if (
+        input.expectedConfigRevision !== undefined &&
+        input.expectedConfigRevision !== existingTask?.configRevision
+      )
+        return yield* changedTask(id);
+      if (existingTask !== null && input.expectedConfigRevision === undefined) {
+        // Older forms cannot express which side of a committed cutover they edited.
+        const transitioned = yield* sql`SELECT 1 FROM thread_destination_transitions t,
+          json_each(t.receipt_json, '$.scheduleBindings') b
+          WHERE json_extract(b.value, '$.id') = ${id} LIMIT 1`.pipe(
+          Effect.mapError((cause) =>
+            taskError("Could not check schedule revision.", { taskId: id, cause }),
+          ),
+        );
+        if (transitioned.length > 0)
+          return yield* taskError(
+            "This task's destination changed. Reopen it in an updated client before editing.",
+            { taskId: id },
+          );
+      }
       const threadMode = resolveThreadMode(input, existingTask);
       const keptThreadId = input.threadId ?? existingTask?.threadId ?? null;
       // A bound thread belongs to its project, so moving the task leaves it for a new one.
@@ -1476,6 +1505,7 @@ export const layer = Layer.effect(
       yield* saveTask(
         task,
         input.requireExisting === true,
+        existingTask?.configRevision ?? null,
         scheduleUnchanged ? existingTask.schedule : null,
         webhook,
       );
@@ -1487,6 +1517,11 @@ export const layer = Layer.effect(
       "ScheduledTaskService.setEnabled",
     )(function* (input) {
       const existing = yield* loadTask(input.id);
+      if (
+        input.expectedConfigRevision !== undefined &&
+        input.expectedConfigRevision !== existing.configRevision
+      )
+        return yield* changedTask(input.id);
       if (existing.enabled === input.enabled) return { task: existing };
       if (
         input.enabled &&
@@ -1517,6 +1552,7 @@ export const layer = Layer.effect(
               next_run_at = ${next},
               updated_at = ${iso(now)}
           WHERE task_id = ${input.id}
+            AND config_revision = ${existing.configRevision ?? ""}
           RETURNING task_id
         `.pipe(
         Effect.mapError((cause) =>
@@ -1524,12 +1560,10 @@ export const layer = Layer.effect(
         ),
       );
       if (updated.length === 0) {
-        return yield* taskError("Schedule task not found.", { taskId: input.id });
+        return yield* changedTask(input.id);
       }
       yield* notifyChanged;
-      return {
-        task: { ...existing, enabled: input.enabled, nextRunAt: next, updatedAt: iso(now) },
-      };
+      return { task: yield* loadTask(input.id) };
     });
 
     const forgetWebhookTask = (id: ScheduledTaskId) =>
@@ -1564,12 +1598,20 @@ export const layer = Layer.effect(
         { discard: true },
       );
 
-    const deleteTask: ScheduledTaskService["Service"]["delete"] = (input) =>
-      deleteRow(input.id).pipe(
-        Effect.andThen(forgetWebhookTask(input.id)),
-        Effect.andThen(notifyChanged),
-        Effect.as({ id: input.id }),
-      );
+    const deleteTask: ScheduledTaskService["Service"]["delete"] = Effect.fn(
+      "ScheduledTaskService.delete",
+    )(function* (input) {
+      const existing = yield* findTask(input.id);
+      if (
+        input.expectedConfigRevision !== undefined &&
+        input.expectedConfigRevision !== existing?.configRevision
+      )
+        return yield* changedTask(input.id);
+      if (existing !== null) yield* deleteRow(existing);
+      yield* forgetWebhookTask(input.id);
+      yield* notifyChanged;
+      return { id: input.id };
+    });
 
     const deleteForThread = Effect.fn("ScheduledTaskService.deleteForThread")(function* (
       threadId: ThreadId,
@@ -1637,17 +1679,21 @@ export const layer = Layer.effect(
       "ScheduledTaskService.rotateWebhookToken",
     )(function* (input) {
       const task = yield* loadTask(input.id);
+      if (
+        input.expectedConfigRevision !== undefined &&
+        input.expectedConfigRevision !== task.configRevision
+      )
+        return yield* changedTask(input.id);
       if (task.schedule.type !== "webhook") {
         return yield* taskError("Only webhook tasks have a URL token.", { taskId: input.id });
       }
       const token = yield* newWebhookToken;
       const now = yield* localNow;
-      // Matching created_at keeps a rotation from landing on a task deleted
-      // and recreated under the same id since it was loaded.
       const updated = yield* sql<{ task_id: string }>`
           UPDATE scheduled_tasks
           SET webhook_token = ${token}, updated_at = ${iso(now)}
           WHERE task_id = ${input.id} AND created_at = ${task.createdAt}
+            AND config_revision = ${task.configRevision ?? ""}
           RETURNING task_id
         `.pipe(
         Effect.mapError((cause) =>
@@ -1655,7 +1701,7 @@ export const layer = Layer.effect(
         ),
       );
       if (updated.length === 0) {
-        return yield* taskError("Schedule task was deleted or replaced.", { taskId: input.id });
+        return yield* changedTask(input.id);
       }
       yield* notifyChanged;
       return { task: yield* loadTask(input.id) };

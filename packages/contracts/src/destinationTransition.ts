@@ -7,6 +7,7 @@ export const DestinationTransitionBinding = Schema.Struct({
   configRevision: TrimmedNonEmptyString,
 });
 
+/** Side chats and provider-owned subagents are unsupported; each successor accepts one incoming transition. */
 export const CommitDestinationTransitionInput = Schema.Struct({
   operationId: TrimmedNonEmptyString.check(Schema.isMaxLength(256)),
   sourceThreadId: ThreadId,
