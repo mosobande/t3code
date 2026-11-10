@@ -1,4 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import { vi } from "vite-plus/test";
+import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { assert, it } from "@effect/vitest";
@@ -23,6 +25,7 @@ import {
   type ThreadPullRequestLink,
   ThreadId,
 } from "@t3tools/contracts";
+import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -377,6 +380,291 @@ const destinationInput = (
       })),
     };
   });
+
+it.effect.each(["occupied", "deleted", "same batch"] as const)(
+  "reserves thread identities against distinct creation events (%s)",
+  (kind) =>
+    Effect.gen(function* () {
+      const fixture = yield* seed();
+      const sink = yield* EventSink.EventSinkV2;
+      const original = yield* fixture.projections.getThread(sourceThreadId);
+      if (kind === "deleted")
+        yield* fixture.append({
+          id: fixture.eventId(),
+          threadId: sourceThreadId,
+          type: "thread.deleted",
+          occurredAt: fixture.now,
+          payload: { ...original, deletedAt: fixture.now },
+        });
+      const threadId =
+        kind === "same batch" ? ThreadId.make("thread:transition:duplicate") : sourceThreadId;
+      const created = (): OrchestrationV2DomainEvent => ({
+        id: fixture.eventId(),
+        threadId,
+        type: "thread.created",
+        occurredAt: fixture.now,
+        payload: {
+          ...original,
+          id: threadId,
+          title: "Replacement",
+          lineage: {
+            parentThreadId: null,
+            relationshipToParent: null,
+            rootThreadId: threadId,
+          },
+        },
+      });
+      const commandId = CommandId.make("command:transition:duplicate");
+      const before =
+        yield* fixture.sql`SELECT * FROM orchestration_v2_projection_threads ORDER BY thread_id`;
+      const sequence = yield* sink.latestSequence();
+      const result = yield* sink
+        .commitCommand({
+          commandId,
+          threadId,
+          commandType: "thread.create",
+          acceptedAt: fixture.now,
+          events: kind === "same batch" ? [created(), created()] : [created()],
+          effects: [
+            {
+              id: "effect:transition:duplicate",
+              commandId,
+              threadId,
+              request: { type: "provider-turn.start", runId: RunId.make("run:duplicate") },
+            },
+          ],
+        })
+        .pipe(Effect.exit);
+      assert.isTrue(Exit.isFailure(result));
+      if (Exit.isFailure(result))
+        assert.include(Cause.pretty(result.cause), "This thread identity is already in use.");
+      assert.equal(yield* sink.latestSequence(), sequence);
+      assert.deepEqual(
+        yield* fixture.sql`SELECT * FROM orchestration_v2_projection_threads ORDER BY thread_id`,
+        before,
+      );
+      assert.equal(
+        (yield* fixture.sql`SELECT * FROM orchestration_v2_command_receipts WHERE command_id = ${commandId}`)
+          .length,
+        0,
+      );
+      assert.equal(
+        (yield* fixture.sql`SELECT * FROM orchestration_v2_effect_outbox WHERE command_id = ${commandId}`)
+          .length,
+        0,
+      );
+    }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory))),
+);
+
+it.effect("replays a creation receipt before checking its now occupied identity", () =>
+  Effect.gen(function* () {
+    const fixture = yield* seed();
+    const sink = yield* EventSink.EventSinkV2;
+    const original = yield* fixture.projections.getThread(sourceThreadId);
+    const threadId = ThreadId.make("thread:transition:receipt");
+    const input = {
+      commandId: CommandId.make("command:transition:receipt"),
+      threadId,
+      commandType: "thread.create",
+      acceptedAt: fixture.now,
+      effects: [],
+      events: [
+        {
+          id: fixture.eventId(),
+          threadId,
+          type: "thread.created" as const,
+          occurredAt: fixture.now,
+          payload: {
+            ...original,
+            id: threadId,
+            lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+          },
+        },
+      ],
+    };
+    const first = yield* sink.commitCommand(input);
+    const replay = yield* sink.commitCommand(input);
+    assert.isTrue(first.committed);
+    assert.isFalse(replay.committed);
+    assert.deepEqual(replay.receipt, first.receipt);
+    assert.deepEqual(replay.storedEvents, first.storedEvents);
+  }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory))),
+);
+
+it.effect(
+  "refuses delegated identity replacement while transition and follow-up acquire opposite locks",
+  () => {
+    const database = SqlitePersistence.layerMemory;
+    const registry = ProviderAdapterRegistry.layerFromAdaptersEffect(
+      ProviderAdapter.ProviderAdapterV2.pipe(Effect.map((adapter) => [adapter])),
+    ).pipe(
+      Layer.provide(
+        Layer.mock(ProviderAdapter.ProviderAdapterV2)({
+          instanceId,
+          driver,
+          getCapabilities: () => Effect.succeed(CodexProviderCapabilitiesV2),
+          planSelectionTransition: () => Effect.succeed({ type: "apply_on_next_turn" }),
+        }),
+      ),
+    );
+    const runtime = ProviderReplayHarness.layerWithRegistry(
+      { name: "identity-collision" },
+      registry,
+      { databaseLayer: database, runEffectWorker: false },
+    );
+    return Effect.gen(function* () {
+      const fixture = yield* seed();
+      const orchestrator = yield* Orchestrator.OrchestratorV2;
+      const service = yield* DestinationTransitionService.DestinationTransitionService;
+      const commands = yield* ThreadCommandExecutor.ThreadCommandExecutor;
+      const allocator = yield* IdAllocator.IdAllocatorV2;
+      const commandId = CommandId.make("command:transition:collision");
+      const childId = allocator.derive.delegatedTaskThread({ commandId });
+      assert.isTrue(childId < successorThreadId);
+      yield* createDestination(fixture, childId);
+      const parent = yield* fixture.projections.getThreadProjection(successorThreadId);
+      const run = parent.runs[0]!;
+      yield* fixture.append({
+        id: fixture.eventId(),
+        threadId: successorThreadId,
+        type: "run.updated",
+        occurredAt: fixture.now,
+        payload: { ...run, status: "running", completedAt: null },
+      });
+      yield* fixture.append({
+        id: fixture.eventId(),
+        threadId: successorThreadId,
+        type: "node.updated",
+        occurredAt: fixture.now,
+        payload: {
+          id: run.rootNodeId!,
+          threadId: successorThreadId,
+          runId: run.id,
+          parentNodeId: null,
+          rootNodeId: run.rootNodeId!,
+          kind: "root_turn",
+          status: "running",
+          countsForRun: true,
+          providerThreadId: run.providerThreadId,
+          providerTurnId: null,
+          nativeItemRef: null,
+          runtimeRequestId: null,
+          checkpointScopeId: null,
+          startedAt: fixture.now,
+          completedAt: null,
+        },
+      });
+      const input = yield* destinationInput(
+        fixture,
+        childId,
+        successorThreadId,
+        "identity-lock-race",
+      );
+      const heldChild = yield* Deferred.make<void>();
+      const releaseTransition = yield* Deferred.make<void>();
+      const followupTriedChild = yield* Deferred.make<void>();
+      const transitionTriedParent = yield* Deferred.make<void>();
+      let phase: "transition" | "delegation" | "followup" | "released" = "transition";
+      let followupHeldParent = false;
+      const withLock = commands.withLock;
+      using _locks = vi
+        .spyOn(commands, "withLock")
+        .mockImplementation(<A, E, R>(key: ThreadId, work: Effect.Effect<A, E, R>) =>
+          Effect.gen(function* () {
+            if (key === childId && phase === "followup")
+              yield* Deferred.succeed(followupTriedChild, undefined);
+            if (key === successorThreadId && phase === "released")
+              yield* Deferred.succeed(transitionTriedParent, undefined);
+            return yield* withLock(
+              key,
+              Effect.gen(function* () {
+                if (key === childId && phase === "transition") {
+                  yield* Deferred.succeed(heldChild, undefined);
+                  yield* Deferred.await(releaseTransition);
+                }
+                if (key === successorThreadId && phase === "followup") followupHeldParent = true;
+                return yield* work;
+              }),
+            );
+          }),
+        );
+      const transition = yield* Effect.forkChild(service.commit(input));
+      yield* Deferred.await(heldChild);
+      phase = "delegation";
+      const before = yield* fixture.projections.getThreadSnapshot(childId);
+      const parentBefore = yield* fixture.projections.getThreadSnapshot(successorThreadId);
+      const sequence = yield* fixture.sink.latestSequence();
+      const collision = yield* orchestrator
+        .dispatch({
+          type: "delegated_task.request",
+          commandId,
+          parentThreadId: successorThreadId,
+          parentRunId: run.id,
+          parentNodeId: run.rootNodeId!,
+          task: "Work",
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          completionWake: "always",
+          workspaceStrategy: { type: "root" },
+          createdBy: "agent",
+          creationSource: "mcp",
+        })
+        .pipe(Effect.exit);
+      const after = yield* fixture.projections.getThreadSnapshot(childId);
+      const parentAfter = yield* fixture.projections.getThreadSnapshot(successorThreadId);
+      const sequenceAfter = yield* fixture.sink.latestSequence();
+      phase = "followup";
+      const followup = yield* Effect.forkChild(
+        orchestrator.dispatch({
+          type: "message.dispatch",
+          commandId: CommandId.make("command:transition:followup"),
+          threadId: childId,
+          messageId: MessageId.make("message:transition:followup"),
+          text: "Continue",
+          attachments: [],
+          dispatchMode: { type: "defer_start" },
+          createdBy: "user",
+          creationSource: "web",
+        }),
+      );
+      yield* Deferred.await(followupTriedChild);
+      phase = "released";
+      yield* Deferred.succeed(releaseTransition, undefined);
+      yield* Deferred.await(transitionTriedParent);
+      if (followupHeldParent) {
+        // Both acquisitions were observed while their opposite locks were held.
+        yield* Fiber.interrupt(transition);
+        yield* Fiber.interrupt(followup);
+        assert.fail("Identity replacement allowed the parent/child command-lock cycle");
+      }
+      const transitioned = yield* Fiber.join(transition);
+      assert.equal(transitioned.status, "deferred");
+      yield* Fiber.join(followup);
+      assert.isTrue(Exit.isFailure(collision));
+      if (Exit.isFailure(collision))
+        assert.include(Cause.pretty(collision.cause), "This thread identity is already in use.");
+      assert.deepEqual(after, before);
+      assert.deepEqual(parentAfter, parentBefore);
+      assert.equal(sequenceAfter, sequence);
+      assert.equal(
+        (yield* fixture.sql`SELECT * FROM orchestration_v2_command_receipts WHERE command_id = ${commandId}`)
+          .length,
+        0,
+      );
+      assert.equal(
+        (yield* fixture.sql`SELECT * FROM orchestration_v2_effect_outbox WHERE command_id = ${commandId}`)
+          .length,
+        0,
+      );
+      assert.equal(
+        (yield* fixture.sql`SELECT * FROM orchestration_events WHERE command_id = ${commandId}`)
+          .length,
+        0,
+      );
+    }).pipe(Effect.provide(Layer.mergeAll(testLayer(database), runtime, IdAllocator.layer)));
+  },
+);
 
 it.effect.each(["missing", "stale", "wrong", "current"] as const)(
   "requires a current form revision after transition (%s)",

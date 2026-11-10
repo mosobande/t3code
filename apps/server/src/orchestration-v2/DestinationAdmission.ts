@@ -12,6 +12,15 @@ class RetiredDestinationError extends Schema.TaggedError<RetiredDestinationError
   }
 }
 
+class ThreadIdentityAlreadyExistsError extends Schema.TaggedError<ThreadIdentityAlreadyExistsError>()(
+  "ThreadIdentityAlreadyExistsError",
+  { threadId: ThreadId },
+) {
+  override get message(): string {
+    return "This thread identity is already in use.";
+  }
+}
+
 export const assertDestinationOpen = Effect.fn("DestinationAdmission.assertOpen")(function* (
   sql: SqlClient.SqlClient,
   threadId: ThreadId,
@@ -57,7 +66,18 @@ export const assertEventsAllowed = Effect.fn("DestinationAdmission.assertEventsA
   events: ReadonlyArray<OrchestrationV2DomainEvent>,
 ) {
   const checked = new Set<ThreadId>();
+  const created = new Set<ThreadId>();
   for (const event of events) {
+    if (event.type === "thread.created") {
+      const threadId = event.payload.id;
+      // Tombstones keep their identity; replacing lineage can invert the command lock order.
+      const occupied = yield* sql`SELECT thread_id FROM orchestration_v2_projection_threads
+        WHERE thread_id = ${threadId} LIMIT 1`;
+      if (created.has(threadId) || occupied.length > 0) {
+        return yield* new ThreadIdentityAlreadyExistsError({ threadId });
+      }
+      created.add(threadId);
+    }
     if (!allowsRetiredEvent(event) && !checked.has(event.threadId)) {
       yield* assertDestinationOpen(sql, event.threadId);
       checked.add(event.threadId);
