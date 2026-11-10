@@ -184,6 +184,7 @@ export const layer = Layer.effect(
             AND deleted_at IS NULL AND archived_at IS NULL
             AND json_extract(payload_json, '$.lineage.parentThreadId') IS NULL
             AND json_extract(payload_json, '$.lineage.relationshipToParent') IS NULL
+            AND json_extract(payload_json, '$.delegatedFrom') IS NULL
             AND COALESCE(json_extract(payload_json, '$.lineage.sideChat'), 0) = 0`;
         // Lineage is immutable; missing identities may become side chats with a different lock order.
         if (endpoints.length !== 2)
@@ -226,6 +227,8 @@ export const layer = Layer.effect(
               source.projection.thread.lineage.relationshipToParent !== null ||
               successor.projection.thread.lineage.parentThreadId !== null ||
               successor.projection.thread.lineage.relationshipToParent !== null ||
+              source.projection.thread.delegatedFrom != null ||
+              successor.projection.thread.delegatedFrom != null ||
               isProviderNativeSubagentThread(source.projection.thread) ||
               isProviderNativeSubagentThread(successor.projection.thread) ||
               source.projection.thread.lineage.sideChat === true ||

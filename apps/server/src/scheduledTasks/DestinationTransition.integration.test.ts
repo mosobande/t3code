@@ -6,6 +6,7 @@ import {
   type CommitDestinationTransitionInput,
   type ScheduledTaskUpsertInput,
   CommandId,
+  EnvironmentId,
   EventId,
   MessageId,
   NodeId,
@@ -626,9 +627,17 @@ it.effect.each([
 
 it.effect.each(
   (["source", "successor"] as const).flatMap((endpoint) =>
-    (["missing", "deleted", "ordinary-fork", "side-chat", "child", "provider-child"] as const).map(
-      (invalid) => ({ endpoint, invalid }),
-    ),
+    (
+      [
+        "missing",
+        "deleted",
+        "ordinary-fork",
+        "side-chat",
+        "child",
+        "provider-child",
+        "remote-child",
+      ] as const
+    ).map((invalid) => ({ endpoint, invalid })),
   ),
 )("rejects $invalid $endpoint before requesting held command locks", ({ endpoint, invalid }) =>
   Effect.gen(function* () {
@@ -668,8 +677,17 @@ it.effect.each(
             ...thread,
             ...(invalid === "deleted" ? { deletedAt: fixture.now } : {}),
             ...(invalid === "provider-child" ? { creationSource: "provider" } : {}),
+            ...(invalid === "remote-child"
+              ? {
+                  delegatedFrom: {
+                    environmentId: EnvironmentId.make("environment:remote-parent"),
+                    threadId: parentThreadId,
+                    title: "Remote parent",
+                  },
+                }
+              : {}),
             lineage:
-              invalid === "deleted"
+              invalid === "deleted" || invalid === "remote-child"
                 ? thread.lineage
                 : {
                     parentThreadId,
