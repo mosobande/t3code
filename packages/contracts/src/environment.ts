@@ -93,6 +93,7 @@ export const ExecutionEnvironmentCapabilities = Schema.Struct({
   inlineMessageContext: Schema.optionalKey(Schema.Boolean),
   requiredWorktreeBootstrap: Schema.optionalKey(Schema.Boolean),
   threadSettlement: Schema.optionalKey(Schema.Boolean),
+  /** Version 1 accepts live root endpoints only; ordinary forks, side chats and children are ineligible. */
   threadDestinationTransitions: Schema.optionalKey(Schema.Literal(1)),
   threadAutoSettlement: Schema.optionalKey(Schema.Boolean),
   storageCleanup: Schema.optionalKey(Schema.Boolean),

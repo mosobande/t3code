@@ -624,68 +624,80 @@ it.effect.each([
     }),
 );
 
-it.effect.each([
-  { endpoint: "source", invalid: "side-chat" },
-  { endpoint: "successor", invalid: "side-chat" },
-  { endpoint: "source", invalid: "missing" },
-  { endpoint: "successor", invalid: "missing" },
-] as const)(
-  "rejects $invalid $endpoint before requesting held command locks",
-  ({ endpoint, invalid }) =>
-    Effect.gen(function* () {
-      const threadId =
-        invalid === "missing"
-          ? ThreadId.make(`thread:transition:absent-${endpoint}`)
-          : endpoint === "source"
-            ? sourceThreadId
-            : successorThreadId;
-      const executor = yield* KeyedLock.make<ThreadId>();
-      const attempted = yield* Deferred.make<void>();
-      const held = yield* Deferred.make<void>();
-      const release = yield* Deferred.make<void>();
-      const commands = Layer.succeed(ThreadCommandExecutor.ThreadCommandExecutor, {
-        ...executor,
-        withLock: (key, work) =>
-          Deferred.succeed(attempted, undefined).pipe(Effect.andThen(executor.withLock(key, work))),
-      });
-      const holding = yield* Effect.forkChild(
-        executor.withLock(
+it.effect.each(
+  (["source", "successor"] as const).flatMap((endpoint) =>
+    (["missing", "deleted", "ordinary-fork", "side-chat", "child", "provider-child"] as const).map(
+      (invalid) => ({ endpoint, invalid }),
+    ),
+  ),
+)("rejects $invalid $endpoint before requesting held command locks", ({ endpoint, invalid }) =>
+  Effect.gen(function* () {
+    const threadId =
+      invalid === "missing"
+        ? ThreadId.make(`thread:transition:absent-${endpoint}`)
+        : endpoint === "source"
+          ? sourceThreadId
+          : successorThreadId;
+    const executor = yield* KeyedLock.make<ThreadId>();
+    const attempted = yield* Deferred.make<void>();
+    const held = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    const commands = Layer.succeed(ThreadCommandExecutor.ThreadCommandExecutor, {
+      ...executor,
+      withLock: (key, work) =>
+        Deferred.succeed(attempted, undefined).pipe(Effect.andThen(executor.withLock(key, work))),
+    });
+    const holding = yield* Effect.forkChild(
+      executor.withLock(
+        threadId,
+        Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))),
+      ),
+    );
+    yield* Deferred.await(held);
+    yield* Effect.gen(function* () {
+      const fixture = yield* seed();
+      if (invalid !== "missing") {
+        const thread = yield* fixture.projections.getThread(threadId);
+        const parentThreadId = threadId === sourceThreadId ? successorThreadId : sourceThreadId;
+        yield* fixture.append({
+          id: fixture.eventId(),
           threadId,
-          Deferred.succeed(held, undefined).pipe(Effect.andThen(Deferred.await(release))),
+          type: invalid === "deleted" ? "thread.deleted" : "thread.metadata-updated",
+          occurredAt: fixture.now,
+          payload: {
+            ...thread,
+            ...(invalid === "deleted" ? { deletedAt: fixture.now } : {}),
+            ...(invalid === "provider-child" ? { creationSource: "provider" } : {}),
+            lineage:
+              invalid === "deleted"
+                ? thread.lineage
+                : {
+                    parentThreadId,
+                    relationshipToParent:
+                      invalid === "child" || invalid === "provider-child" ? "subagent" : "fork",
+                    rootThreadId: parentThreadId,
+                    ...(invalid === "side-chat" ? { sideChat: true } : {}),
+                  },
+          },
+        });
+      }
+      const service = yield* DestinationTransitionService.DestinationTransitionService;
+      const input = {
+        ...(yield* fixture.input()),
+        ...(endpoint === "source" ? { sourceThreadId: threadId } : { successorThreadId: threadId }),
+      };
+      const result = yield* Effect.raceFirst(
+        service.commit(input),
+        Deferred.await(attempted).pipe(
+          Effect.andThen(Effect.die("Invalid transition endpoint requested a command lock")),
         ),
       );
-      yield* Deferred.await(held);
-      yield* Effect.gen(function* () {
-        const fixture = yield* seed();
-        if (invalid === "side-chat") {
-          const thread = yield* fixture.projections.getThread(threadId);
-          yield* fixture.append({
-            id: fixture.eventId(),
-            threadId,
-            type: "thread.metadata-updated",
-            occurredAt: fixture.now,
-            payload: { ...thread, lineage: { ...thread.lineage, sideChat: true } },
-          });
-        }
-        const service = yield* DestinationTransitionService.DestinationTransitionService;
-        const input = {
-          ...(yield* fixture.input()),
-          ...(endpoint === "source"
-            ? { sourceThreadId: threadId }
-            : { successorThreadId: threadId }),
-        };
-        const result = yield* Effect.raceFirst(
-          service.commit(input),
-          Deferred.await(attempted).pipe(
-            Effect.andThen(Effect.die("Invalid transition endpoint requested a command lock")),
-          ),
-        );
-        assert.deepEqual(result, { status: "conflict", reason: "invalid_threads" });
-        assert.equal((yield* fixture.sql`SELECT * FROM retired_thread_destinations`).length, 0);
-      }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory, undefined, commands)));
-      yield* Deferred.succeed(release, undefined);
-      yield* Fiber.join(holding);
-    }),
+      assert.deepEqual(result, { status: "conflict", reason: "invalid_threads" });
+      assert.equal((yield* fixture.sql`SELECT * FROM retired_thread_destinations`).length, 0);
+    }).pipe(Effect.provide(testLayer(SqlitePersistence.layerMemory, undefined, commands)));
+    yield* Deferred.succeed(release, undefined);
+    yield* Fiber.join(holding);
+  }),
 );
 
 it.effect(

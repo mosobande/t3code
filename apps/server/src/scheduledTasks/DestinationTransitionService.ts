@@ -222,6 +222,10 @@ export const layer = Layer.effect(
             const source = yield* projections.getThreadSnapshot(input.sourceThreadId);
             const successor = yield* projections.getThreadSnapshot(input.successorThreadId);
             if (
+              source.projection.thread.lineage.parentThreadId !== null ||
+              source.projection.thread.lineage.relationshipToParent !== null ||
+              successor.projection.thread.lineage.parentThreadId !== null ||
+              successor.projection.thread.lineage.relationshipToParent !== null ||
               isProviderNativeSubagentThread(source.projection.thread) ||
               isProviderNativeSubagentThread(successor.projection.thread) ||
               source.projection.thread.lineage.sideChat === true ||
